@@ -1397,6 +1397,7 @@ function About() {
 
 // ─── Contact ──────────────────────────────────────────────────────────────────
 function Contact() {
+  const { language } = useLanguage();
   const [form, setForm] = useState({ name: "", email: "", message: "", website: "" });
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -1409,7 +1410,7 @@ function Contact() {
       const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, language }),
       });
       const result = await response.json().catch(() => null);
       if (!response.ok || !result?.ok) throw new Error("Message delivery failed");
@@ -1494,13 +1495,25 @@ function Contact() {
           {/* Form */}
           <div className="p-6 md:p-10" style={{ border: "1px solid #303844", background: "linear-gradient(145deg, rgba(21,24,31,0.9), rgba(10,11,13,0.88))", boxShadow: "20px 20px 0 rgba(91,110,245,0.06)" }}>
             {status === "sent" ? (
-              <div className="p-10 flex flex-col items-start justify-center" role="status" aria-live="polite" style={{ border: "1px solid rgba(91,110,245,0.2)", minHeight: "360px" }}>
-                <div className="w-2 h-2 rounded-full mb-6" style={{ background: "#5b6ef5" }} />
-                <h3 className="font-sans font-bold text-2xl mb-4 tracking-tight" style={{ letterSpacing: "-0.03em", color: "#f5f5f5" }}>
-                  {t("Wiadomość wysłana.")}
-                </h3>
-                <p className="text-sm mb-2" style={{ color: "#8b8f98" }}>{t("Dziękuję za kontakt.")}</p>
-                <p className="text-sm" style={{ color: "#8b8f98" }}>{t("Odpowiem w ciągu 1–2 dni roboczych.")}</p>
+              <div className="relative isolate min-h-[360px] overflow-hidden p-8 md:p-10 flex flex-col justify-center" role="status" aria-live="polite" style={{ border: "1px solid rgba(91,110,245,0.28)", background: "radial-gradient(circle at 88% 12%, rgba(91,110,245,0.16), transparent 36%), linear-gradient(145deg, rgba(30,35,58,0.68), rgba(10,11,13,0.82))" }}>
+                <div className="absolute -right-16 -top-20 h-52 w-52 rounded-full opacity-60" aria-hidden="true" style={{ border: "1px solid rgba(147,160,255,0.22)", boxShadow: "0 0 0 24px rgba(91,110,245,0.035), 0 0 0 48px rgba(91,110,245,0.02)" }} />
+                <div className="relative z-10 max-w-md">
+                  <div className="mb-7 flex h-12 w-12 items-center justify-center rounded-full" style={{ border: "1px solid rgba(147,160,255,0.54)", background: "rgba(91,110,245,0.14)", boxShadow: "0 0 30px rgba(91,110,245,0.18)" }}>
+                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path d="m5 12 4.2 4.2L19.5 6" stroke="#d9ddff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                  <p className="mb-4 font-mono text-[10px] tracking-[0.2em] uppercase" style={{ color: "#93a0ff" }}>{t("Wiadomość dotarła")}</p>
+                  <h3 className="font-sans font-bold text-3xl md:text-4xl mb-4 tracking-tight" style={{ letterSpacing: "-0.04em", color: "#f5f5f5" }}>
+                    {t("Dziękuję za kontakt.")}
+                  </h3>
+                  <p className="text-sm leading-relaxed" style={{ color: "#b5bbc6" }}>{t("Odpowiem w ciągu 1–2 dni roboczych.")}</p>
+                  <div className="my-7 h-px w-full" style={{ background: "linear-gradient(90deg, rgba(147,160,255,0.42), rgba(147,160,255,0))" }} />
+                  <p className="mb-6 text-xs leading-relaxed" style={{ color: "#8b8f98" }}>{t("Możesz spokojnie zamknąć tę stronę — wiadomość jest już u mnie.")}</p>
+                  <button type="button" onClick={() => setStatus("idle")} className="liquid-button liquid-button--secondary inline-flex w-fit items-center gap-2 px-5 py-3 font-mono text-[9px] tracking-[0.16em] uppercase" style={{ color: "#d9ddff" }}>
+                    <span aria-hidden="true">+</span>{t("Wyślij kolejną wiadomość")}
+                  </button>
+                </div>
               </div>
             ) : (
             <form onSubmit={handleSubmit} className="space-y-4">

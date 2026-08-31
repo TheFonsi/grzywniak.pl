@@ -89,6 +89,7 @@ $email = contactValue($payload, 'email', 254);
 $message = trim((string)($payload['message'] ?? ''));
 $message = mb_substr($message, 0, 5000);
 $honeypot = contactValue($payload, 'website', 254);
+$language = contactValue($payload, 'language', 2);
 
 if ($honeypot !== '') {
     http_response_code(200);
@@ -136,6 +137,28 @@ if (!mail($recipient, $subject, $body, implode("\r\n", $headers), '-f' . $sender
     http_response_code(500);
     echo json_encode(['ok' => false, 'message' => 'Nie udało się wysłać wiadomości. Spróbuj ponownie później.']);
     exit;
+}
+
+$confirmationIsEnglish = $language === 'en';
+$confirmationSubject = $confirmationIsEnglish
+    ? 'We received your message — Dawid Grzywniak'
+    : 'Potwierdzenie kontaktu — Dawid Grzywniak';
+$confirmationBody = $confirmationIsEnglish
+    ? "Hello {$name},\n\nThank you for your message. I have received it and will get back to you as soon as possible, usually within 1–2 business days.\n\nBest regards,\nDawid Grzywniak\nhttps://grzywniak.pl\n"
+    : "Cześć {$name},\n\nDziękuję za wiadomość. Dotarła do mnie i wrócę z odpowiedzią tak szybko, jak to możliwe — zwykle w ciągu 1–2 dni roboczych.\n\nPozdrawiam,\nDawid Grzywniak\nhttps://grzywniak.pl\n";
+$confirmationHeaders = [
+    "From: Dawid Grzywniak <{$sender}>",
+    "Reply-To: {$sender}",
+    'MIME-Version: 1.0',
+    'Content-Type: text/plain; charset=UTF-8',
+    'Auto-Submitted: auto-replied',
+    'X-Auto-Response-Suppress: All',
+];
+
+// Confirmation is a convenience for the visitor. Do not report a failed
+// confirmation as a failed enquiry: the main message is already delivered.
+if (!mail($email, $confirmationSubject, $confirmationBody, implode("\r\n", $confirmationHeaders), '-f' . $sender)) {
+    error_log('Contact form: confirmation mail() rejected for ' . $email);
 }
 
 echo json_encode(['ok' => true]);
