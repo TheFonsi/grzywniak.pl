@@ -53,3 +53,47 @@ jobs:
           path: dist
           if-no-files-found: error
           retention-days: 7
+
+  deploy:
+    name: Deploy to SFTP
+    needs: quality
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.DEPLOY_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      SFTP_SERVER: ${{ secrets.SFTP_SERVER }}
+      SFTP_USERNAME: ${{ secrets.SFTP_USERNAME }}
+      SFTP_PASSWORD: ${{ secrets.SFTP_PASSWORD }}
+      SFTP_SERVER_DIR: ${{ secrets.SFTP_SERVER_DIR }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Download production bundle
+        uses: actions/download-artifact@v5
+        with:
+          name: production-site
+          path: dist
+
+      - name: Deploy website bundle
+        uses: wlixcc/SFTP-Deploy-Action@v1.2.6
+        with:
+          server: ${{ env.SFTP_SERVER }}
+          username: ${{ env.SFTP_USERNAME }}
+          password: ${{ env.SFTP_PASSWORD }}
+          port: 22
+          sftp_only: true
+          local_path: ./dist/*
+          remote_path: ${{ env.SFTP_SERVER_DIR }}
+
+      - name: Deploy PHP contact endpoint
+        uses: wlixcc/SFTP-Deploy-Action@v1.2.6
+        with:
+          server: ${{ env.SFTP_SERVER }}
+          username: ${{ env.SFTP_USERNAME }}
+          password: ${{ env.SFTP_PASSWORD }}
+          port: 22
+          sftp_only: true
+          local_path: ./api/contact.php
+          remote_path: ${{ env.SFTP_SERVER_DIR }}api/
