@@ -1398,7 +1398,7 @@ function About() {
 // ─── Contact ──────────────────────────────────────────────────────────────────
 function Contact() {
   const { language } = useLanguage();
-  const [form, setForm] = useState({ name: "", email: "", message: "", website: "" });
+  const [form, setForm] = useState({ name: "", email: "", phone: "", message: "", website: "" });
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -1414,7 +1414,7 @@ function Contact() {
       });
       const result = await response.json().catch(() => null);
       if (!response.ok || !result?.ok) throw new Error("Message delivery failed");
-      setForm({ name: "", email: "", message: "", website: "" });
+      setForm({ name: "", email: "", phone: "", message: "", website: "" });
       setStatus("sent");
     } catch {
       setStatus("error");
@@ -1551,6 +1551,17 @@ function Contact() {
                     id="contact-email" name="email" type="email" required maxLength={254} autoComplete="email" value={form.email}
                     onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
                     placeholder={t("Na jaki adres mam odpisać?")}
+                    style={{ ...inputStyle }}
+                    onFocus={(e) => ((e.target as HTMLInputElement).style.borderColor = "#5b6ef5")}
+                    onBlur={(e) => ((e.target as HTMLInputElement).style.borderColor = "#1a1d22")}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="contact-phone" className="block font-mono text-[9px] tracking-[0.2em] uppercase mb-2" style={{ color: "#8b8f98" }}>{t("Telefon (opcjonalnie)")}</label>
+                  <input
+                    id="contact-phone" name="phone" type="tel" inputMode="tel" maxLength={40} autoComplete="tel" value={form.phone}
+                    onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                    placeholder={t("Np. +48 600 000 000")}
                     style={{ ...inputStyle }}
                     onFocus={(e) => ((e.target as HTMLInputElement).style.borderColor = "#5b6ef5")}
                     onBlur={(e) => ((e.target as HTMLInputElement).style.borderColor = "#1a1d22")}

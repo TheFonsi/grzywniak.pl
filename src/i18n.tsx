@@ -163,6 +163,8 @@ const english: Record<string, string> = {
   "Imię / Firma": "Name / company",
   "Jak mam się do Ciebie zwracać?": "How should I address you?",
   "Email": "Email",
+  "Telefon (opcjonalnie)": "Phone (optional)",
+  "Np. +48 600 000 000": "e.g. +48 600 000 000",
   "Na jaki adres mam odpisać?": "Which email address should I reply to?",
   "Co chcesz osiągnąć?": "What do you want to achieve?",
   "Co dziś nie działa lub co chcesz usprawnić?": "What is not working today, or what would you like to improve?",

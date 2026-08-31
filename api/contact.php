@@ -86,6 +86,7 @@ function contactRateLimit(string $ip): bool
 
 $name = contactValue($payload, 'name', 120);
 $email = contactValue($payload, 'email', 254);
+$phone = contactValue($payload, 'phone', 40);
 $message = trim((string)($payload['message'] ?? ''));
 $message = mb_substr($message, 0, 5000);
 $honeypot = contactValue($payload, 'website', 254);
@@ -100,6 +101,12 @@ if ($honeypot !== '') {
 if ($name === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || mb_strlen($message) < 10) {
     http_response_code(422);
     echo json_encode(['ok' => false, 'message' => 'Uzupełnij poprawnie wszystkie pola formularza.']);
+    exit;
+}
+
+if ($phone !== '' && !preg_match('/^[0-9+(). -]+$/', $phone)) {
+    http_response_code(422);
+    echo json_encode(['ok' => false, 'message' => 'Podaj poprawny numer telefonu lub pozostaw to pole puste.']);
     exit;
 }
 
@@ -121,7 +128,8 @@ if (!filter_var($sender, FILTER_VALIDATE_EMAIL)) {
 
 $subject = 'Nowe zapytanie ze strony — ' . $name;
 $body = "Imię / firma: {$name}\n";
-$body .= "E-mail do odpowiedzi: {$email}\n\n";
+$body .= "E-mail do odpowiedzi: {$email}\n";
+$body .= 'Telefon: ' . ($phone !== '' ? $phone : 'Nie podano') . "\n\n";
 $body .= "Wiadomość:\n{$message}\n";
 $headers = [
     "From: Formularz strony <{$sender}>",
