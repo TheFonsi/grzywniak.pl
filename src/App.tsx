@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { I18nProvider, languages, t, useLanguage } from "./i18n";
 import aboutPortrait from "./assets/about-consultant.jpg";
 import firstConversation from "./assets/first-conversation.jpg";
@@ -19,6 +19,8 @@ import workflowPlanningRetina from "./assets/responsive/retina/workflow-planning
 import serverConfigurationRetina from "./assets/responsive/retina/server-configuration.webp";
 import firstConversationRetina from "./assets/responsive/retina/first-conversation.webp";
 import contactDeskRetina from "./assets/responsive/retina/contact-desk.webp";
+
+const HeroCanvas = lazy(() => import("./HeroCanvas"));
 
 function useMobilePerformanceProfile() {
   const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches);
@@ -307,7 +309,7 @@ function Nav() {
 }
 
 // ─── Hero Canvas ─────────────────────────────────────────────────────────────
-function HeroCanvas() {
+/* function HeroCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animRef = useRef<number>(0);
   const activeNodeRef = useRef(-1);
@@ -477,7 +479,7 @@ function HeroCanvas() {
       </div>
     </div>
   );
-}
+} */
 
 // Legacy WebGL experiments retained in source history; the production visual below is intentionally CSS-based.
 /*
@@ -768,7 +770,11 @@ function Hero() {
 
           {/* Right: Canvas */}
           <div className="relative hidden md:block overflow-hidden" style={{ height: "650px" }}>
-            {!isMobile && <HeroCanvas />}
+            {!isMobile && (
+              <Suspense fallback={null}>
+                <HeroCanvas />
+              </Suspense>
+            )}
             <div className="absolute bottom-4 right-4 font-mono text-[9px] tracking-widest uppercase" style={{ color: "#7d8795" }}>
               {t("Architektura rozwiązania")}
             </div>
@@ -1391,20 +1397,23 @@ function About() {
 
 // ─── Contact ──────────────────────────────────────────────────────────────────
 function Contact() {
-  const [form, setForm] = useState({ name: "", email: "", message: "" });
+  const [form, setForm] = useState({ name: "", email: "", message: "", website: "" });
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setStatus("sending");
     try {
-      const response = await fetch("/api/contact.php", {
+      const endpoint = import.meta.env.PROD
+        ? "https://api.grzywniak.pl/contact.php"
+        : "/api/contact.php";
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
       const result = await response.json().catch(() => null);
       if (!response.ok || !result?.ok) throw new Error("Message delivery failed");
-      setForm({ name: "", email: "", message: "" });
+      setForm({ name: "", email: "", message: "", website: "" });
       setStatus("sent");
     } catch {
       setStatus("error");
@@ -1494,7 +1503,19 @@ function Contact() {
                 <p className="text-sm" style={{ color: "#8b8f98" }}>{t("Odpowiem w ciągu 1–2 dni roboczych.")}</p>
               </div>
             ) : (
-              <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div aria-hidden="true" className="absolute -left-[10000px] h-px w-px overflow-hidden">
+                <label htmlFor="contact-website">Website</label>
+                <input
+                  id="contact-website"
+                  name="website"
+                  type="text"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  value={form.website}
+                  onChange={(e) => setForm((current) => ({ ...current, website: e.target.value }))}
+                />
+              </div>
                 {status === "error" && (
                   <p className="p-4 text-sm" role="alert" style={{ color: "#ffb4b4", border: "1px solid rgba(255, 120, 120, 0.35)", background: "rgba(255, 120, 120, 0.06)" }}>
                     {t("Nie udało się wysłać wiadomości. Spróbuj ponownie lub napisz bezpośrednio na dawid@grzywniak.pl.")}

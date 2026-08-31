@@ -87,8 +87,10 @@ jobs:
           ssh-keygen -lf ~/.ssh/id_ed25519.pub
           ssh-keyscan -H -p 22 "$DEPLOY_HOST" >> ~/.ssh/known_hosts
 
-      - name: Set deployment path
-        run: echo "DEPLOY_PATH=/usr/home/$DEPLOY_USER/domains/$DEPLOY_DOMAIN/public_nodejs/public/" >> "$GITHUB_ENV"
+      - name: Set deployment paths
+        run: |
+          echo "DEPLOY_PATH=/usr/home/$DEPLOY_USER/domains/$DEPLOY_DOMAIN/public_nodejs/public/" >> "$GITHUB_ENV"
+          echo "API_DEPLOY_PATH=/usr/home/$DEPLOY_USER/domains/api.$DEPLOY_DOMAIN/public_html/" >> "$GITHUB_ENV"
 
       - name: Deploy website bundle
         run: |
@@ -98,7 +100,7 @@ jobs:
       - name: Deploy contact endpoint
         run: |
           set -euo pipefail
-          rsync -az ./api/ "$DEPLOY_USER@$DEPLOY_HOST:${DEPLOY_PATH}api/"
+          rsync -az --delete ./api/ "$DEPLOY_USER@$DEPLOY_HOST:${API_DEPLOY_PATH}"
 
       - name: Restart website process
         run: ssh "$DEPLOY_USER@$DEPLOY_HOST" "devil www restart $DEPLOY_DOMAIN"
