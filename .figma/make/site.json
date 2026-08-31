@@ -1,0 +1,12 @@
+{
+  "title": "Dawid Grzywniak — strony, aplikacje i automatyzacje dla firm",
+  "description": "Tworzę strony internetowe, aplikacje, systemy i automatyzacje dopasowane do potrzeb Twojej firmy — od pomysłu po wdrożenie.",
+  "language": "pl",
+  "robots": {
+    "index": true
+  },
+  "accessibility": {
+    "addBypassLinks": true,
+    "ignoreReducedMotion": false
+  }
+}

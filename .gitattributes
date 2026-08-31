@@ -1,0 +1,24 @@
+# Store text files consistently, regardless of the contributor's operating system.
+* text=auto eol=lf
+
+# Windows command scripts need CRLF to remain directly executable.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Do not attempt text conversion or diffing for binary assets.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.svg text eol=lf
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.pdf binary
+
+# Generated bundles should never be committed; retain useful diffs for source files.
+*.min.js -diff
