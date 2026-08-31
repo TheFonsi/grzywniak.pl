@@ -111,7 +111,7 @@ if (!contactRateLimit($ip)) {
 }
 
 $recipient = getenv('CONTACT_TO') ?: 'dawid@grzywniak.pl';
-$sender = getenv('CONTACT_FROM') ?: 'noreply@grzywniak.pl';
+$sender = getenv('CONTACT_FROM') ?: 'dawid@grzywniak.pl';
 if (!filter_var($sender, FILTER_VALIDATE_EMAIL)) {
     http_response_code(500);
     echo json_encode(['ok' => false, 'message' => 'Brakuje konfiguracji nadawcy wiadomości.']);
