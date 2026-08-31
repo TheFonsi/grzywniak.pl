@@ -1605,7 +1605,7 @@ function Contact() {
 // ─── Return to top & footer ──────────────────────────────────────────────────
 function ReturnToTop() {
   return (
-    <section className="relative px-6 md:px-12 pb-10 md:pb-12" style={{ background: "#070809" }}>
+    <section className="relative px-6 md:px-12 pb-10 md:pb-12" style={{ background: "#0a0b0d" }}>
       <div className="max-w-[1400px] mx-auto flex justify-center">
         <div className="return-to-top-wrap">
           <a href="#" className="liquid-button liquid-button--secondary inline-flex items-center gap-3 px-5 py-3 font-mono text-[9px] tracking-[0.18em] uppercase" style={{ color: "#c8ceff" }}>
