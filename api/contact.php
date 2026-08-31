@@ -129,7 +129,10 @@ $headers = [
     'Content-Type: text/plain; charset=UTF-8',
 ];
 
-if (!mail($recipient, $subject, $body, implode("\r\n", $headers))) {
+// MyDevil validates the envelope sender against the domain's SPF policy.
+// Keep it on our verified domain; the visitor's address belongs only in Reply-To.
+if (!mail($recipient, $subject, $body, implode("\r\n", $headers), '-f' . $sender)) {
+    error_log('Contact form: mail() rejected the message for ' . $recipient);
     http_response_code(500);
     echo json_encode(['ok' => false, 'message' => 'Nie udało się wysłać wiadomości. Spróbuj ponownie później.']);
     exit;
