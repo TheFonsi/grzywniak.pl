@@ -87,6 +87,7 @@ function contactRateLimit(string $ip): bool
 $name = contactValue($payload, 'name', 120);
 $email = contactValue($payload, 'email', 254);
 $phone = contactValue($payload, 'phone', 40);
+$budget = contactValue($payload, 'budget', 40);
 $message = trim((string)($payload['message'] ?? ''));
 $message = mb_substr($message, 0, 5000);
 $honeypot = contactValue($payload, 'website', 254);
@@ -130,6 +131,7 @@ $subject = 'Nowe zapytanie ze strony — ' . $name;
 $body = "Imię / firma: {$name}\n";
 $body .= "E-mail do odpowiedzi: {$email}\n";
 $body .= 'Telefon: ' . ($phone !== '' ? $phone : 'Nie podano') . "\n\n";
+$body .= 'Orientacyjny budżet: ' . ($budget !== '' ? $budget : 'Nie podano') . "\n\n";
 $body .= "Wiadomość:\n{$message}\n";
 $headers = [
     "From: Formularz strony <{$sender}>",

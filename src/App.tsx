@@ -733,11 +733,11 @@ function Hero() {
             </h1>
 
             <p className="text-base leading-relaxed mb-4 max-w-md" style={{ color: "#8b8f98", lineHeight: 1.75 }}>
-              {t("Pomagam firmom rozwiązywać problemy za pomocą technologii. Nie musisz wiedzieć, jak to zbudować.")}
+              {t("Pomagam firmom projektować, budować i utrzymywać serwisy, aplikacje, integracje oraz automatyzacje. Ty opisujesz cel — ja prowadzę techniczną całość.")}
             </p>
 
             <p className="font-mono text-[10px] tracking-widest mb-10" style={{ color: "#7d8795" }}>
-              {t("Ty znasz swój biznes. Ja zajmę się technologią.")}
+              {t("Ty znasz swój biznes. Ja zajmę się technologią, wdrożeniem i utrzymaniem.")}
             </p>
 
             <div className="flex flex-wrap gap-4">
@@ -752,14 +752,14 @@ function Hero() {
                 href="#capabilities"
                 className="liquid-button liquid-button--secondary px-7 py-3.5 text-sm font-sans"
               >
-                {t("Zobacz, w czym mogę pomóc")}
+                {t("Zobacz ofertę")}
               </a>
             </div>
 
-            {/* 5-second clarity strip */}
+            {/* Subtle credibility bar — intentionally contains no unverified figures. */}
             <div className="mt-14 pt-8" style={{ borderTop: "1px solid #1a1d22" }}>
               <div className="flex flex-wrap gap-6">
-                {["Strony i aplikacje", "Systemy na miarę", "Jeden kontakt", "Od pomysłu do wdrożenia"].map((tag) => (
+                {["Development", "Integracje", "Automatyzacje", "Infrastruktura"].map((tag) => (
                   <span key={tag} className="font-mono text-[9px] tracking-[0.15em] uppercase" style={{ color: "#8b8f98" }}>
                     {t(tag)}
                   </span>
@@ -802,17 +802,17 @@ function ValueProposition() {
     {
       n: "01",
       title: "Całościowe podejście",
-      desc: "Przejmuję odpowiedzialność za cały projekt — od pierwszej rozmowy przez projekt, kod i bazę danych, aż po serwer i wdrożenie.",
+      desc: "Od analizy problemu, przez development i integracje, po wdrożenie oraz spokojne utrzymanie produkcyjne.",
     },
     {
       n: "02",
       title: "Jeden kontakt",
-      desc: "Nie musisz koordynować kilku wykonawców. Rozmawiasz z jedną osobą, która rozumie zarówno problem, jak i techniczne rozwiązanie.",
+      desc: "Bez handlowców pomiędzy Tobą a osobą, która buduje rozwiązanie. Mniej przekazywania informacji i szybsze decyzje.",
     },
     {
       n: "03",
       title: "Dopasowanie",
-      desc: "Nie wciskam gotowego rozwiązania. Najpierw poznaję problem, potem proponuję to, co rzeczywiście ma sens.",
+      desc: "Najpierw poznaję proces, obecne systemy i ograniczenia. Dopiero potem proponuję rozwiązanie, które ma sens biznesowo.",
     },
   ];
 
@@ -884,12 +884,12 @@ function ValueProposition() {
 
 // ─── Problem First ────────────────────────────────────────────────────────────
 const problems = [
-  { text: "Twoja firma traci czas na ręczne zadania?", cta: "Odzyskaj czas →" },
-  { text: "Potrzebujesz systemu, który uporządkuje pracę?", cta: "Uporządkuj pracę →" },
-  { text: "Masz pomysł na aplikację, ale nie wiesz od czego zacząć?", cta: "Rozwiń pomysł →" },
-  { text: "Twoja obecna strona nie spełnia swojej roli?", cta: "Popraw stronę →" },
-  { text: "Kilka systemów nie potrafi ze sobą współpracować?", cta: "Połącz narzędzia →" },
-  { text: "Potrzebujesz rozwiązania stworzonego dokładnie pod Twój biznes?", cta: "Poznaj możliwości →" },
+  { text: "Serwis działa wolno albo niestabilnie?", cta: "Uporządkujmy to →" },
+  { text: "Systemy nie wymieniają między sobą danych?", cta: "Połącz narzędzia →" },
+  { text: "Zespół ręcznie wykonuje zadania, które można zautomatyzować?", cta: "Odzyskaj czas →" },
+  { text: "Potrzebujesz aplikacji, ale nie wiesz, jak ją zaprojektować?", cta: "Zaplanujmy ją →" },
+  { text: "Istniejący system trzeba rozwinąć albo uporządkować?", cta: "Sprawdźmy zakres →" },
+  { text: "Projekt został niedokończony i potrzebuje odpowiedzialnego przejęcia?", cta: "Porozmawiajmy →" },
 ];
 
 function ProblemFirst() {
@@ -930,6 +930,9 @@ function ProblemFirst() {
           </article>
 
           <div className="space-y-0">
+            <p className="mb-6 max-w-lg text-sm leading-relaxed" style={{ color: "#8b8f98" }}>
+              {t("Nie musisz znać technologii ani mieć gotowego rozwiązania. Wystarczy, że opiszesz problem lub cel biznesowy.")}
+            </p>
             {problems.map((problem, i) => (
               <div
                 key={i}
@@ -1065,10 +1068,10 @@ function DontKnowSection() {
 
 // ─── Capabilities ─────────────────────────────────────────────────────────────
 const caps = [
-  { n: "01", title: "Strony internetowe", desc: "Strony firmowe, sklepy i landing pages, które jasno pokazują ofertę i zachęcają do kontaktu.", result: "Efekt: większa widoczność i więcej zapytań" },
-  { n: "02", title: "Aplikacje dla firmy", desc: "Panele klienta, rezerwacje i narzędzia do codziennej pracy — dokładnie dopasowane do Twojego sposobu działania.", result: "Efekt: sprawniejsza obsługa klientów i zespołu" },
-  { n: "03", title: "Systemy i integracje", desc: "Łączę narzędzia, których już używasz, aby informacje przepływały bez ręcznego przepisywania.", result: "Efekt: mniej błędów i pełniejszy obraz firmy" },
-  { n: "04", title: "Optymalizacja procesów", desc: "Przyglądam się, jak dziś pracuje firma, porządkuję informacje i wskazuję, co można uprościć.", result: "Efekt: mniej chaosu, szybsza praca i lepsze decyzje" },
+  { n: "01", title: "Serwisy i platformy webowe", desc: "Serwisy firmowe i platformy, które porządkują ofertę, obsługę klienta oraz proces pozyskiwania zapytań.", result: "Efekt: czytelny produkt i lepszy pierwszy kontakt" },
+  { n: "02", title: "Aplikacje dla firm", desc: "Narzędzia dopasowane do pracy zespołu: panele, procesy, rezerwacje i obsługa klienta.", result: "Efekt: sprawniejsza codzienna praca" },
+  { n: "03", title: "Systemy i integracje", desc: "Łączę istniejące narzędzia, żeby dane przepływały bez ręcznego przepisywania i rozbieżności.", result: "Efekt: mniej błędów i pełniejszy obraz firmy" },
+  { n: "04", title: "Optymalizacja serwisów", desc: "Porządkuję wolne, niestabilne lub trudne w rozwoju serwisy oraz ich krytyczne procesy.", result: "Efekt: stabilniejsza praca i mniej blokad" },
   { n: "05", title: "Serwery i konfiguracja", desc: "Konfiguruję środowisko, zabezpieczenia i monitoring, aby rozwiązanie działało stabilnie dziś i było gotowe na rozwój.", result: "Efekt: spokój i przewidywalne działanie" },
   { n: "06", title: "Automatyzacje", desc: "Eliminuję powtarzalne zadania i przekazywanie danych między narzędziami.", result: "Efekt: więcej czasu na pracę, która ma znaczenie" },
 ];
@@ -1274,12 +1277,12 @@ function StartFromProblem() {
 
 // ─── Process ──────────────────────────────────────────────────────────────────
 const steps = [
-  { n: "01", title: "ROZMOWA", desc: "Poznaję Twój cel, kontekst i to, co dziś nie działa. Bez technicznego żargonu." },
-  { n: "02", title: "PLAN", desc: "Przedstawiam prosty plan, zakres prac i kolejne kroki, zanim podejmiemy decyzję." },
-  { n: "03", title: "REALIZACJA", desc: "Tworzę rozwiązanie etapami. Masz regularny kontakt i widzisz postępy." },
-  { n: "04", title: "SPRAWDZENIE", desc: "Wspólnie upewniamy się, że wszystko działa tak, jak potrzebujesz." },
-  { n: "05", title: "WDROŻENIE", desc: "Uruchamiam gotowe rozwiązanie i dbam o bezpieczne przejście do codziennej pracy." },
-  { n: "06", title: "WSPARCIE", desc: "Po wdrożeniu nadal możesz liczyć na pomoc, rozwój i spokojną rozmowę." },
+  { n: "01", title: "ROZMAWIAMY", desc: "Opisujesz problem lub cel. Bez potrzeby przygotowywania technicznego briefu." },
+  { n: "02", title: "ANALIZUJĘ", desc: "Sprawdzam proces, istniejące systemy oraz ograniczenia, które warto uwzględnić." },
+  { n: "03", title: "PROPONUJĘ ROZWIĄZANIE", desc: "Ustalamy zakres, sposób realizacji, koszt i kolejne kroki przed rozpoczęciem prac." },
+  { n: "04", title: "BUDUJĘ", desc: "Realizuję rozwiązanie etapami, z bezpośrednim kontaktem i widocznym postępem." },
+  { n: "05", title: "WDRAŻAM", desc: "Testy, konfiguracja produkcyjna, uruchomienie i monitoring krytycznych elementów." },
+  { n: "06", title: "ROZWIJAMY", desc: "Po starcie możliwe jest dalsze utrzymanie, rozwój i spokojne porządkowanie kolejnych potrzeb." },
 ];
 
 function Process() {
@@ -1367,7 +1370,7 @@ function About() {
               {t("Jestem Dawid — developer i twórca systemów z szerokim zakresem kompetencji. Buduję rozwiązania IT od A do Z: od pierwszej rozmowy o problemie, przez projekt i kod, aż po serwer i wdrożenie produkcyjne.")}
             </p>
             <p className="text-base leading-relaxed mb-10" style={{ color: "#8b8f98", lineHeight: 1.8 }}>
-              {t("Nie musisz koordynować kilku osób ani powtarzać tej samej historii. Masz jeden kontakt i jasną odpowiedzialność za cały projekt.")}
+              {t("Nie musisz koordynować kilku osób ani powtarzać tej samej historii. Masz jeden kontakt i jasną odpowiedzialność za cały projekt — także po wdrożeniu, gdy system działa już produkcyjnie.")}
             </p>
 
             <div
@@ -1398,7 +1401,7 @@ function About() {
 // ─── Contact ──────────────────────────────────────────────────────────────────
 function Contact() {
   const { language } = useLanguage();
-  const [form, setForm] = useState({ name: "", email: "", phone: "", message: "", website: "" });
+  const [form, setForm] = useState({ name: "", email: "", phone: "", budget: "", message: "", website: "" });
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -1414,7 +1417,7 @@ function Contact() {
       });
       const result = await response.json().catch(() => null);
       if (!response.ok || !result?.ok) throw new Error("Message delivery failed");
-      setForm({ name: "", email: "", phone: "", message: "", website: "" });
+      setForm({ name: "", email: "", phone: "", budget: "", message: "", website: "" });
       setStatus("sent");
     } catch {
       setStatus("error");
@@ -1567,6 +1570,37 @@ function Contact() {
                     onBlur={(e) => ((e.target as HTMLInputElement).style.borderColor = "#1a1d22")}
                   />
                 </div>
+                <fieldset>
+                  <legend className="font-mono text-[9px] tracking-[0.2em] uppercase mb-2" style={{ color: "#8b8f98" }}>{t("Orientacyjny budżet (opcjonalnie)")}</legend>
+                  <p id="budget-help" className="text-xs mb-3" style={{ color: "#68707d" }}>{t("Pomoże mi lepiej przygotować pierwszą odpowiedź.")}</p>
+                  <div className="grid grid-cols-2 gap-2" role="group" aria-describedby="budget-help">
+                    {[
+                      "Do 1 tys. zł", "1–2 tys. zł", "2–5 tys. zł", "5–10 tys. zł",
+                      "10–20 tys. zł", "20–50 tys. zł", "50–100 tys. zł", "100 tys. zł+", "Jeszcze nie wiem",
+                    ].map((option) => {
+                      const selected = form.budget === option;
+                      return (
+                        <button
+                          key={option}
+                          type="button"
+                          aria-pressed={selected}
+                          onClick={() => setForm((f) => ({ ...f, budget: f.budget === option ? "" : option }))}
+                          className="min-h-11 px-3 text-left font-mono text-[10px] tracking-wide"
+                          style={{
+                            color: selected ? "#dce1ff" : "#8b8f98",
+                            border: `1px solid ${selected ? "rgba(112, 130, 255, 0.72)" : "#1a1d22"}`,
+                            background: selected ? "rgba(91, 110, 245, 0.14)" : "rgba(7, 8, 9, 0.44)",
+                            boxShadow: selected ? "inset 0 0 0 1px rgba(91, 110, 245, 0.12), 0 0 18px rgba(91, 110, 245, 0.08)" : "none",
+                            cursor: "pointer",
+                            transition: "color 0.2s, border-color 0.2s, background 0.2s, box-shadow 0.2s",
+                          }}
+                        >
+                          {t(option)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </fieldset>
                 <div>
                   <label htmlFor="contact-message" className="block font-mono text-[9px] tracking-[0.2em] uppercase mb-2" style={{ color: "#8b8f98" }}>
                     {t("Co chcesz osiągnąć?")}
