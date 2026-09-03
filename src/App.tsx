@@ -23,7 +23,9 @@ import contactDeskRetina from "./assets/responsive/retina/contact-desk.webp";
 const HeroCanvas = lazy(() => import("./HeroCanvas"));
 
 function useMobilePerformanceProfile() {
-  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches);
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches,
+  );
 
   useEffect(() => {
     const query = window.matchMedia("(max-width: 767px)");
@@ -68,7 +70,16 @@ function CustomCursor() {
       <div
         ref={glowRef}
         className="fixed z-[9995] pointer-events-none top-0 left-0"
-        style={{ width: 150, height: 150, opacity: 0, borderRadius: "50%", background: "radial-gradient(circle, rgba(91,110,245,0.16) 0%, rgba(91,110,245,0.06) 35%, transparent 72%)", transition: "width 0.3s ease, height 0.3s ease, opacity 0.3s ease", willChange: "transform, width, height, opacity" }}
+        style={{
+          width: 150,
+          height: 150,
+          opacity: 0,
+          borderRadius: "50%",
+          background:
+            "radial-gradient(circle, rgba(91,110,245,0.16) 0%, rgba(91,110,245,0.06) 35%, transparent 72%)",
+          transition: "width 0.3s ease, height 0.3s ease, opacity 0.3s ease",
+          willChange: "transform, width, height, opacity",
+        }}
       />
     </>
   );
@@ -84,8 +95,11 @@ function ClickFeedback() {
       if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
       const pulse = { id: id++, x: event.clientX, y: event.clientY };
-      setPulses((current) => isMobile ? [pulse] : [...current, pulse]);
-      window.setTimeout(() => setPulses((current) => current.filter((item) => item.id !== pulse.id)), isMobile ? 620 : 900);
+      setPulses((current) => (isMobile ? [pulse] : [...current, pulse]));
+      window.setTimeout(
+        () => setPulses((current) => current.filter((item) => item.id !== pulse.id)),
+        isMobile ? 620 : 900,
+      );
     };
 
     window.addEventListener("pointerdown", onPointerDown, { passive: true });
@@ -120,11 +134,22 @@ function ScrollProgress() {
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     onScroll();
-    return () => { window.removeEventListener("scroll", onScroll); cancelAnimationFrame(frame); };
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      cancelAnimationFrame(frame);
+    };
   }, []);
   return (
     <div className="fixed top-0 left-0 right-0 h-px z-[9990]">
-      <div ref={barRef} className="h-full" style={{ background: "linear-gradient(90deg, #5b6ef5, #7c8dff)", transform: "scaleX(0)", transformOrigin: "left" }} />
+      <div
+        ref={barRef}
+        className="h-full"
+        style={{
+          background: "linear-gradient(90deg, #5b6ef5, #7c8dff)",
+          transform: "scaleX(0)",
+          transformOrigin: "left",
+        }}
+      />
     </div>
   );
 }
@@ -151,7 +176,11 @@ function ScrollReveal({ children }: { children: React.ReactNode }) {
     return () => observer.disconnect();
   }, []);
 
-  return <div ref={ref} className={`scroll-reveal${visible ? " is-visible" : ""}`}>{children}</div>;
+  return (
+    <div ref={ref} className={`scroll-reveal${visible ? " is-visible" : ""}`}>
+      {children}
+    </div>
+  );
 }
 
 function AmbientSignals() {
@@ -164,12 +193,18 @@ function AmbientSignals() {
     const spawn = () => {
       const signal = {
         id: id++,
-        side: Math.random() > 0.5 ? "left" as const : "right" as const,
+        side: Math.random() > 0.5 ? ("left" as const) : ("right" as const),
         top: window.scrollY + window.innerHeight * (0.18 + Math.random() * 0.64),
       };
       setSignals((current) => [...current, signal]);
-      window.setTimeout(() => setSignals((current) => current.filter((item) => item.id !== signal.id)), 2200);
-      timeout = window.setTimeout(spawn, isMobile ? 9000 + Math.random() * 5000 : 3500 + Math.random() * 5000);
+      window.setTimeout(
+        () => setSignals((current) => current.filter((item) => item.id !== signal.id)),
+        2200,
+      );
+      timeout = window.setTimeout(
+        spawn,
+        isMobile ? 9000 + Math.random() * 5000 : 3500 + Math.random() * 5000,
+      );
     };
     timeout = window.setTimeout(spawn, isMobile ? 5000 : 1800);
     return () => window.clearTimeout(timeout);
@@ -178,7 +213,11 @@ function AmbientSignals() {
   return (
     <div className="absolute inset-0 z-20 pointer-events-none overflow-hidden" aria-hidden="true">
       {signals.map((signal) => (
-        <div key={signal.id} className={`signal-wave signal-wave--${signal.side}`} style={{ top: `${signal.top}px` }}>
+        <div
+          key={signal.id}
+          className={`signal-wave signal-wave--${signal.side}`}
+          style={{ top: `${signal.top}px` }}
+        >
           <svg viewBox="0 0 360 160" preserveAspectRatio="none" fill="none" aria-hidden="true">
             <defs>
               <linearGradient id={`signal-gradient-${signal.id}`} x1="0" y1="0" x2="1" y2="0">
@@ -189,8 +228,25 @@ function AmbientSignals() {
                 <stop offset="100%" stopColor="#7c8dff" stopOpacity="0.95" />
               </linearGradient>
             </defs>
-            <path className="signal-path signal-path--one" stroke={`url(#signal-gradient-${signal.id})`} d="M0 88 C52 16 104 16 156 88 S260 160 360 74" />
-            {!isMobile && <><path className="signal-path signal-path--two" stroke={`url(#signal-gradient-${signal.id})`} d="M0 112 C58 38 116 38 174 112 S280 170 360 96" /><path className="signal-path signal-path--three" stroke={`url(#signal-gradient-${signal.id})`} d="M0 62 C48 -4 96 -4 144 62 S246 132 360 48" /></>}
+            <path
+              className="signal-path signal-path--one"
+              stroke={`url(#signal-gradient-${signal.id})`}
+              d="M0 88 C52 16 104 16 156 88 S260 160 360 74"
+            />
+            {!isMobile && (
+              <>
+                <path
+                  className="signal-path signal-path--two"
+                  stroke={`url(#signal-gradient-${signal.id})`}
+                  d="M0 112 C58 38 116 38 174 112 S280 170 360 96"
+                />
+                <path
+                  className="signal-path signal-path--three"
+                  stroke={`url(#signal-gradient-${signal.id})`}
+                  d="M0 62 C48 -4 96 -4 144 62 S246 132 360 48"
+                />
+              </>
+            )}
           </svg>
         </div>
       ))}
@@ -228,15 +284,45 @@ function Nav() {
         transition: "background 0.4s, border-color 0.4s, backdrop-filter 0.4s",
       }}
     >
-      <div className="max-w-[1400px] mx-auto px-5 md:px-12 flex items-center justify-between transition-all duration-300" style={{ paddingTop: scrolled ? "0.75rem" : "1.25rem", paddingBottom: scrolled ? "0.75rem" : "1.25rem" }}>
-        <a href="#" className="group flex flex-col text-sm font-semibold tracking-widest text-white uppercase" style={{ letterSpacing: "0.12em" }}>
-          <span className="flex items-center gap-2.5"><i className="h-1.5 w-1.5 rounded-full bg-[#5b6ef5] shadow-[0_0_12px_#5b6ef5]" />Dawid Grzywniak</span>
-          <span className="flex items-start gap-1.5 mt-1.5 normal-case tracking-normal" style={{ color: "#8b8f98" }}>
-            <span aria-hidden="true" className="font-serif text-base md:text-lg leading-[0.8]" style={{ color: "#5b6ef5" }}>&ldquo;</span>
-            <span className="font-sans text-[8px] md:text-[9px] italic font-medium leading-[1.35]">
-              {t("Niemożliwe nie istnieje,")}<br />{t("ogranicza nas tylko kreatywność.")}
+      <div
+        className="max-w-[1400px] mx-auto px-5 md:px-12 flex items-center justify-between transition-all duration-300"
+        style={{
+          paddingTop: scrolled ? "0.75rem" : "1.25rem",
+          paddingBottom: scrolled ? "0.75rem" : "1.25rem",
+        }}
+      >
+        <a
+          href="#"
+          className="group flex flex-col text-sm font-semibold tracking-widest text-white uppercase"
+          style={{ letterSpacing: "0.12em" }}
+        >
+          <span className="flex items-center gap-2.5">
+            <i className="h-1.5 w-1.5 rounded-full bg-[#5b6ef5] shadow-[0_0_12px_#5b6ef5]" />
+            Dawid Grzywniak
+          </span>
+          <span
+            className="flex items-start gap-1.5 mt-1.5 normal-case tracking-normal"
+            style={{ color: "#8b8f98" }}
+          >
+            <span
+              aria-hidden="true"
+              className="font-serif text-base md:text-lg leading-[0.8]"
+              style={{ color: "#5b6ef5" }}
+            >
+              &ldquo;
             </span>
-            <span aria-hidden="true" className="self-end font-serif text-base md:text-lg leading-[0.65]" style={{ color: "#5b6ef5" }}>&rdquo;</span>
+            <span className="font-sans text-[8px] md:text-[9px] italic font-medium leading-[1.35]">
+              {t("Niemożliwe nie istnieje,")}
+              <br />
+              {t("ogranicza nas tylko kreatywność.")}
+            </span>
+            <span
+              aria-hidden="true"
+              className="self-end font-serif text-base md:text-lg leading-[0.65]"
+              style={{ color: "#5b6ef5" }}
+            >
+              &rdquo;
+            </span>
           </span>
         </a>
 
@@ -246,9 +332,19 @@ function Nav() {
               <a
                 href={l.href}
                 className="block py-2 text-[10px] tracking-widest font-mono uppercase"
-                style={{ color: "#8b8f98", letterSpacing: "0.1em", transition: "color 0.2s, text-shadow 0.2s" }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = "#f5f5f5"; e.currentTarget.style.textShadow = "0 0 14px rgba(124,141,255,0.5)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = "#8b8f98"; e.currentTarget.style.textShadow = "none"; }}
+                style={{
+                  color: "#8b8f98",
+                  letterSpacing: "0.1em",
+                  transition: "color 0.2s, text-shadow 0.2s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = "#f5f5f5";
+                  e.currentTarget.style.textShadow = "0 0 14px rgba(124,141,255,0.5)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = "#8b8f98";
+                  e.currentTarget.style.textShadow = "none";
+                }}
               >
                 {l.label}
               </a>
@@ -264,7 +360,11 @@ function Nav() {
           {t("Porozmawiajmy →")}
         </a>
 
-        <div className="flex shrink-0 items-center gap-1" role="group" aria-label={t("Wybór języka")}>
+        <div
+          className="flex shrink-0 items-center gap-1"
+          role="group"
+          aria-label={t("Wybór języka")}
+        >
           {languages.map((option) => (
             <button
               key={option.code}
@@ -272,7 +372,13 @@ function Nav() {
               onClick={() => setLanguage(option.code)}
               aria-pressed={language === option.code}
               className="min-h-9 min-w-9 px-2 py-1 font-mono text-[9px] tracking-widest md:px-2.5"
-              style={{ color: language === option.code ? "#f5f5f5" : "#7d8795", borderBottom: language === option.code ? "1px solid #5b6ef5" : "1px solid transparent", cursor: "pointer", transition: "color 0.2s, border-color 0.2s" }}
+              style={{
+                color: language === option.code ? "#f5f5f5" : "#7d8795",
+                borderBottom:
+                  language === option.code ? "1px solid #5b6ef5" : "1px solid transparent",
+                cursor: "pointer",
+                transition: "color 0.2s, border-color 0.2s",
+              }}
             >
               {option.label}
             </button>
@@ -287,19 +393,40 @@ function Nav() {
           aria-controls="mobile-navigation"
           onClick={() => setMenuOpen(!menuOpen)}
         >
-          <div className="w-5 h-px bg-white mb-1.5" style={{ transform: menuOpen ? "rotate(45deg) translate(1px, 1px)" : "" }} />
-          <div className="w-5 h-px bg-white" style={{ transform: menuOpen ? "rotate(-45deg)" : "" }} />
+          <div
+            className="w-5 h-px bg-white mb-1.5"
+            style={{ transform: menuOpen ? "rotate(45deg) translate(1px, 1px)" : "" }}
+          />
+          <div
+            className="w-5 h-px bg-white"
+            style={{ transform: menuOpen ? "rotate(-45deg)" : "" }}
+          />
         </button>
       </div>
 
       {menuOpen && (
-        <div id="mobile-navigation" className="md:hidden px-6 pb-8 pt-2" style={{ background: "rgba(7,8,9,0.96)", borderBottom: "1px solid #1a1d22" }}>
+        <div
+          id="mobile-navigation"
+          className="md:hidden px-6 pb-8 pt-2"
+          style={{ background: "rgba(7,8,9,0.96)", borderBottom: "1px solid #1a1d22" }}
+        >
           {links.map((l) => (
-            <a key={l.label} href={l.href} className="block py-3 text-sm font-mono tracking-widest uppercase" style={{ color: "#8b8f98", letterSpacing: "0.1em" }} onClick={() => setMenuOpen(false)}>
+            <a
+              key={l.label}
+              href={l.href}
+              className="block py-3 text-sm font-mono tracking-widest uppercase"
+              style={{ color: "#8b8f98", letterSpacing: "0.1em" }}
+              onClick={() => setMenuOpen(false)}
+            >
               {l.label}
             </a>
           ))}
-          <a href="#contact" className="block mt-4 py-3 text-center text-sm font-mono tracking-widest uppercase" style={{ border: "1px solid #1a1d22", color: "#f5f5f5", letterSpacing: "0.1em" }} onClick={() => setMenuOpen(false)}>
+          <a
+            href="#contact"
+            className="block mt-4 py-3 text-center text-sm font-mono tracking-widest uppercase"
+            style={{ border: "1px solid #1a1d22", color: "#f5f5f5", letterSpacing: "0.1em" }}
+            onClick={() => setMenuOpen(false)}
+          >
             {t("Porozmawiajmy →")}
           </a>
         </div>
@@ -692,7 +819,11 @@ function SolutionCore3D() {
 
 function InfrastructureOrbit() {
   return (
-    <div className="infrastructure-orbit w-full h-full" role="img" aria-label={t("Interaktywna wizualizacja infrastruktury")}>
+    <div
+      className="infrastructure-orbit w-full h-full"
+      role="img"
+      aria-label={t("Interaktywna wizualizacja infrastruktury")}
+    >
       <span className="infrastructure-orbit__ring infrastructure-orbit__ring--one" />
       <span className="infrastructure-orbit__ring infrastructure-orbit__ring--two" />
       <span className="infrastructure-orbit__ring infrastructure-orbit__ring--three" />
@@ -707,33 +838,60 @@ function Hero() {
   const isMobile = useMobilePerformanceProfile();
 
   return (
-    <section className="relative min-h-screen flex items-center overflow-hidden" style={{ background: "radial-gradient(ellipse 55% 55% at 78% 42%, rgba(44,54,135,0.12), transparent 72%), #070809" }}>
+    <section
+      className="relative min-h-screen flex items-center overflow-hidden"
+      style={{
+        background:
+          "radial-gradient(ellipse 55% 55% at 78% 42%, rgba(44,54,135,0.12), transparent 72%), #070809",
+      }}
+    >
       <div className="max-w-[1400px] mx-auto px-6 md:px-12 w-full pt-28 pb-16">
         <div className="grid md:grid-cols-2 gap-16 items-center min-h-[80vh]">
           {/* Left */}
           <div className="flex flex-col justify-center">
             <div className="flex items-center gap-3 mb-10">
-              <span className="animate-pulse-dot inline-block w-1.5 h-1.5 rounded-full" style={{ background: "#5b6ef5" }} />
-              <span className="font-mono text-[10px] tracking-[0.2em] uppercase" style={{ color: "#5b6ef5" }}>
+              <span
+                className="animate-pulse-dot inline-block w-1.5 h-1.5 rounded-full"
+                style={{ background: "#5b6ef5" }}
+              />
+              <span
+                className="font-mono text-[10px] tracking-[0.2em] uppercase"
+                style={{ color: "#5b6ef5" }}
+              >
                 {t("Dostępny dla nowych projektów")}
               </span>
             </div>
 
             <h1
               className="font-sans font-bold leading-none mb-6"
-              style={{ fontSize: "clamp(38px, 5.2vw, 76px)", letterSpacing: "-0.03em", color: "#f5f5f5" }}
+              style={{
+                fontSize: "clamp(38px, 5.2vw, 76px)",
+                letterSpacing: "-0.03em",
+                color: "#f5f5f5",
+              }}
             >
               {t("Tworzę rozwiązania IT")}
               <br />
               <span>{t("od pomysłu")}</span>
               <br />
-              <span style={{ background: "linear-gradient(135deg, #5b6ef5, #7c8dff)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+              <span
+                style={{
+                  background: "linear-gradient(135deg, #5b6ef5, #7c8dff)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                }}
+              >
                 {t("do produkcji.")}
               </span>
             </h1>
 
-            <p className="text-base leading-relaxed mb-4 max-w-md" style={{ color: "#8b8f98", lineHeight: 1.75 }}>
-              {t("Pomagam firmom projektować, budować i utrzymywać serwisy, aplikacje, integracje oraz automatyzacje. Ty opisujesz cel — ja prowadzę techniczną całość.")}
+            <p
+              className="text-base leading-relaxed mb-4 max-w-md"
+              style={{ color: "#8b8f98", lineHeight: 1.75 }}
+            >
+              {t(
+                "Pomagam firmom projektować, budować i utrzymywać serwisy, aplikacje, integracje oraz automatyzacje. Ty opisujesz cel — ja prowadzę techniczną całość.",
+              )}
             </p>
 
             <p className="font-mono text-[10px] tracking-widest mb-10" style={{ color: "#7d8795" }}>
@@ -756,14 +914,23 @@ function Hero() {
               </a>
             </div>
 
-            {/* Subtle credibility bar — intentionally contains no unverified figures. */}
+            {/* Subtle credibility bar with confirmed experience figures. */}
             <div className="mt-14 pt-8" style={{ borderTop: "1px solid #1a1d22" }}>
-              <div className="flex flex-wrap gap-6">
-                {["Development", "Integracje", "Automatyzacje", "Infrastruktura"].map((tag) => (
-                  <span key={tag} className="font-mono text-[9px] tracking-[0.15em] uppercase" style={{ color: "#8b8f98" }}>
-                    {t(tag)}
-                  </span>
-                ))}
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                <span
+                  className="font-mono text-[9px] tracking-[0.15em] uppercase"
+                  style={{ color: "#b5bbc6" }}
+                >
+                  {t("10+ lat doświadczenia")}
+                </span>
+                <span aria-hidden="true" className="font-mono text-[9px]" style={{ color: "#5b6ef5" }}>·</span>
+                <span className="font-mono text-[9px] tracking-[0.15em] uppercase" style={{ color: "#b5bbc6" }}>
+                  {t("15+ wdrożeń produkcyjnych")}
+                </span>
+                <span aria-hidden="true" className="font-mono text-[9px]" style={{ color: "#5b6ef5" }}>·</span>
+                <span className="font-mono text-[9px] tracking-[0.15em] uppercase" style={{ color: "#8b8f98" }}>
+                  {t("Od developmentu po utrzymanie")}
+                </span>
               </div>
             </div>
           </div>
@@ -775,13 +942,19 @@ function Hero() {
                 <HeroCanvas />
               </Suspense>
             )}
-            <div className="absolute bottom-4 right-4 font-mono text-[9px] tracking-widest uppercase" style={{ color: "#7d8795" }}>
+            <div
+              className="absolute bottom-4 right-4 font-mono text-[9px] tracking-widest uppercase"
+              style={{ color: "#7d8795" }}
+            >
               {t("Architektura rozwiązania")}
             </div>
           </div>
         </div>
       </div>
-      <div className="absolute bottom-0 left-0 right-0 h-32 pointer-events-none" style={{ background: "linear-gradient(to bottom, transparent, #070809)" }} />
+      <div
+        className="absolute bottom-0 left-0 right-0 h-32 pointer-events-none"
+        style={{ background: "linear-gradient(to bottom, transparent, #070809)" }}
+      />
     </section>
   );
 }
@@ -793,7 +966,12 @@ function ValueProposition() {
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) setVisible(true); }, { threshold: 0.2 });
+    const obs = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting) setVisible(true);
+      },
+      { threshold: 0.2 },
+    );
     obs.observe(el);
     return () => obs.disconnect();
   }, []);
@@ -817,29 +995,70 @@ function ValueProposition() {
   ];
 
   return (
-    <section className="relative overflow-hidden py-24 md:py-28 px-6 md:px-12" style={{ background: "#0a0b0d" }}>
+    <section
+      className="relative overflow-hidden pt-22 pb-24 md:pt-25 md:pb-26 px-6 md:px-12"
+      style={{ background: "#0a0b0d" }}
+    >
       <div className="max-w-[1400px] mx-auto" ref={ref}>
         <div className="grid lg:grid-cols-[0.95fr_1.05fr] gap-10 lg:gap-20 items-end mb-14 md:mb-16">
           <div>
-            <div className="font-mono text-[10px] tracking-[0.2em] uppercase mb-5" style={{ color: "#5b6ef5" }}>
+            <div
+              className="font-mono text-[10px] tracking-[0.2em] uppercase mb-5"
+              style={{ color: "#5b6ef5" }}
+            >
               {t("Dlaczego warto")}
             </div>
-            <h2 className="font-sans font-bold leading-none" style={{ fontSize: "clamp(34px, 4.4vw, 64px)", letterSpacing: "-0.04em", color: "#f5f5f5" }}>
+            <h2
+              className="font-sans font-bold leading-none"
+              style={{
+                fontSize: "clamp(34px, 4.4vw, 64px)",
+                letterSpacing: "-0.04em",
+                color: "#f5f5f5",
+              }}
+            >
               {t("Jeden kontakt.")}
               <br />
               <span style={{ color: "#8b8f98" }}>{t("Pełna odpowiedzialność.")}</span>
             </h2>
           </div>
-          <div className="relative min-h-[180px] overflow-hidden" style={{ border: "1px solid #303844" }}>
+          <div
+            className="relative min-h-[180px] overflow-hidden"
+            style={{ border: "1px solid #303844" }}
+          >
             <picture className="absolute inset-0 block">
               <source media="(max-width: 767px)" srcSet={oneContactMobile} type="image/webp" />
-              <img src={oneContact} srcSet={`${oneContactRetina} 768w, ${oneContact} 1536w`} sizes="50vw" alt={t("Wspólne planowanie rozwiązania")} loading="lazy" decoding="async" className="w-full h-full object-cover" style={{ objectPosition: "65% center" }} />
+              <img
+                src={oneContact}
+                srcSet={`${oneContactRetina} 768w, ${oneContact} 1536w`}
+                sizes="50vw"
+                alt={t("Wspólne planowanie rozwiązania")}
+                loading="lazy"
+                decoding="async"
+                className="w-full h-full object-cover"
+                style={{ objectPosition: "65% center" }}
+              />
             </picture>
-            <div className="absolute inset-0" style={{ background: "linear-gradient(90deg, rgba(7,8,9,0.9) 0%, rgba(7,8,9,0.42) 72%, rgba(7,8,9,0.18) 100%)" }} />
+            <div
+              className="absolute inset-0"
+              style={{
+                background:
+                  "linear-gradient(90deg, rgba(7,8,9,0.9) 0%, rgba(7,8,9,0.42) 72%, rgba(7,8,9,0.18) 100%)",
+              }}
+            />
             <div className="absolute inset-x-0 bottom-0 p-6">
-              <div className="font-mono text-[9px] tracking-[0.18em] uppercase mb-2" style={{ color: "#a9b5ff" }}>{t("Od pierwszej rozmowy")}</div>
-              <p className="max-w-lg text-sm leading-relaxed" style={{ color: "#e0e3ec", lineHeight: 1.7 }}>
-                {t("Jedna osoba prowadzi temat od pierwszej rozmowy po działające rozwiązanie — bez przekazywania go między kolejnymi wykonawcami.")}
+              <div
+                className="font-mono text-[9px] tracking-[0.18em] uppercase mb-2"
+                style={{ color: "#a9b5ff" }}
+              >
+                {t("Od pierwszej rozmowy")}
+              </div>
+              <p
+                className="max-w-lg text-sm leading-relaxed"
+                style={{ color: "#e0e3ec", lineHeight: 1.7 }}
+              >
+                {t(
+                  "Jedna osoba prowadzi temat od pierwszej rozmowy po działające rozwiązanie — bez przekazywania go między kolejnymi wykonawcami.",
+                )}
               </p>
             </div>
           </div>
@@ -856,22 +1075,55 @@ function ValueProposition() {
             <div
               key={p.n}
               className="relative min-h-[255px] p-8 md:p-10 flex flex-col overflow-hidden group"
-              style={{ background: "linear-gradient(145deg, rgba(18,20,26,0.92), rgba(10,11,13,0.98))", border: "1px solid #252a33", transition: "border-color 0.3s, transform 0.3s, background 0.3s" }}
-              onMouseEnter={(e) => { const card = e.currentTarget; card.style.borderColor = "rgba(91,110,245,0.42)"; card.style.transform = "translateY(-4px)"; card.style.background = "linear-gradient(145deg, rgba(26,30,42,0.96), rgba(10,11,13,1))"; }}
-              onMouseLeave={(e) => { const card = e.currentTarget; card.style.borderColor = "#252a33"; card.style.transform = "translateY(0)"; card.style.background = "linear-gradient(145deg, rgba(18,20,26,0.92), rgba(10,11,13,0.98))"; }}
+              style={{
+                background: "linear-gradient(145deg, rgba(18,20,26,0.92), rgba(10,11,13,0.98))",
+                border: "1px solid #252a33",
+                transition: "border-color 0.3s, transform 0.3s, background 0.3s",
+              }}
+              onMouseEnter={(e) => {
+                const card = e.currentTarget;
+                card.style.borderColor = "rgba(91,110,245,0.42)";
+                card.style.transform = "translateY(-4px)";
+                card.style.background =
+                  "linear-gradient(145deg, rgba(26,30,42,0.96), rgba(10,11,13,1))";
+              }}
+              onMouseLeave={(e) => {
+                const card = e.currentTarget;
+                card.style.borderColor = "#252a33";
+                card.style.transform = "translateY(0)";
+                card.style.background =
+                  "linear-gradient(145deg, rgba(18,20,26,0.92), rgba(10,11,13,0.98))";
+              }}
             >
               <div className="flex items-center gap-3 mb-10">
-                <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#5b6ef5", boxShadow: "0 0 12px rgba(91,110,245,0.9)" }} />
-                <div className="h-px flex-1" style={{ background: "linear-gradient(90deg, rgba(91,110,245,0.5), transparent)" }} />
-                <span className="font-mono text-[9px] tracking-widest" style={{ color: "#7d8795" }}>{p.n}</span>
+                <span
+                  className="w-1.5 h-1.5 rounded-full"
+                  style={{ background: "#5b6ef5", boxShadow: "0 0 12px rgba(91,110,245,0.9)" }}
+                />
+                <div
+                  className="h-px flex-1"
+                  style={{
+                    background: "linear-gradient(90deg, rgba(91,110,245,0.5), transparent)",
+                  }}
+                />
+                <span className="font-mono text-[9px] tracking-widest" style={{ color: "#7d8795" }}>
+                  {p.n}
+                </span>
               </div>
               <h3
                 className="font-sans font-bold mb-4 tracking-tight"
-                style={{ fontSize: "clamp(18px, 1.8vw, 24px)", letterSpacing: "-0.03em", color: "#f5f5f5" }}
+                style={{
+                  fontSize: "clamp(18px, 1.8vw, 24px)",
+                  letterSpacing: "-0.03em",
+                  color: "#f5f5f5",
+                }}
               >
                 {t(p.title)}
               </h3>
-              <p className="text-sm leading-relaxed mt-auto" style={{ color: "#9ba1ac", lineHeight: 1.78 }}>
+              <p
+                className="text-sm leading-relaxed mt-auto"
+                style={{ color: "#9ba1ac", lineHeight: 1.78 }}
+              >
                 {t(p.desc)}
               </p>
             </div>
@@ -889,7 +1141,10 @@ const problems = [
   { text: "Zespół ręcznie wykonuje zadania, które można zautomatyzować?", cta: "Odzyskaj czas →" },
   { text: "Potrzebujesz aplikacji, ale nie wiesz, jak ją zaprojektować?", cta: "Zaplanujmy ją →" },
   { text: "Istniejący system trzeba rozwinąć albo uporządkować?", cta: "Sprawdźmy zakres →" },
-  { text: "Projekt został niedokończony i potrzebuje odpowiedzialnego przejęcia?", cta: "Porozmawiajmy →" },
+  {
+    text: "Projekt został niedokończony i potrzebuje odpowiedzialnego przejęcia?",
+    cta: "Porozmawiajmy →",
+  },
 ];
 
 function ProblemFirst() {
@@ -898,40 +1153,83 @@ function ProblemFirst() {
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) setVisible(true); }, { threshold: 0.15 });
+    const obs = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting) setVisible(true);
+      },
+      { threshold: 0.15 },
+    );
     obs.observe(el);
     return () => obs.disconnect();
   }, []);
 
   return (
-    <section className="py-32 px-6 md:px-12" style={{ background: "#070809" }}>
+    <section className="pt-28 pb-32 px-6 md:pt-28 md:pb-32" style={{ background: "#070809" }}>
       <div className="max-w-[1400px] mx-auto" ref={ref}>
         <div className="grid md:grid-cols-2 gap-20 items-start">
-          <article className="relative min-h-[510px] overflow-hidden" style={{ border: "1px solid #303844", boxShadow: "18px 18px 0 rgba(91,110,245,0.06)" }}>
-            <img src={manualProcess} srcSet={`${manualProcessMobile} 480w, ${manualProcess} 727w`} sizes="(max-width: 767px) 100vw, 50vw" alt={t("Ręczne procesy w firmie")} loading="lazy" decoding="async" className="absolute inset-0 w-full h-full object-cover" style={{ objectPosition: "left center" }} />
-            <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(7,8,9,0.18) 0%, rgba(7,8,9,0.48) 38%, rgba(7,8,9,0.95) 100%), linear-gradient(90deg, rgba(7,8,9,0.65), transparent 75%)" }} />
+          <article
+            className="relative min-h-[510px] overflow-hidden"
+            style={{ border: "1px solid #303844", boxShadow: "18px 18px 0 rgba(91,110,245,0.06)" }}
+          >
+            <img
+              src={manualProcess}
+              srcSet={`${manualProcessMobile} 480w, ${manualProcess} 727w`}
+              sizes="(max-width: 767px) 100vw, 50vw"
+              alt={t("Ręczne procesy w firmie")}
+              loading="lazy"
+              decoding="async"
+              className="absolute inset-0 w-full h-full object-cover"
+              style={{ objectPosition: "left center" }}
+            />
+            <div
+              className="absolute inset-0"
+              style={{
+                background:
+                  "linear-gradient(180deg, rgba(7,8,9,0.18) 0%, rgba(7,8,9,0.48) 38%, rgba(7,8,9,0.95) 100%), linear-gradient(90deg, rgba(7,8,9,0.65), transparent 75%)",
+              }}
+            />
             <div className="relative h-full min-h-[510px] p-8 md:p-10 flex flex-col justify-end">
-              <div className="font-mono text-[10px] tracking-[0.2em] uppercase mb-6" style={{ color: "#aebaff" }}>
+              <div
+                className="font-mono text-[10px] tracking-[0.2em] uppercase mb-6"
+                style={{ color: "#aebaff" }}
+              >
                 {t("Czy to brzmi znajomo?")}
               </div>
               <h2
                 className="font-sans font-bold leading-tight"
-                style={{ fontSize: "clamp(34px, 4.5vw, 64px)", letterSpacing: "-0.04em", color: "#f5f5f5" }}
+                style={{
+                  fontSize: "clamp(34px, 4.5vw, 64px)",
+                  letterSpacing: "-0.04em",
+                  color: "#f5f5f5",
+                }}
               >
                 {t("Masz problem.")}
                 <br />
                 <span style={{ color: "#c0c4cf" }}>{t("Znajdziemy rozwiązanie.")}</span>
               </h2>
-              <div className="mt-8 pt-5 flex items-center gap-3" style={{ borderTop: "1px solid rgba(255,255,255,0.14)" }}>
-                <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#5b6ef5", boxShadow: "0 0 12px #5b6ef5" }} />
-                <span className="font-mono text-[9px] tracking-[0.18em] uppercase" style={{ color: "#c8d0ff" }}>{t("Od problemu zaczynamy")}</span>
+              <div
+                className="mt-8 pt-5 flex items-center gap-3"
+                style={{ borderTop: "1px solid rgba(255,255,255,0.14)" }}
+              >
+                <span
+                  className="w-1.5 h-1.5 rounded-full"
+                  style={{ background: "#5b6ef5", boxShadow: "0 0 12px #5b6ef5" }}
+                />
+                <span
+                  className="font-mono text-[9px] tracking-[0.18em] uppercase"
+                  style={{ color: "#c8d0ff" }}
+                >
+                  {t("Od problemu zaczynamy")}
+                </span>
               </div>
             </div>
           </article>
 
           <div className="space-y-0">
             <p className="mb-6 max-w-lg text-sm leading-relaxed" style={{ color: "#8b8f98" }}>
-              {t("Nie musisz znać technologii ani mieć gotowego rozwiązania. Wystarczy, że opiszesz problem lub cel biznesowy.")}
+              {t(
+                "Nie musisz znać technologii ani mieć gotowego rozwiązania. Wystarczy, że opiszesz problem lub cel biznesowy.",
+              )}
             </p>
             {problems.map((problem, i) => (
               <div
@@ -945,10 +1243,10 @@ function ProblemFirst() {
                 }}
               >
                 <p
-                  className="text-sm leading-relaxed flex-1 pr-4"
-                  style={{ color: "#8b8f98", transition: "color 0.2s" }}
+                  className="text-sm font-medium leading-relaxed flex-1 pr-4"
+                  style={{ color: "#a5aab4", transition: "color 0.2s" }}
                   onMouseEnter={(e) => ((e.target as HTMLElement).style.color = "#f5f5f5")}
-                  onMouseLeave={(e) => ((e.target as HTMLElement).style.color = "#8b8f98")}
+                  onMouseLeave={(e) => ((e.target as HTMLElement).style.color = "#a5aab4")}
                 >
                   {t(problem.text)}
                 </p>
@@ -977,7 +1275,12 @@ function DontKnowSection() {
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) setVisible(true); }, { threshold: 0.3 });
+    const obs = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting) setVisible(true);
+      },
+      { threshold: 0.3 },
+    );
     obs.observe(el);
     return () => obs.disconnect();
   }, []);
@@ -995,64 +1298,128 @@ function DontKnowSection() {
       >
         <div className="grid md:grid-cols-2 gap-16 lg:gap-24 items-center">
           <div className="max-w-xl">
-          <div className="font-mono text-[10px] tracking-[0.2em] uppercase mb-8" style={{ color: "#5b6ef5" }}>
-            Nie wiesz jeszcze, czego potrzebujesz?
-          </div>
-          <h2
-            className="font-sans font-bold leading-none mb-8"
-            style={{ fontSize: "clamp(40px, 6vw, 96px)", letterSpacing: "-0.04em", color: "#f5f5f5", lineHeight: 0.95 }}
-          >
-            To żaden
-            <br />
-            problem.
-          </h2>
-          <p className="text-base leading-relaxed mb-4 max-w-xl" style={{ color: "#8b8f98", lineHeight: 1.8 }}>
-            Opowiedz mi, co chcesz osiągnąć. Pomogę określić, co najlepiej sprawdzi się w Twojej sytuacji.
-          </p>
-          <p className="text-sm mb-12" style={{ color: "#8b8f98" }}>
-            Nie musisz mieć gotowej specyfikacji. Na początku wystarczy krótka rozmowa.
-          </p>
+            <div
+              className="font-mono text-[10px] tracking-[0.2em] uppercase mb-8"
+              style={{ color: "#5b6ef5" }}
+            >
+              Nie wiesz jeszcze, czego potrzebujesz?
+            </div>
+            <h2
+              className="font-sans font-bold leading-none mb-8"
+              style={{
+                fontSize: "clamp(40px, 6vw, 96px)",
+                letterSpacing: "-0.04em",
+                color: "#f5f5f5",
+                lineHeight: 0.95,
+              }}
+            >
+              To żaden
+              <br />
+              problem.
+            </h2>
+            <p
+              className="text-base leading-relaxed mb-4 max-w-xl"
+              style={{ color: "#8b8f98", lineHeight: 1.8 }}
+            >
+              Opowiedz mi, co chcesz osiągnąć. Pomogę określić, co najlepiej sprawdzi się w Twojej
+              sytuacji.
+            </p>
+            <p className="text-sm mb-12" style={{ color: "#8b8f98" }}>
+              Nie musisz mieć gotowej specyfikacji. Na początku wystarczy krótka rozmowa.
+            </p>
 
-          <div className="flex flex-wrap gap-4">
-            <a
-              href="#contact"
-              className="px-7 py-3.5 text-sm font-sans font-medium"
-              style={{ background: "#5b6ef5", color: "#fff", letterSpacing: "-0.01em", transition: "background 0.2s, transform 0.2s" }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "#6b7ef8"; (e.currentTarget as HTMLElement).style.transform = "translateY(-1px)"; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "#5b6ef5"; (e.currentTarget as HTMLElement).style.transform = "translateY(0)"; }}
-            >
-              Potrzebuję pomocy →
-            </a>
-            <a
-              href="#contact"
-              className="px-7 py-3.5 text-sm font-sans"
-              style={{ border: "1px solid #1a1d22", color: "#8b8f98", transition: "border-color 0.2s, color 0.2s" }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "#8b8f98"; (e.currentTarget as HTMLElement).style.color = "#f5f5f5"; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "#1a1d22"; (e.currentTarget as HTMLElement).style.color = "#8b8f98"; }}
-            >
-              Opowiedz o pomyśle →
-            </a>
+            <div className="flex flex-wrap gap-4">
+              <a
+                href="#contact"
+                className="px-7 py-3.5 text-sm font-sans font-medium"
+                style={{
+                  background: "#5b6ef5",
+                  color: "#fff",
+                  letterSpacing: "-0.01em",
+                  transition: "background 0.2s, transform 0.2s",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLElement).style.background = "#6b7ef8";
+                  (e.currentTarget as HTMLElement).style.transform = "translateY(-1px)";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLElement).style.background = "#5b6ef5";
+                  (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
+                }}
+              >
+                Potrzebuję pomocy →
+              </a>
+              <a
+                href="#contact"
+                className="px-7 py-3.5 text-sm font-sans"
+                style={{
+                  border: "1px solid #1a1d22",
+                  color: "#8b8f98",
+                  transition: "border-color 0.2s, color 0.2s",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLElement).style.borderColor = "#8b8f98";
+                  (e.currentTarget as HTMLElement).style.color = "#f5f5f5";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLElement).style.borderColor = "#1a1d22";
+                  (e.currentTarget as HTMLElement).style.color = "#8b8f98";
+                }}
+              >
+                Opowiedz o pomyśle →
+              </a>
+            </div>
           </div>
-          </div>
-          <div className="relative min-h-[360px] overflow-hidden" style={{ border: "1px solid #303844", boxShadow: "20px 20px 0 rgba(91,110,245,0.07)" }}>
-            <img src={workflowPlanning} srcSet={`${workflowPlanningMobile} 480w, ${workflowPlanningRetina} 768w, ${workflowPlanning} 1536w`} sizes="(max-width: 767px) calc(100vw - 3rem), 50vw" alt="Wspólne planowanie rozwiązania" loading="lazy" decoding="async" className="absolute inset-0 w-full h-full object-cover" style={{ objectPosition: "70% center" }} />
-            <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(7,8,9,0.08), rgba(7,8,9,0.78))" }} />
+          <div
+            className="relative min-h-[360px] overflow-hidden"
+            style={{ border: "1px solid #303844", boxShadow: "20px 20px 0 rgba(91,110,245,0.07)" }}
+          >
+            <img
+              src={workflowPlanning}
+              srcSet={`${workflowPlanningMobile} 480w, ${workflowPlanningRetina} 768w, ${workflowPlanning} 1536w`}
+              sizes="(max-width: 767px) calc(100vw - 3rem), 50vw"
+              alt="Wspólne planowanie rozwiązania"
+              loading="lazy"
+              decoding="async"
+              className="absolute inset-0 w-full h-full object-cover"
+              style={{ objectPosition: "70% center" }}
+            />
+            <div
+              className="absolute inset-0"
+              style={{ background: "linear-gradient(180deg, rgba(7,8,9,0.08), rgba(7,8,9,0.78))" }}
+            />
             <div className="absolute bottom-0 left-0 right-0 p-7">
-              <div className="font-mono text-[9px] tracking-[0.18em] uppercase mb-3" style={{ color: "#93a0ff" }}>Od krótkiej rozmowy</div>
-              <p className="text-sm leading-relaxed max-w-xs" style={{ color: "#f5f5f5" }}>Wystarczy opisać sytuację. Wspólnie zamienimy ją w klarowny plan działania.</p>
+              <div
+                className="font-mono text-[9px] tracking-[0.18em] uppercase mb-3"
+                style={{ color: "#93a0ff" }}
+              >
+                Od krótkiej rozmowy
+              </div>
+              <p className="text-sm leading-relaxed max-w-xs" style={{ color: "#f5f5f5" }}>
+                Wystarczy opisać sytuację. Wspólnie zamienimy ją w klarowny plan działania.
+              </p>
             </div>
           </div>
         </div>
 
         {/* Trust signals */}
-        <div className="mt-20 pt-10 grid md:grid-cols-3 gap-px" style={{ borderTop: "1px solid #1a1d22" }}>
+        <div
+          className="mt-20 pt-10 grid md:grid-cols-3 gap-px"
+          style={{ borderTop: "1px solid #1a1d22" }}
+        >
           {[
             { label: "Nie wymagam specyfikacji", desc: "Na początku wystarczy opis problemu." },
-            { label: "Najpierw poznajemy problem", desc: "Nie zaczynam od kodowania. Najpierw ustalamy, co ma sens." },
+            {
+              label: "Najpierw poznajemy problem",
+              desc: "Nie zaczynam od kodowania. Najpierw ustalamy, co ma sens.",
+            },
             { label: "Bez zobowiązań", desc: "Najpierw sprawdzimy, czy możemy pomóc." },
           ].map((t) => (
             <div key={t.label} className="py-6 pr-8">
-              <div className="font-mono text-[9px] tracking-widest uppercase mb-2" style={{ color: "#5b6ef5" }}>
+              <div
+                className="font-mono text-[9px] tracking-widest uppercase mb-2"
+                style={{ color: "#5b6ef5" }}
+              >
                 {t.label}
               </div>
               <p className="text-xs leading-relaxed" style={{ color: "#8b8f98" }}>
@@ -1068,22 +1435,57 @@ function DontKnowSection() {
 
 // ─── Capabilities ─────────────────────────────────────────────────────────────
 const caps = [
-  { n: "01", title: "Serwisy i platformy webowe", desc: "Serwisy firmowe i platformy, które porządkują ofertę, obsługę klienta oraz proces pozyskiwania zapytań.", result: "Efekt: czytelny produkt i lepszy pierwszy kontakt" },
-  { n: "02", title: "Aplikacje dla firm", desc: "Narzędzia dopasowane do pracy zespołu: panele, procesy, rezerwacje i obsługa klienta.", result: "Efekt: sprawniejsza codzienna praca" },
-  { n: "03", title: "Systemy i integracje", desc: "Łączę istniejące narzędzia, żeby dane przepływały bez ręcznego przepisywania i rozbieżności.", result: "Efekt: mniej błędów i pełniejszy obraz firmy" },
-  { n: "04", title: "Optymalizacja serwisów", desc: "Porządkuję wolne, niestabilne lub trudne w rozwoju serwisy oraz ich krytyczne procesy.", result: "Efekt: stabilniejsza praca i mniej blokad" },
-  { n: "05", title: "Serwery i konfiguracja", desc: "Konfiguruję środowisko, zabezpieczenia i monitoring, aby rozwiązanie działało stabilnie dziś i było gotowe na rozwój.", result: "Efekt: spokój i przewidywalne działanie" },
-  { n: "06", title: "Automatyzacje", desc: "Eliminuję powtarzalne zadania i przekazywanie danych między narzędziami.", result: "Efekt: więcej czasu na pracę, która ma znaczenie" },
+  {
+    n: "01",
+    title: "Serwisy i platformy webowe",
+    desc: "Serwisy firmowe i platformy, które porządkują ofertę, obsługę klienta oraz proces pozyskiwania zapytań.",
+    result: "Efekt: czytelny produkt i lepszy pierwszy kontakt",
+  },
+  {
+    n: "02",
+    title: "Aplikacje dla firm",
+    desc: "Narzędzia dopasowane do pracy zespołu: panele, procesy, rezerwacje i obsługa klienta.",
+    result: "Efekt: sprawniejsza codzienna praca",
+  },
+  {
+    n: "03",
+    title: "Systemy i integracje",
+    desc: "Łączę istniejące narzędzia, żeby dane przepływały bez ręcznego przepisywania i rozbieżności.",
+    result: "Efekt: mniej błędów i pełniejszy obraz firmy",
+  },
+  {
+    n: "04",
+    title: "Optymalizacja serwisów",
+    desc: "Porządkuję wolne, niestabilne lub trudne w rozwoju serwisy oraz ich krytyczne procesy.",
+    result: "Efekt: stabilniejsza praca i mniej blokad",
+  },
+  {
+    n: "05",
+    title: "Serwery i konfiguracja",
+    desc: "Konfiguruję środowisko, zabezpieczenia i monitoring, aby rozwiązanie działało stabilnie dziś i było gotowe na rozwój.",
+    result: "Efekt: spokój i przewidywalne działanie",
+  },
+  {
+    n: "06",
+    title: "Automatyzacje",
+    desc: "Eliminuję powtarzalne zadania i przekazywanie danych między narzędziami.",
+    result: "Efekt: więcej czasu na pracę, która ma znaczenie",
+  },
 ];
 
-function CapabilityCard({ cap, delay }: { cap: typeof caps[0]; delay: number }) {
+function CapabilityCard({ cap, delay }: { cap: (typeof caps)[0]; delay: number }) {
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
   const [hovered, setHovered] = useState(false);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) setVisible(true); }, { threshold: 0.1 });
+    const obs = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting) setVisible(true);
+      },
+      { threshold: 0.1 },
+    );
     obs.observe(el);
     return () => obs.disconnect();
   }, []);
@@ -1099,25 +1501,40 @@ function CapabilityCard({ cap, delay }: { cap: typeof caps[0]; delay: number }) 
         border: "1px solid",
         borderColor: hovered ? "rgba(91,110,245,0.3)" : "#1a1d22",
         opacity: visible ? 1 : 0,
-        transform: visible ? hovered ? "translateY(-4px)" : "translateY(0)" : "translateY(24px)",
+        transform: visible ? (hovered ? "translateY(-4px)" : "translateY(0)") : "translateY(24px)",
         transition: `opacity 0.7s ease ${delay}ms, transform 0.4s cubic-bezier(0.16,1,0.3,1), border-color 0.3s, background 0.3s`,
         boxShadow: hovered ? "0 20px 60px rgba(91,110,245,0.08)" : "none",
       }}
     >
-      <div className="font-mono text-[9px] tracking-[0.2em] mb-6" style={{ color: hovered ? "#5b6ef5" : "#7d8795", transition: "color 0.3s" }}>
-      {cap.n}
+      <div
+        className="font-mono text-[9px] tracking-[0.2em] mb-6"
+        style={{ color: hovered ? "#5b6ef5" : "#7d8795", transition: "color 0.3s" }}
+      >
+        {cap.n}
       </div>
-      <h3 className="font-sans font-bold tracking-tight mb-3" style={{ fontSize: "clamp(18px, 1.8vw, 24px)", letterSpacing: "-0.03em", color: "#f5f5f5" }}>
+      <h3
+        className="font-sans font-bold tracking-tight mb-3"
+        style={{ fontSize: "clamp(18px, 1.8vw, 24px)", letterSpacing: "-0.03em", color: "#f5f5f5" }}
+      >
         {t(cap.title)}
       </h3>
       <p className="text-sm leading-relaxed mb-6" style={{ color: "#8b8f98", lineHeight: 1.7 }}>
         {t(cap.desc)}
       </p>
-      <div className="font-mono text-[9px] tracking-[0.12em] leading-relaxed" style={{ color: hovered ? "#93a0ff" : "#7d8795", transition: "color 0.3s" }}>
+      <div
+        className="font-mono text-[9px] tracking-[0.12em] leading-relaxed"
+        style={{ color: hovered ? "#93a0ff" : "#7d8795", transition: "color 0.3s" }}
+      >
         {t(cap.result)}
       </div>
       {hovered && (
-        <div className="absolute top-0 right-0 w-24 h-24 pointer-events-none" style={{ background: "radial-gradient(circle at top right, rgba(91,110,245,0.08), transparent 70%)" }} />
+        <div
+          className="absolute top-0 right-0 w-24 h-24 pointer-events-none"
+          style={{
+            background:
+              "radial-gradient(circle at top right, rgba(91,110,245,0.08), transparent 70%)",
+          }}
+        />
       )}
     </div>
   );
@@ -1128,12 +1545,19 @@ function Capabilities() {
     <section id="capabilities" className="py-32 px-6 md:px-12" style={{ background: "#070809" }}>
       <div className="max-w-[1400px] mx-auto">
         <div className="mb-20">
-          <div className="font-mono text-[10px] tracking-[0.2em] uppercase mb-6" style={{ color: "#8b8f98" }}>
+          <div
+            className="font-mono text-[10px] tracking-[0.2em] uppercase mb-6"
+            style={{ color: "#8b8f98" }}
+          >
             {t("W czym mogę pomóc")}
           </div>
           <h2
             className="font-sans font-bold leading-none"
-            style={{ fontSize: "clamp(36px, 5vw, 72px)", letterSpacing: "-0.04em", color: "#f5f5f5" }}
+            style={{
+              fontSize: "clamp(36px, 5vw, 72px)",
+              letterSpacing: "-0.04em",
+              color: "#f5f5f5",
+            }}
           >
             {t("Jeden developer.")}
             <br />
@@ -1141,8 +1565,13 @@ function Capabilities() {
           </h2>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-px" style={{ background: "#1a1d22" }}>
-          {caps.map((c, i) => <CapabilityCard key={c.n} cap={c} delay={i * 80} />)}
+        <div
+          className="grid md:grid-cols-2 lg:grid-cols-3 gap-px"
+          style={{ background: "#1a1d22" }}
+        >
+          {caps.map((c, i) => (
+            <CapabilityCard key={c.n} cap={c} delay={i * 80} />
+          ))}
         </div>
 
         {/* After-capabilities CTA */}
@@ -1155,7 +1584,9 @@ function Capabilities() {
               {t("Nie widzisz tutaj dokładnie tego, czego szukasz?")}
             </p>
             <p className="text-sm" style={{ color: "#8b8f98" }}>
-              {t("Możliwe, że i tak mogę pomóc. Nie zaczynam od katalogu usług — zaczynam od zrozumienia Twojej sytuacji.")}
+              {t(
+                "Możliwe, że i tak mogę pomóc. Nie zaczynam od katalogu usług — zaczynam od zrozumienia Twojej sytuacji.",
+              )}
             </p>
           </div>
           <a
@@ -1173,36 +1604,110 @@ function Capabilities() {
 // ─── Start From Problem ───────────────────────────────────────────────────────
 function VisualHighlights() {
   return (
-    <section className="relative overflow-hidden py-32 px-6 md:px-12" style={{ background: "#0a0b0d" }}>
+    <section
+      className="relative overflow-hidden py-32 px-6 md:px-12"
+      style={{ background: "#0a0b0d" }}
+    >
       <div className="blue-flare blue-flare--right" aria-hidden="true" />
       <div className="max-w-[1400px] mx-auto relative z-10">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-14">
           <div>
-            <div className="font-mono text-[10px] tracking-[0.2em] uppercase mb-5" style={{ color: "#5b6ef5" }}>{t("Od problemu do rozwiązania")}</div>
-            <h2 className="font-sans font-bold leading-none" style={{ fontSize: "clamp(34px, 4.5vw, 64px)", letterSpacing: "-0.04em", color: "#f5f5f5" }}>
-              {t("Dobre rozwiązanie")}<br /><span style={{ color: "#8b8f98" }}>{t("widać w codziennej pracy.")}</span>
+            <div
+              className="font-mono text-[10px] tracking-[0.2em] uppercase mb-5"
+              style={{ color: "#5b6ef5" }}
+            >
+              {t("Od problemu do rozwiązania")}
+            </div>
+            <h2
+              className="font-sans font-bold leading-none"
+              style={{
+                fontSize: "clamp(34px, 4.5vw, 64px)",
+                letterSpacing: "-0.04em",
+                color: "#f5f5f5",
+              }}
+            >
+              {t("Dobre rozwiązanie")}
+              <br />
+              <span style={{ color: "#8b8f98" }}>{t("widać w codziennej pracy.")}</span>
             </h2>
           </div>
-          <p className="max-w-sm text-sm leading-relaxed" style={{ color: "#8b8f98" }}>{t("Najpierw porządkujemy proces. Potem dbam, żeby całość działała stabilnie w tle.")}</p>
+          <p className="max-w-sm text-sm leading-relaxed" style={{ color: "#8b8f98" }}>
+            {t("Najpierw porządkujemy proces. Potem dbam, żeby całość działała stabilnie w tle.")}
+          </p>
         </div>
         <div className="grid md:grid-cols-2 gap-6">
-          <article className="relative min-h-[420px] overflow-hidden" style={{ border: "1px solid #303844" }}>
-            <img src={workflowPlanning} srcSet={`${workflowPlanningMobile} 480w, ${workflowPlanningRetina} 768w, ${workflowPlanning} 1536w`} sizes="(max-width: 767px) calc(100vw - 3rem), 50vw" alt={t("Planowanie procesu pracy przy biurku")} loading="lazy" decoding="async" className="absolute inset-0 w-full h-full object-cover" />
-            <div className="absolute inset-0" style={{ background: "linear-gradient(90deg, rgba(7,8,9,0.86) 0%, rgba(7,8,9,0.3) 72%)" }} />
+          <article
+            className="relative min-h-[420px] overflow-hidden"
+            style={{ border: "1px solid #303844" }}
+          >
+            <img
+              src={workflowPlanning}
+              srcSet={`${workflowPlanningMobile} 480w, ${workflowPlanningRetina} 768w, ${workflowPlanning} 1536w`}
+              sizes="(max-width: 767px) calc(100vw - 3rem), 50vw"
+              alt={t("Planowanie procesu pracy przy biurku")}
+              loading="lazy"
+              decoding="async"
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+            <div
+              className="absolute inset-0"
+              style={{
+                background: "linear-gradient(90deg, rgba(7,8,9,0.86) 0%, rgba(7,8,9,0.3) 72%)",
+              }}
+            />
             <div className="relative h-full p-8 flex flex-col justify-end max-w-sm">
-              <div className="font-mono text-[10px] tracking-[0.18em] uppercase mb-4" style={{ color: "#93a0ff" }}>{t("01 / Najpierw zrozumienie")}</div>
-              <h3 className="text-2xl font-bold mb-3" style={{ color: "#f5f5f5" }}>{t("Mniej zgadywania.")}<br />{t("Więcej jasności.")}</h3>
-              <p className="text-sm leading-relaxed" style={{ color: "#d0d4db" }}>{t("Wspólnie układamy problem, cele i sensowne kolejne kroki.")}</p>
+              <div
+                className="font-mono text-[10px] tracking-[0.18em] uppercase mb-4"
+                style={{ color: "#93a0ff" }}
+              >
+                {t("01 / Najpierw zrozumienie")}
+              </div>
+              <h3 className="text-2xl font-bold mb-3" style={{ color: "#f5f5f5" }}>
+                {t("Mniej zgadywania.")}
+                <br />
+                {t("Więcej jasności.")}
+              </h3>
+              <p className="text-sm leading-relaxed" style={{ color: "#d0d4db" }}>
+                {t("Wspólnie układamy problem, cele i sensowne kolejne kroki.")}
+              </p>
             </div>
           </article>
-          <article className="relative min-h-[420px] overflow-hidden" style={{ border: "1px solid #303844" }}>
-            <img src={serverConfiguration} srcSet={`${serverConfigurationMobile} 480w, ${serverConfigurationRetina} 768w, ${serverConfiguration} 1536w`} sizes="(max-width: 767px) calc(100vw - 3rem), 50vw" alt={t("Skonfigurowana infrastruktura serwerowa")} loading="lazy" decoding="async" className="absolute inset-0 w-full h-full object-cover" />
-            <div className="absolute inset-0" style={{ background: "linear-gradient(90deg, rgba(7,8,9,0.84) 0%, rgba(7,8,9,0.22) 75%)" }} />
-            <div className="absolute top-5 right-5 w-40 h-40" style={{ background: "radial-gradient(circle, rgba(7,8,9,0.5), transparent 70%)" }}><InfrastructureOrbit /></div>
+          <article
+            className="relative min-h-[420px] overflow-hidden"
+            style={{ border: "1px solid #303844" }}
+          >
+            <img
+              src={serverConfiguration}
+              srcSet={`${serverConfigurationMobile} 480w, ${serverConfigurationRetina} 768w, ${serverConfiguration} 1536w`}
+              sizes="(max-width: 767px) calc(100vw - 3rem), 50vw"
+              alt={t("Skonfigurowana infrastruktura serwerowa")}
+              loading="lazy"
+              decoding="async"
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+            <div
+              className="absolute inset-0"
+              style={{
+                background: "linear-gradient(90deg, rgba(7,8,9,0.84) 0%, rgba(7,8,9,0.22) 75%)",
+              }}
+            />
             <div className="relative h-full p-8 flex flex-col justify-end max-w-sm">
-              <div className="font-mono text-[10px] tracking-[0.18em] uppercase mb-4" style={{ color: "#93a0ff" }}>{t("02 / Stabilne zaplecze")}</div>
-              <h3 className="text-2xl font-bold mb-3" style={{ color: "#f5f5f5" }}>{t("Technologia, która")}<br />{t("po prostu działa.")}</h3>
-              <p className="text-sm leading-relaxed" style={{ color: "#d0d4db" }}>{t("Konfiguracja, bezpieczeństwo i monitoring dopasowane do skali Twojego biznesu.")}</p>
+              <div
+                className="font-mono text-[10px] tracking-[0.18em] uppercase mb-4"
+                style={{ color: "#93a0ff" }}
+              >
+                {t("02 / Stabilne zaplecze")}
+              </div>
+              <h3 className="text-2xl font-bold mb-3" style={{ color: "#f5f5f5" }}>
+                {t("Technologia, która")}
+                <br />
+                {t("po prostu działa.")}
+              </h3>
+              <p className="text-sm leading-relaxed" style={{ color: "#d0d4db" }}>
+                {t(
+                  "Konfiguracja, bezpieczeństwo i monitoring dopasowane do skali Twojego biznesu.",
+                )}
+              </p>
             </div>
           </article>
         </div>
@@ -1217,7 +1722,12 @@ function StartFromProblem() {
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) setVisible(true); }, { threshold: 0.3 });
+    const obs = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting) setVisible(true);
+      },
+      { threshold: 0.3 },
+    );
     obs.observe(el);
     return () => obs.disconnect();
   }, []);
@@ -1235,19 +1745,32 @@ function StartFromProblem() {
           }}
         >
           <div>
-            <div className="font-mono text-[10px] tracking-[0.2em] uppercase mb-8" style={{ color: "#8b8f98" }}>
+            <div
+              className="font-mono text-[10px] tracking-[0.2em] uppercase mb-8"
+              style={{ color: "#8b8f98" }}
+            >
               {t("Pierwszy kontakt")}
             </div>
             <h2
               className="font-sans font-bold leading-none mb-8"
-              style={{ fontSize: "clamp(36px, 5vw, 72px)", letterSpacing: "-0.04em", color: "#f5f5f5", lineHeight: 0.95 }}
+              style={{
+                fontSize: "clamp(36px, 5vw, 72px)",
+                letterSpacing: "-0.04em",
+                color: "#f5f5f5",
+                lineHeight: 0.95,
+              }}
             >
               {t("Napisz, co chcesz")}
               <br />
               {t("osiągnąć.")}
             </h2>
-            <p className="text-base leading-relaxed mb-4 max-w-md" style={{ color: "#8b8f98", lineHeight: 1.8 }}>
-              {t("Kilka zdań o sytuacji i celu wystarczy. Nie musisz przygotowywać briefu ani znać technologii.")}
+            <p
+              className="text-base leading-relaxed mb-4 max-w-md"
+              style={{ color: "#8b8f98", lineHeight: 1.8 }}
+            >
+              {t(
+                "Kilka zdań o sytuacji i celu wystarczy. Nie musisz przygotowywać briefu ani znać technologii.",
+              )}
             </p>
             <p className="text-sm mb-10" style={{ color: "#8b8f98" }}>
               {t("Odpowiem konkretnie: co warto zrobić dalej i czy mogę realnie pomóc.")}
@@ -1261,12 +1784,34 @@ function StartFromProblem() {
             </a>
           </div>
 
-          <div className="relative min-h-[400px] overflow-hidden" style={{ border: "1px solid #303844", boxShadow: "20px 20px 0 rgba(91,110,245,0.07)" }}>
-            <img src={firstConversation} srcSet={`${firstConversationMobile} 480w, ${firstConversationRetina} 768w, ${firstConversation} 1536w`} sizes="(max-width: 767px) calc(100vw - 3rem), 50vw" alt={t("Pierwsza rozmowa o projekcie")} loading="lazy" decoding="async" className="absolute inset-0 w-full h-full object-cover" style={{ objectPosition: "70% center" }} />
-            <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(7,8,9,0.08), rgba(7,8,9,0.82))" }} />
+          <div
+            className="relative min-h-[400px] overflow-hidden"
+            style={{ border: "1px solid #303844", boxShadow: "20px 20px 0 rgba(91,110,245,0.07)" }}
+          >
+            <img
+              src={firstConversation}
+              srcSet={`${firstConversationMobile} 480w, ${firstConversationRetina} 768w, ${firstConversation} 1536w`}
+              sizes="(max-width: 767px) calc(100vw - 3rem), 50vw"
+              alt={t("Pierwsza rozmowa o projekcie")}
+              loading="lazy"
+              decoding="async"
+              className="absolute inset-0 w-full h-full object-cover"
+              style={{ objectPosition: "70% center" }}
+            />
+            <div
+              className="absolute inset-0"
+              style={{ background: "linear-gradient(180deg, rgba(7,8,9,0.08), rgba(7,8,9,0.82))" }}
+            />
             <div className="absolute bottom-0 left-0 right-0 p-8">
-              <div className="font-mono text-[10px] tracking-[0.18em] uppercase mb-4" style={{ color: "#93a0ff" }}>{t("Bez formalności")}</div>
-              <p className="text-base leading-relaxed max-w-sm" style={{ color: "#f5f5f5" }}>{t("Krótka wiadomość wystarczy, aby zacząć. Resztę wspólnie uporządkujemy.")}</p>
+              <div
+                className="font-mono text-[10px] tracking-[0.18em] uppercase mb-4"
+                style={{ color: "#93a0ff" }}
+              >
+                {t("Bez formalności")}
+              </div>
+              <p className="text-base leading-relaxed max-w-sm" style={{ color: "#f5f5f5" }}>
+                {t("Krótka wiadomość wystarczy, aby zacząć. Resztę wspólnie uporządkujemy.")}
+              </p>
             </div>
           </div>
         </div>
@@ -1277,25 +1822,32 @@ function StartFromProblem() {
 
 // ─── Process ──────────────────────────────────────────────────────────────────
 const steps = [
-  { n: "01", title: "ROZMAWIAMY", desc: "Opisujesz problem lub cel. Bez potrzeby przygotowywania technicznego briefu." },
-  { n: "02", title: "ANALIZUJĘ", desc: "Sprawdzam proces, istniejące systemy oraz ograniczenia, które warto uwzględnić." },
-  { n: "03", title: "PROPONUJĘ ROZWIĄZANIE", desc: "Ustalamy zakres, sposób realizacji, koszt i kolejne kroki przed rozpoczęciem prac." },
-  { n: "04", title: "BUDUJĘ", desc: "Realizuję rozwiązanie etapami, z bezpośrednim kontaktem i widocznym postępem." },
-  { n: "05", title: "WDRAŻAM", desc: "Testy, konfiguracja produkcyjna, uruchomienie i monitoring krytycznych elementów." },
-  { n: "06", title: "ROZWIJAMY", desc: "Po starcie możliwe jest dalsze utrzymanie, rozwój i spokojne porządkowanie kolejnych potrzeb." },
+  { n: "01", title: "ROZMOWA", desc: "Opisujesz problem lub cel." },
+  { n: "02", title: "ANALIZA", desc: "Sprawdzam proces i ograniczenia." },
+  { n: "03", title: "ZAKRES", desc: "Ustalamy kierunek i kolejne kroki." },
+  { n: "04", title: "REALIZACJA", desc: "Buduję etapami, z widocznym postępem." },
+  { n: "05", title: "WDROŻENIE", desc: "Testy, uruchomienie i monitoring." },
+  { n: "06", title: "ROZWÓJ", desc: "Utrzymanie i dalsze usprawnienia." },
 ];
 
 function Process() {
   return (
     <section id="process" className="py-32 px-6 md:px-12" style={{ background: "#0a0b0d" }}>
       <div className="max-w-[1400px] mx-auto">
-        <div className="mb-20">
-          <div className="font-mono text-[10px] tracking-[0.2em] uppercase mb-6" style={{ color: "#8b8f98" }}>
+        <div className="mb-14">
+          <div
+            className="font-mono text-[10px] tracking-[0.2em] uppercase mb-6"
+            style={{ color: "#8b8f98" }}
+          >
             {t("Jak działam")}
           </div>
           <h2
             className="font-sans font-bold leading-none"
-            style={{ fontSize: "clamp(36px, 5vw, 72px)", letterSpacing: "-0.04em", color: "#f5f5f5" }}
+            style={{
+              fontSize: "clamp(36px, 5vw, 72px)",
+              letterSpacing: "-0.04em",
+              color: "#f5f5f5",
+            }}
           >
             {t("Przejrzysty")}
             <br />
@@ -1303,20 +1855,52 @@ function Process() {
           </h2>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-px" style={{ background: "#1a1d22" }}>
-          {steps.map((step) => (
-            <div
-              key={step.n}
-              className="p-8"
-              style={{ background: "#0a0b0d", transition: "background 0.3s" }}
-              onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "#070809")}
-              onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "#0a0b0d")}
-            >
-              <div className="font-mono text-[9px] tracking-widest mb-8" style={{ color: "#5b6ef5" }}>{step.n}</div>
-              <h3 className="font-mono text-xs tracking-[0.15em] mb-3" style={{ color: "#f5f5f5" }}>{t(step.title)}</h3>
-              <p className="text-sm leading-relaxed" style={{ color: "#8b8f98", lineHeight: 1.7 }}>{t(step.desc)}</p>
-            </div>
-          ))}
+        <div className="relative">
+          <div
+            className="pointer-events-none absolute left-[8.33%] right-[8.33%] top-[38px] hidden h-px lg:block"
+            aria-hidden="true"
+            style={{
+              background:
+                "linear-gradient(90deg, transparent, rgba(91,110,245,0.62) 12%, rgba(91,110,245,0.22) 88%, transparent)",
+            }}
+          />
+          <div
+            className="grid md:grid-cols-2 lg:grid-cols-6 gap-px"
+            style={{ background: "#1a1d22" }}
+          >
+            {steps.map((step) => (
+              <div
+                key={step.n}
+                className="relative z-10 min-h-[210px] p-6 md:p-7"
+                style={{ background: "#0a0b0d", transition: "background 0.3s" }}
+                onMouseEnter={(e) =>
+                  ((e.currentTarget as HTMLElement).style.background = "#070809")
+                }
+                onMouseLeave={(e) =>
+                  ((e.currentTarget as HTMLElement).style.background = "#0a0b0d")
+                }
+              >
+                <div
+                  className="font-mono text-3xl tracking-[-0.08em] mb-6"
+                  style={{ color: "#7383ff" }}
+                >
+                  {step.n}
+                </div>
+                <h3
+                  className="font-mono text-[10px] tracking-[0.15em] mb-4"
+                  style={{ color: "#f5f5f5" }}
+                >
+                  {t(step.title)}
+                </h3>
+                <p
+                  className="text-sm leading-relaxed"
+                  style={{ color: "#a5aab4", lineHeight: 1.72 }}
+                >
+                  {t(step.desc)}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </section>
@@ -1331,7 +1915,13 @@ function About() {
         <div className="grid md:grid-cols-2 gap-20 items-start">
           {/* Portrait */}
           <div className="relative">
-            <div className="aspect-[3/4] max-w-sm relative overflow-hidden" style={{ border: "1px solid #252a33", boxShadow: "24px 24px 0 rgba(91,110,245,0.08)" }}>
+            <div
+              className="aspect-[3/4] max-w-sm relative overflow-hidden"
+              style={{
+                border: "1px solid #252a33",
+                boxShadow: "24px 24px 0 rgba(91,110,245,0.08)",
+              }}
+            >
               <img
                 src={aboutPortrait}
                 srcSet={`${aboutPortraitMobile} 480w, ${aboutPortrait} 768w`}
@@ -1342,43 +1932,126 @@ function About() {
                 className="absolute inset-0 w-full h-full object-cover"
                 style={{ objectPosition: "64% center", filter: "saturate(0.82) contrast(1.06)" }}
               />
-              <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(7,8,9,0.12) 30%, rgba(7,8,9,0.78) 100%)" }} />
-              <div className="absolute top-4 left-4 flex items-center gap-2 font-mono text-[9px] tracking-widest uppercase" style={{ color: "#d9ddff" }}>
-                <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#5b6ef5", boxShadow: "0 0 12px #5b6ef5" }} />
+              <div
+                className="absolute inset-0"
+                style={{
+                  background:
+                    "linear-gradient(180deg, rgba(7,8,9,0.12) 30%, rgba(7,8,9,0.78) 100%)",
+                }}
+              />
+              <div
+                className="absolute top-4 left-4 flex items-center gap-2 font-mono text-[9px] tracking-widest uppercase"
+                style={{ color: "#d9ddff" }}
+              >
+                <span
+                  className="w-1.5 h-1.5 rounded-full"
+                  style={{ background: "#5b6ef5", boxShadow: "0 0 12px #5b6ef5" }}
+                />
                 {t("Od pomysłu do wdrożenia")}
               </div>
-              <div className="absolute bottom-4 left-4 right-4 p-4" style={{ background: "rgba(7,8,9,0.68)", border: "1px solid rgba(255,255,255,0.12)", backdropFilter: "blur(10px)" }}>
-                <div className="font-mono text-[9px] tracking-[0.18em] uppercase mb-2" style={{ color: "#8b8f98" }}>{t("Twój partner techniczny")}</div>
-                <div className="text-sm font-medium" style={{ color: "#f5f5f5" }}>{t("Od planu po działające rozwiązanie.")}</div>
+              <div
+                className="absolute bottom-4 left-4 right-4 p-4"
+                style={{
+                  background: "rgba(7,8,9,0.68)",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  backdropFilter: "blur(10px)",
+                }}
+              >
+                <div
+                  className="font-mono text-[9px] tracking-[0.18em] uppercase mb-2"
+                  style={{ color: "#8b8f98" }}
+                >
+                  {t("Twój partner techniczny")}
+                </div>
+                <div className="text-sm font-medium" style={{ color: "#f5f5f5" }}>
+                  {t("Od planu po działające rozwiązanie.")}
+                </div>
               </div>
             </div>
           </div>
 
           {/* Bio */}
           <div>
-            <div className="font-mono text-[10px] tracking-[0.2em] uppercase mb-6" style={{ color: "#8b8f98" }}>{t("O mnie")}</div>
+            <div
+              className="font-mono text-[10px] tracking-[0.2em] uppercase mb-6"
+              style={{ color: "#8b8f98" }}
+            >
+              {t("O mnie")}
+            </div>
             <h2
               className="font-sans font-bold leading-tight mb-10"
-              style={{ fontSize: "clamp(30px, 4vw, 52px)", letterSpacing: "-0.04em", color: "#f5f5f5" }}
+              style={{
+                fontSize: "clamp(30px, 4vw, 52px)",
+                letterSpacing: "-0.04em",
+                color: "#f5f5f5",
+              }}
             >
               {t("Rozmawiasz bezpośrednio")}
               <br />
-              <span style={{ color: "#8b8f98" }}>{t("z osobą, która zajmie się Twoim projektem.")}</span>
+              <span style={{ color: "#8b8f98" }}>
+                {t("z osobą, która zajmie się Twoim projektem.")}
+              </span>
             </h2>
 
-            <p className="text-base leading-relaxed mb-5" style={{ color: "#8b8f98", lineHeight: 1.8 }}>
-              {t("Jestem Dawid — developer i twórca systemów z szerokim zakresem kompetencji. Buduję rozwiązania IT od A do Z: od pierwszej rozmowy o problemie, przez projekt i kod, aż po serwer i wdrożenie produkcyjne.")}
+            <p
+              className="text-base leading-relaxed mb-5"
+              style={{ color: "#8b8f98", lineHeight: 1.8 }}
+            >
+              {t(
+                "Jestem Dawid — developer i twórca systemów z szerokim zakresem kompetencji. Buduję rozwiązania IT od A do Z: od pierwszej rozmowy o problemie, przez projekt i kod, aż po serwer i wdrożenie produkcyjne.",
+              )}
             </p>
-            <p className="text-base leading-relaxed mb-10" style={{ color: "#8b8f98", lineHeight: 1.8 }}>
-              {t("Nie musisz koordynować kilku osób ani powtarzać tej samej historii. Masz jeden kontakt i jasną odpowiedzialność za cały projekt — także po wdrożeniu, gdy system działa już produkcyjnie.")}
+            <p
+              className="text-base leading-relaxed mb-10"
+              style={{ color: "#8b8f98", lineHeight: 1.8 }}
+            >
+              {t(
+                "Nie musisz koordynować kilku osób ani powtarzać tej samej historii. Masz jeden kontakt i jasną odpowiedzialność za cały projekt — także po wdrożeniu, gdy system działa już produkcyjnie.",
+              )}
             </p>
 
             <div
-              className="p-6 mb-8"
-              style={{ border: "1px solid rgba(91,110,245,0.2)", background: "rgba(91,110,245,0.03)" }}
+              className="grid grid-cols-3 gap-3 mb-10"
+              aria-label={t("Doświadczenie i zakres pracy")}
             >
-              <p className="text-sm leading-relaxed" style={{ color: "#8b8f98", fontStyle: "italic" }}>
-                &ldquo;{t("Dobieram technologię do problemu, nie odwrotnie. Dzięki temu możesz skupić się na swoim biznesie, a nie na technicznych decyzjach.")}&rdquo;
+              {[
+                ["10+ lat", "doświadczenia"],
+                ["Full-stack", "frontend · backend · infrastruktura"],
+                ["Production", "wdrożenie · monitoring · rozwój"],
+              ].map(([label, detail]) => (
+                <div key={label} className="pt-3" style={{ borderTop: "1px solid #303844" }}>
+                  <div
+                    className="font-mono text-[10px] tracking-wide mb-1"
+                    style={{ color: "#d9ddff" }}
+                  >
+                    {t(label)}
+                  </div>
+                  <div
+                    className="font-mono text-[9px] leading-relaxed"
+                    style={{ color: "#7d8795" }}
+                  >
+                    {t(detail)}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div
+              className="p-6 mb-8"
+              style={{
+                border: "1px solid rgba(91,110,245,0.2)",
+                background: "rgba(91,110,245,0.03)",
+              }}
+            >
+              <p
+                className="text-sm leading-relaxed"
+                style={{ color: "#8b8f98", fontStyle: "italic" }}
+              >
+                &ldquo;
+                {t(
+                  "Dobieram technologię do problemu, nie odwrotnie. Dzięki temu możesz skupić się na swoim biznesie, a nie na technicznych decyzjach.",
+                )}
+                &rdquo;
               </p>
             </div>
 
@@ -1401,7 +2074,14 @@ function About() {
 // ─── Contact ──────────────────────────────────────────────────────────────────
 function Contact() {
   const { language } = useLanguage();
-  const [form, setForm] = useState({ name: "", email: "", phone: "", budget: "", message: "", website: "" });
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    budget: "",
+    message: "",
+    website: "",
+  });
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [budgetOpen, setBudgetOpen] = useState(false);
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -1438,19 +2118,31 @@ function Contact() {
   };
 
   return (
-    <section id="contact" className="relative overflow-hidden py-40 px-6 md:px-12" style={{ background: "#0a0b0d" }}>
+    <section
+      id="contact"
+      className="relative overflow-hidden py-40 px-6 md:px-12"
+      style={{ background: "#0a0b0d" }}
+    >
       <div className="blue-flare blue-flare--left" aria-hidden="true" />
       <div className="blue-flare blue-flare--right" aria-hidden="true" />
       <div className="max-w-[1400px] mx-auto relative z-10">
         <div className="grid md:grid-cols-2 gap-20">
           {/* Left */}
           <div>
-            <div className="font-mono text-[10px] tracking-[0.2em] uppercase mb-8" style={{ color: "#8b8f98" }}>
+            <div
+              className="font-mono text-[10px] tracking-[0.2em] uppercase mb-8"
+              style={{ color: "#8b8f98" }}
+            >
               {t("Zacznijmy rozmowę")}
             </div>
             <h2
               className="font-sans font-bold leading-tight mb-6"
-              style={{ fontSize: "clamp(36px, 5vw, 72px)", letterSpacing: "-0.04em", color: "#f5f5f5", lineHeight: 0.95 }}
+              style={{
+                fontSize: "clamp(36px, 5vw, 72px)",
+                letterSpacing: "-0.04em",
+                color: "#f5f5f5",
+                lineHeight: 0.95,
+              }}
             >
               {t("Masz pomysł.")}
               <br />
@@ -1459,8 +2151,13 @@ function Contact() {
               {t("rozwiązanie.")}
             </h2>
 
-            <p className="text-base leading-relaxed mt-8 mb-6 max-w-sm" style={{ color: "#8b8f98", lineHeight: 1.75 }}>
-              {t("Napisz, jaki rezultat chcesz osiągnąć i co dziś utrudnia pracę. Im więcej kontekstu podasz, tym trafniej przygotuję odpowiedź.")}
+            <p
+              className="text-base leading-relaxed mt-8 mb-6 max-w-sm"
+              style={{ color: "#8b8f98", lineHeight: 1.75 }}
+            >
+              {t(
+                "Napisz, jaki rezultat chcesz osiągnąć i co dziś utrudnia pracę. Im więcej kontekstu podasz, tym trafniej przygotuję odpowiedź.",
+              )}
             </p>
             <p className="text-sm mb-12" style={{ color: "#8b8f98" }}>
               {t("Najpierw sprawdzę temat i wrócę z konkretną odpowiedzią.")}
@@ -1489,59 +2186,166 @@ function Contact() {
               </a>
             </div>
 
-            <div className="relative h-64 mt-12 overflow-hidden" style={{ border: "1px solid #303844" }}>
-              <img src={contactDesk} srcSet={`${contactDeskMobile} 480w, ${contactDeskRetina} 640w, ${contactDesk} 1280w`} sizes="(max-width: 767px) calc(100vw - 3rem), 32rem" alt={t("Spokojne miejsce pracy")} loading="lazy" decoding="async" className="absolute inset-0 w-full h-full object-cover" />
-              <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, transparent, rgba(7,8,9,0.78))" }} />
-              <div className="absolute bottom-5 left-5 font-mono text-[9px] tracking-[0.16em] uppercase" style={{ color: "#d9ddff" }}>{t("Odpowiadam osobiście")}</div>
+            <div
+              className="relative h-64 mt-12 overflow-hidden"
+              style={{ border: "1px solid #303844" }}
+            >
+              <img
+                src={contactDesk}
+                srcSet={`${contactDeskMobile} 480w, ${contactDeskRetina} 640w, ${contactDesk} 1280w`}
+                sizes="(max-width: 767px) calc(100vw - 3rem), 32rem"
+                alt={t("Spokojne miejsce pracy")}
+                loading="lazy"
+                decoding="async"
+                className="absolute inset-0 w-full h-full object-cover"
+              />
+              <div
+                className="absolute inset-0"
+                style={{ background: "linear-gradient(180deg, transparent, rgba(7,8,9,0.78))" }}
+              />
+              <div
+                className="absolute bottom-5 left-5 font-mono text-[9px] tracking-[0.16em] uppercase"
+                style={{ color: "#d9ddff" }}
+              >
+                {t("Odpowiadam osobiście")}
+              </div>
             </div>
           </div>
 
           {/* Form */}
-          <div className="p-6 md:p-10" style={{ border: "1px solid #303844", background: "linear-gradient(145deg, rgba(21,24,31,0.9), rgba(10,11,13,0.88))", boxShadow: "20px 20px 0 rgba(91,110,245,0.06)" }}>
+          <div
+            className="p-6 md:p-10"
+            style={{
+              border: "1px solid #303844",
+              background: "linear-gradient(145deg, rgba(21,24,31,0.9), rgba(10,11,13,0.88))",
+              boxShadow: "20px 20px 0 rgba(91,110,245,0.06)",
+            }}
+          >
             {status === "sent" ? (
-              <div className="relative isolate min-h-[360px] overflow-hidden p-8 md:p-10 flex flex-col justify-center" role="status" aria-live="polite" style={{ border: "1px solid rgba(91,110,245,0.28)", background: "radial-gradient(circle at 88% 12%, rgba(91,110,245,0.16), transparent 36%), linear-gradient(145deg, rgba(30,35,58,0.68), rgba(10,11,13,0.82))" }}>
-                <div className="absolute -right-16 -top-20 h-52 w-52 rounded-full opacity-60" aria-hidden="true" style={{ border: "1px solid rgba(147,160,255,0.22)", boxShadow: "0 0 0 24px rgba(91,110,245,0.035), 0 0 0 48px rgba(91,110,245,0.02)" }} />
+              <div
+                className="relative isolate min-h-[360px] overflow-hidden p-8 md:p-10 flex flex-col justify-center"
+                role="status"
+                aria-live="polite"
+                style={{
+                  border: "1px solid rgba(91,110,245,0.28)",
+                  background:
+                    "radial-gradient(circle at 88% 12%, rgba(91,110,245,0.16), transparent 36%), linear-gradient(145deg, rgba(30,35,58,0.68), rgba(10,11,13,0.82))",
+                }}
+              >
+                <div
+                  className="absolute -right-16 -top-20 h-52 w-52 rounded-full opacity-60"
+                  aria-hidden="true"
+                  style={{
+                    border: "1px solid rgba(147,160,255,0.22)",
+                    boxShadow:
+                      "0 0 0 24px rgba(91,110,245,0.035), 0 0 0 48px rgba(91,110,245,0.02)",
+                  }}
+                />
                 <div className="relative z-10 max-w-md">
-                  <div className="mb-7 flex h-12 w-12 items-center justify-center rounded-full" style={{ border: "1px solid rgba(147,160,255,0.54)", background: "rgba(91,110,245,0.14)", boxShadow: "0 0 30px rgba(91,110,245,0.18)" }}>
+                  <div
+                    className="mb-7 flex h-12 w-12 items-center justify-center rounded-full"
+                    style={{
+                      border: "1px solid rgba(147,160,255,0.54)",
+                      background: "rgba(91,110,245,0.14)",
+                      boxShadow: "0 0 30px rgba(91,110,245,0.18)",
+                    }}
+                  >
                     <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                      <path d="m5 12 4.2 4.2L19.5 6" stroke="#d9ddff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                      <path
+                        d="m5 12 4.2 4.2L19.5 6"
+                        stroke="#d9ddff"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
                     </svg>
                   </div>
-                  <p className="mb-4 font-mono text-[10px] tracking-[0.2em] uppercase" style={{ color: "#93a0ff" }}>{t("Wiadomość dotarła")}</p>
-                  <h3 className="font-sans font-bold text-3xl md:text-4xl mb-4 tracking-tight" style={{ letterSpacing: "-0.04em", color: "#f5f5f5" }}>
+                  <p
+                    className="mb-4 font-mono text-[10px] tracking-[0.2em] uppercase"
+                    style={{ color: "#93a0ff" }}
+                  >
+                    {t("Wiadomość dotarła")}
+                  </p>
+                  <h3
+                    className="font-sans font-bold text-3xl md:text-4xl mb-4 tracking-tight"
+                    style={{ letterSpacing: "-0.04em", color: "#f5f5f5" }}
+                  >
                     {t("Dziękuję za kontakt.")}
                   </h3>
-                  <p className="text-sm leading-relaxed" style={{ color: "#b5bbc6" }}>{t("Odpowiem w ciągu 1–2 dni roboczych.")}</p>
-                  <div className="my-7 h-px w-full" style={{ background: "linear-gradient(90deg, rgba(147,160,255,0.42), rgba(147,160,255,0))" }} />
-                  <p className="mb-6 text-xs leading-relaxed" style={{ color: "#8b8f98" }}>{t("Możesz spokojnie zamknąć tę stronę — wiadomość jest już u mnie.")}</p>
-                  <button type="button" onClick={() => setStatus("idle")} className="liquid-button liquid-button--secondary inline-flex w-fit items-center gap-2 px-5 py-3 font-mono text-[9px] tracking-[0.16em] uppercase" style={{ color: "#d9ddff" }}>
-                    <span aria-hidden="true">+</span>{t("Wyślij kolejną wiadomość")}
+                  <p className="text-sm leading-relaxed" style={{ color: "#b5bbc6" }}>
+                    {t("Odpowiem w ciągu 1–2 dni roboczych.")}
+                  </p>
+                  <div
+                    className="my-7 h-px w-full"
+                    style={{
+                      background:
+                        "linear-gradient(90deg, rgba(147,160,255,0.42), rgba(147,160,255,0))",
+                    }}
+                  />
+                  <p className="mb-6 text-xs leading-relaxed" style={{ color: "#8b8f98" }}>
+                    {t("Możesz spokojnie zamknąć tę stronę — wiadomość jest już u mnie.")}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setStatus("idle")}
+                    className="liquid-button liquid-button--secondary inline-flex w-fit items-center gap-2 px-5 py-3 font-mono text-[9px] tracking-[0.16em] uppercase"
+                    style={{ color: "#d9ddff" }}
+                  >
+                    <span aria-hidden="true">+</span>
+                    {t("Wyślij kolejną wiadomość")}
                   </button>
                 </div>
               </div>
             ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div aria-hidden="true" className="absolute -left-[10000px] h-px w-px overflow-hidden">
-                <label htmlFor="contact-website">Website</label>
-                <input
-                  id="contact-website"
-                  name="website"
-                  type="text"
-                  tabIndex={-1}
-                  autoComplete="off"
-                  value={form.website}
-                  onChange={(e) => setForm((current) => ({ ...current, website: e.target.value }))}
-                />
-              </div>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div
+                  aria-hidden="true"
+                  className="absolute -left-[10000px] h-px w-px overflow-hidden"
+                >
+                  <label htmlFor="contact-website">Website</label>
+                  <input
+                    id="contact-website"
+                    name="website"
+                    type="text"
+                    tabIndex={-1}
+                    autoComplete="off"
+                    value={form.website}
+                    onChange={(e) =>
+                      setForm((current) => ({ ...current, website: e.target.value }))
+                    }
+                  />
+                </div>
                 {status === "error" && (
-                  <p className="p-4 text-sm" role="alert" style={{ color: "#ffb4b4", border: "1px solid rgba(255, 120, 120, 0.35)", background: "rgba(255, 120, 120, 0.06)" }}>
-                    {t("Nie udało się wysłać wiadomości. Spróbuj ponownie lub napisz bezpośrednio na dawid@grzywniak.pl.")}
+                  <p
+                    className="p-4 text-sm"
+                    role="alert"
+                    style={{
+                      color: "#ffb4b4",
+                      border: "1px solid rgba(255, 120, 120, 0.35)",
+                      background: "rgba(255, 120, 120, 0.06)",
+                    }}
+                  >
+                    {t(
+                      "Nie udało się wysłać wiadomości. Spróbuj ponownie lub napisz bezpośrednio na dawid@grzywniak.pl.",
+                    )}
                   </p>
                 )}
                 <div>
-                  <label htmlFor="contact-name" className="block font-mono text-[9px] tracking-[0.2em] uppercase mb-2" style={{ color: "#8b8f98" }}>{t("Imię / Firma")}</label>
+                  <label
+                    htmlFor="contact-name"
+                    className="block font-mono text-[9px] tracking-[0.2em] uppercase mb-2"
+                    style={{ color: "#8b8f98" }}
+                  >
+                    {t("Imię / Firma")}
+                  </label>
                   <input
-                    id="contact-name" name="name" type="text" required maxLength={120} autoComplete="name" value={form.name}
+                    id="contact-name"
+                    name="name"
+                    type="text"
+                    required
+                    maxLength={120}
+                    autoComplete="name"
+                    value={form.name}
                     onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                     placeholder={t("Jak mam się do Ciebie zwracać?")}
                     style={{ ...inputStyle }}
@@ -1550,9 +2354,21 @@ function Contact() {
                   />
                 </div>
                 <div>
-                  <label htmlFor="contact-email" className="block font-mono text-[9px] tracking-[0.2em] uppercase mb-2" style={{ color: "#8b8f98" }}>{t("Email")}</label>
+                  <label
+                    htmlFor="contact-email"
+                    className="block font-mono text-[9px] tracking-[0.2em] uppercase mb-2"
+                    style={{ color: "#8b8f98" }}
+                  >
+                    {t("Email")}
+                  </label>
                   <input
-                    id="contact-email" name="email" type="email" required maxLength={254} autoComplete="email" value={form.email}
+                    id="contact-email"
+                    name="email"
+                    type="email"
+                    required
+                    maxLength={254}
+                    autoComplete="email"
+                    value={form.email}
                     onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
                     placeholder={t("Na jaki adres mam odpisać?")}
                     style={{ ...inputStyle }}
@@ -1561,9 +2377,21 @@ function Contact() {
                   />
                 </div>
                 <div>
-                  <label htmlFor="contact-phone" className="block font-mono text-[9px] tracking-[0.2em] uppercase mb-2" style={{ color: "#8b8f98" }}>{t("Telefon (opcjonalnie)")}</label>
+                  <label
+                    htmlFor="contact-phone"
+                    className="block font-mono text-[9px] tracking-[0.2em] uppercase mb-2"
+                    style={{ color: "#8b8f98" }}
+                  >
+                    {t("Telefon (opcjonalnie)")}
+                  </label>
                   <input
-                    id="contact-phone" name="phone" type="tel" inputMode="tel" maxLength={40} autoComplete="tel" value={form.phone}
+                    id="contact-phone"
+                    name="phone"
+                    type="tel"
+                    inputMode="tel"
+                    maxLength={40}
+                    autoComplete="tel"
+                    value={form.phone}
                     onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
                     placeholder={t("Np. +48 600 000 000")}
                     style={{ ...inputStyle }}
@@ -1572,24 +2400,63 @@ function Contact() {
                   />
                 </div>
                 <fieldset className="relative">
-                  <legend className="font-mono text-[9px] tracking-[0.2em] uppercase mb-2" style={{ color: "#8b8f98" }}>{t("Orientacyjny budżet (opcjonalnie)")}</legend>
-                  <p id="budget-help" className="text-xs mb-3" style={{ color: "#68707d" }}>{t("Pomoże mi lepiej przygotować pierwszą odpowiedź.")}</p>
+                  <legend
+                    className="font-mono text-[9px] tracking-[0.2em] uppercase mb-2"
+                    style={{ color: "#8b8f98" }}
+                  >
+                    {t("Orientacyjny budżet (opcjonalnie)")}
+                  </legend>
+                  <p id="budget-help" className="text-xs mb-3" style={{ color: "#68707d" }}>
+                    {t("Pomoże mi lepiej przygotować pierwszą odpowiedź.")}
+                  </p>
                   <button
                     type="button"
                     aria-expanded={budgetOpen}
                     aria-controls="budget-options"
                     onClick={() => setBudgetOpen((open) => !open)}
                     className="flex min-h-12 w-full items-center justify-between gap-4 px-4 text-left font-mono text-[10px] tracking-wide"
-                    style={{ color: form.budget ? "#dce1ff" : "#8b8f98", border: `1px solid ${budgetOpen ? "rgba(112, 130, 255, 0.72)" : "#1a1d22"}`, background: budgetOpen ? "rgba(91, 110, 245, 0.09)" : "rgba(7, 8, 9, 0.44)", transition: "color 0.2s, border-color 0.2s, background 0.2s" }}
+                    style={{
+                      color: form.budget ? "#dce1ff" : "#8b8f98",
+                      border: `1px solid ${budgetOpen ? "rgba(112, 130, 255, 0.72)" : "#1a1d22"}`,
+                      background: budgetOpen ? "rgba(91, 110, 245, 0.09)" : "rgba(7, 8, 9, 0.44)",
+                      transition: "color 0.2s, border-color 0.2s, background 0.2s",
+                    }}
                   >
                     <span>{form.budget ? t(form.budget) : t("Wybierz przedział budżetowy")}</span>
-                    <span aria-hidden="true" className="text-base leading-none" style={{ color: "#93a0ff", transform: budgetOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }}>⌄</span>
+                    <span
+                      aria-hidden="true"
+                      className="text-base leading-none"
+                      style={{
+                        color: "#93a0ff",
+                        transform: budgetOpen ? "rotate(180deg)" : "rotate(0deg)",
+                        transition: "transform 0.2s",
+                      }}
+                    >
+                      ⌄
+                    </span>
                   </button>
                   {budgetOpen && (
-                    <div id="budget-options" className="budget-dropdown absolute top-full left-0 right-0 z-20 mt-2 grid grid-cols-2 gap-2 p-2" role="group" aria-describedby="budget-help" style={{ border: "1px solid rgba(91, 110, 245, 0.24)", background: "rgba(7, 8, 9, 0.96)", boxShadow: "0 16px 38px rgba(0, 0, 0, 0.36)" }}>
+                    <div
+                      id="budget-options"
+                      className="budget-dropdown absolute top-full left-0 right-0 z-20 mt-2 grid grid-cols-2 gap-2 p-2"
+                      role="group"
+                      aria-describedby="budget-help"
+                      style={{
+                        border: "1px solid rgba(91, 110, 245, 0.24)",
+                        background: "rgba(7, 8, 9, 0.96)",
+                        boxShadow: "0 16px 38px rgba(0, 0, 0, 0.36)",
+                      }}
+                    >
                       {[
-                        "Do 1 tys. zł", "1–2 tys. zł", "2–5 tys. zł", "5–10 tys. zł",
-                        "10–20 tys. zł", "20–50 tys. zł", "50–100 tys. zł", "100 tys. zł+", "Jeszcze nie wiem",
+                        "Do 1 tys. zł",
+                        "1–2 tys. zł",
+                        "2–5 tys. zł",
+                        "5–10 tys. zł",
+                        "10–20 tys. zł",
+                        "20–50 tys. zł",
+                        "50–100 tys. zł",
+                        "100 tys. zł+",
+                        "Jeszcze nie wiem",
                       ].map((option) => {
                         const selected = form.budget === option;
                         return (
@@ -1602,7 +2469,15 @@ function Contact() {
                               setBudgetOpen(false);
                             }}
                             className="min-h-11 px-3 text-left font-mono text-[10px] tracking-wide"
-                            style={{ color: selected ? "#dce1ff" : "#8b8f98", border: `1px solid ${selected ? "rgba(112, 130, 255, 0.72)" : "#1a1d22"}`, background: selected ? "rgba(91, 110, 245, 0.14)" : "rgba(7, 8, 9, 0.44)", cursor: "pointer", transition: "color 0.2s, border-color 0.2s, background 0.2s" }}
+                            style={{
+                              color: selected ? "#dce1ff" : "#8b8f98",
+                              border: `1px solid ${selected ? "rgba(112, 130, 255, 0.72)" : "#1a1d22"}`,
+                              background: selected
+                                ? "rgba(91, 110, 245, 0.14)"
+                                : "rgba(7, 8, 9, 0.44)",
+                              cursor: "pointer",
+                              transition: "color 0.2s, border-color 0.2s, background 0.2s",
+                            }}
                           >
                             {t(option)}
                           </button>
@@ -1612,16 +2487,30 @@ function Contact() {
                   )}
                 </fieldset>
                 <div>
-                  <label htmlFor="contact-message" className="block font-mono text-[9px] tracking-[0.2em] uppercase mb-2" style={{ color: "#8b8f98" }}>
+                  <label
+                    htmlFor="contact-message"
+                    className="block font-mono text-[9px] tracking-[0.2em] uppercase mb-2"
+                    style={{ color: "#8b8f98" }}
+                  >
                     {t("Co chcesz osiągnąć?")}
                   </label>
                   <textarea
-                    id="contact-message" name="message" required minLength={10} maxLength={5000} rows={6} value={form.message}
+                    id="contact-message"
+                    name="message"
+                    required
+                    minLength={10}
+                    maxLength={5000}
+                    rows={6}
+                    value={form.message}
                     onChange={(e) => setForm((f) => ({ ...f, message: e.target.value }))}
                     placeholder={t("Co dziś nie działa lub co chcesz usprawnić?")}
                     style={{ ...inputStyle, resize: "none" }}
-                    onFocus={(e) => ((e.target as HTMLTextAreaElement).style.borderColor = "#5b6ef5")}
-                    onBlur={(e) => ((e.target as HTMLTextAreaElement).style.borderColor = "#1a1d22")}
+                    onFocus={(e) =>
+                      ((e.target as HTMLTextAreaElement).style.borderColor = "#5b6ef5")
+                    }
+                    onBlur={(e) =>
+                      ((e.target as HTMLTextAreaElement).style.borderColor = "#1a1d22")
+                    }
                   />
                 </div>
                 <div className="pt-2">
@@ -1629,12 +2518,18 @@ function Contact() {
                     type="submit"
                     disabled={status === "sending"}
                     className="liquid-button liquid-button--primary w-full py-4 text-sm font-sans font-medium"
-                    style={{ letterSpacing: "-0.01em", cursor: status === "sending" ? "wait" : "pointer", opacity: status === "sending" ? 0.65 : 1 }}
+                    style={{
+                      letterSpacing: "-0.01em",
+                      cursor: status === "sending" ? "wait" : "pointer",
+                      opacity: status === "sending" ? 0.65 : 1,
+                    }}
                   >
                     {status === "sending" ? t("Wysyłanie…") : t("Wyślij wiadomość →")}
                   </button>
                   <p className="text-center text-xs mt-3" style={{ color: "#7d8795" }}>
-                    {t("Wiadomość zostanie wysłana bezpośrednio z formularza. Odpiszę w ciągu 1–2 dni.")}
+                    {t(
+                      "Wiadomość zostanie wysłana bezpośrednio z formularza. Odpiszę w ciągu 1–2 dni.",
+                    )}
                   </p>
                 </div>
               </form>
@@ -1653,8 +2548,18 @@ function ReturnToTop() {
     <section className="relative z-10 px-6 pt-20 md:px-12 md:pt-24 pb-10 md:pb-12">
       <div className="max-w-[1400px] mx-auto flex justify-center">
         <div className="return-to-top-wrap">
-          <a href="#" className="liquid-button liquid-button--secondary inline-flex items-center gap-3 px-5 py-3 font-mono text-[9px] tracking-[0.18em] uppercase" style={{ color: "#c8ceff" }}>
-            <span aria-hidden="true" className="flex h-5 w-5 items-center justify-center rounded-full" style={{ border: "1px solid rgba(183,193,255,0.36)" }}>↑</span>
+          <a
+            href="#"
+            className="liquid-button liquid-button--secondary inline-flex items-center gap-3 px-5 py-3 font-mono text-[9px] tracking-[0.18em] uppercase"
+            style={{ color: "#c8ceff" }}
+          >
+            <span
+              aria-hidden="true"
+              className="flex h-5 w-5 items-center justify-center rounded-full"
+              style={{ border: "1px solid rgba(183,193,255,0.36)" }}
+            >
+              ↑
+            </span>
             {t("Na górę")}
           </a>
         </div>
@@ -1665,9 +2570,28 @@ function ReturnToTop() {
 
 function Footer() {
   return (
-    <footer className="px-6 md:px-12 py-5 md:py-6" style={{ background: "#070809", borderTop: "1px solid #1a1d22" }}>
-      <div className="max-w-[1400px] mx-auto text-center font-mono text-[9px] tracking-[0.1em]" style={{ color: "#7d8795" }}>
-        {t("© 2026 Dawid Grzywniak — Wszelkie prawa zastrzeżone.")}
+    <footer
+      className="px-6 md:px-12 py-7 md:py-8"
+      style={{ background: "#070809", borderTop: "1px solid #1a1d22" }}
+    >
+      <div
+        className="max-w-[1400px] mx-auto flex flex-col gap-4 text-center font-mono text-[9px] tracking-[0.1em] md:flex-row md:items-center md:justify-between md:text-left"
+        style={{ color: "#7d8795" }}
+      >
+        <div>
+          <div className="mb-1 uppercase" style={{ color: "#b5bbc6" }}>
+            Dawid Grzywniak
+          </div>
+          <div>{t("Strony · Aplikacje · Automatyzacje")}</div>
+        </div>
+        <a
+          href="mailto:dawid@grzywniak.pl"
+          className="transition-colors hover:text-[#d9ddff]"
+          style={{ color: "#8b8f98" }}
+        >
+          dawid@grzywniak.pl
+        </a>
+        <div>{t("© 2026 Dawid Grzywniak")}</div>
       </div>
     </footer>
   );
@@ -1685,20 +2609,42 @@ function AppContent() {
       <Nav />
       <main id="main-content" className="relative z-10 page-content">
         <Hero />
-        <ScrollReveal><ValueProposition /></ScrollReveal>
-        <ScrollReveal><ProblemFirst /></ScrollReveal>
-        <ScrollReveal><Capabilities /></ScrollReveal>
-        <ScrollReveal><VisualHighlights /></ScrollReveal>
-        <ScrollReveal><StartFromProblem /></ScrollReveal>
-        <ScrollReveal><Process /></ScrollReveal>
-        <ScrollReveal><About /></ScrollReveal>
-        <ScrollReveal><Contact /></ScrollReveal>
+        <ScrollReveal>
+          <ValueProposition />
+        </ScrollReveal>
+        <ScrollReveal>
+          <ProblemFirst />
+        </ScrollReveal>
+        <ScrollReveal>
+          <Capabilities />
+        </ScrollReveal>
+        <ScrollReveal>
+          <VisualHighlights />
+        </ScrollReveal>
+        <ScrollReveal>
+          <StartFromProblem />
+        </ScrollReveal>
+        <ScrollReveal>
+          <Process />
+        </ScrollReveal>
+        <ScrollReveal>
+          <About />
+        </ScrollReveal>
+        <ScrollReveal>
+          <Contact />
+        </ScrollReveal>
       </main>
-      <div className="relative z-10 page-footer"><Footer /></div>
+      <div className="relative z-10 page-footer">
+        <Footer />
+      </div>
     </div>
   );
 }
 
 export default function App() {
-  return <I18nProvider><AppContent /></I18nProvider>;
+  return (
+    <I18nProvider>
+      <AppContent />
+    </I18nProvider>
+  );
 }
