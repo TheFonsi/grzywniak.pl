@@ -1403,6 +1403,7 @@ function Contact() {
   const { language } = useLanguage();
   const [form, setForm] = useState({ name: "", email: "", phone: "", budget: "", message: "", website: "" });
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [budgetOpen, setBudgetOpen] = useState(false);
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setStatus("sending");
@@ -1570,36 +1571,45 @@ function Contact() {
                     onBlur={(e) => ((e.target as HTMLInputElement).style.borderColor = "#1a1d22")}
                   />
                 </div>
-                <fieldset>
+                <fieldset className="relative">
                   <legend className="font-mono text-[9px] tracking-[0.2em] uppercase mb-2" style={{ color: "#8b8f98" }}>{t("Orientacyjny budżet (opcjonalnie)")}</legend>
                   <p id="budget-help" className="text-xs mb-3" style={{ color: "#68707d" }}>{t("Pomoże mi lepiej przygotować pierwszą odpowiedź.")}</p>
-                  <div className="grid grid-cols-2 gap-2" role="group" aria-describedby="budget-help">
-                    {[
-                      "Do 1 tys. zł", "1–2 tys. zł", "2–5 tys. zł", "5–10 tys. zł",
-                      "10–20 tys. zł", "20–50 tys. zł", "50–100 tys. zł", "100 tys. zł+", "Jeszcze nie wiem",
-                    ].map((option) => {
-                      const selected = form.budget === option;
-                      return (
-                        <button
-                          key={option}
-                          type="button"
-                          aria-pressed={selected}
-                          onClick={() => setForm((f) => ({ ...f, budget: f.budget === option ? "" : option }))}
-                          className="min-h-11 px-3 text-left font-mono text-[10px] tracking-wide"
-                          style={{
-                            color: selected ? "#dce1ff" : "#8b8f98",
-                            border: `1px solid ${selected ? "rgba(112, 130, 255, 0.72)" : "#1a1d22"}`,
-                            background: selected ? "rgba(91, 110, 245, 0.14)" : "rgba(7, 8, 9, 0.44)",
-                            boxShadow: selected ? "inset 0 0 0 1px rgba(91, 110, 245, 0.12), 0 0 18px rgba(91, 110, 245, 0.08)" : "none",
-                            cursor: "pointer",
-                            transition: "color 0.2s, border-color 0.2s, background 0.2s, box-shadow 0.2s",
-                          }}
-                        >
-                          {t(option)}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <button
+                    type="button"
+                    aria-expanded={budgetOpen}
+                    aria-controls="budget-options"
+                    onClick={() => setBudgetOpen((open) => !open)}
+                    className="flex min-h-12 w-full items-center justify-between gap-4 px-4 text-left font-mono text-[10px] tracking-wide"
+                    style={{ color: form.budget ? "#dce1ff" : "#8b8f98", border: `1px solid ${budgetOpen ? "rgba(112, 130, 255, 0.72)" : "#1a1d22"}`, background: budgetOpen ? "rgba(91, 110, 245, 0.09)" : "rgba(7, 8, 9, 0.44)", transition: "color 0.2s, border-color 0.2s, background 0.2s" }}
+                  >
+                    <span>{form.budget ? t(form.budget) : t("Wybierz przedział budżetowy")}</span>
+                    <span aria-hidden="true" className="text-base leading-none" style={{ color: "#93a0ff", transform: budgetOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }}>⌄</span>
+                  </button>
+                  {budgetOpen && (
+                    <div id="budget-options" className="budget-dropdown absolute top-full left-0 right-0 z-20 mt-2 grid grid-cols-2 gap-2 p-2" role="group" aria-describedby="budget-help" style={{ border: "1px solid rgba(91, 110, 245, 0.24)", background: "rgba(7, 8, 9, 0.96)", boxShadow: "0 16px 38px rgba(0, 0, 0, 0.36)" }}>
+                      {[
+                        "Do 1 tys. zł", "1–2 tys. zł", "2–5 tys. zł", "5–10 tys. zł",
+                        "10–20 tys. zł", "20–50 tys. zł", "50–100 tys. zł", "100 tys. zł+", "Jeszcze nie wiem",
+                      ].map((option) => {
+                        const selected = form.budget === option;
+                        return (
+                          <button
+                            key={option}
+                            type="button"
+                            aria-pressed={selected}
+                            onClick={() => {
+                              setForm((f) => ({ ...f, budget: f.budget === option ? "" : option }));
+                              setBudgetOpen(false);
+                            }}
+                            className="min-h-11 px-3 text-left font-mono text-[10px] tracking-wide"
+                            style={{ color: selected ? "#dce1ff" : "#8b8f98", border: `1px solid ${selected ? "rgba(112, 130, 255, 0.72)" : "#1a1d22"}`, background: selected ? "rgba(91, 110, 245, 0.14)" : "rgba(7, 8, 9, 0.44)", cursor: "pointer", transition: "color 0.2s, border-color 0.2s, background 0.2s" }}
+                          >
+                            {t(option)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </fieldset>
                 <div>
                   <label htmlFor="contact-message" className="block font-mono text-[9px] tracking-[0.2em] uppercase mb-2" style={{ color: "#8b8f98" }}>

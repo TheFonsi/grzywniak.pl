@@ -171,6 +171,7 @@ const english: Record<string, string> = {
   "Np. +48 600 000 000": "e.g. +48 600 000 000",
   "Orientacyjny budżet (opcjonalnie)": "Estimated budget (optional)",
   "Wybierz, jeśli chcesz podać": "Select if you wish to share it",
+  "Wybierz przedział budżetowy": "Choose a budget range",
   "Pomoże mi lepiej przygotować pierwszą odpowiedź.": "It helps me prepare a more useful first response.",
   "Do 1 tys. zł": "Up to PLN 1k",
   "1–2 tys. zł": "PLN 1k–2k",
