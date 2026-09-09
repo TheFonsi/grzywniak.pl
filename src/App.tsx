@@ -9,6 +9,7 @@ import oneContact from "./assets/one-contact.jpg";
 import manualProcess from "./assets/manual-process.jpg";
 import oneContactMobile from "./assets/responsive/one-contact.webp";
 import manualProcessMobile from "./assets/responsive/manual-process.webp";
+import manualProcessDesktop from "./assets/responsive/retina/manual-process.jpg";
 import workflowPlanningMobile from "./assets/responsive/workflow-planning.webp";
 import serverConfigurationMobile from "./assets/responsive/server-configuration.webp";
 import firstConversationMobile from "./assets/responsive/first-conversation.webp";
@@ -1026,12 +1027,16 @@ function ValueProposition() {
             style={{ border: "1px solid #303844" }}
           >
             <picture className="absolute inset-0 block">
-              <source media="(max-width: 767px)" srcSet={oneContactMobile} type="image/webp" />
+              <source
+                srcSet={`${oneContactMobile} 480w, ${oneContactRetina} 768w`}
+                sizes="(max-width: 767px) calc(100vw - 48px), (max-width: 1400px) 50vw, 700px"
+                type="image/webp"
+              />
               <img
                 src={oneContact}
-                srcSet={`${oneContactRetina} 768w, ${oneContact} 1536w`}
-                sizes="50vw"
                 alt={t("Wspólne planowanie rozwiązania")}
+                width="768"
+                height="512"
                 loading="lazy"
                 decoding="async"
                 className="w-full h-full object-cover"
@@ -1171,16 +1176,20 @@ function ProblemFirst() {
             className="relative min-h-[510px] overflow-hidden"
             style={{ border: "1px solid #303844", boxShadow: "18px 18px 0 rgba(91,110,245,0.06)" }}
           >
-            <img
-              src={manualProcess}
-              srcSet={`${manualProcessMobile} 480w, ${manualProcess} 727w`}
-              sizes="(max-width: 767px) 100vw, 50vw"
-              alt={t("Ręczne procesy w firmie")}
-              loading="lazy"
-              decoding="async"
-              className="absolute inset-0 w-full h-full object-cover"
-              style={{ objectPosition: "left center" }}
-            />
+            <picture className="absolute inset-0 block">
+              <source media="(max-width: 767px)" srcSet={manualProcessMobile} type="image/webp" />
+              <source media="(min-width: 768px)" srcSet={manualProcessDesktop} type="image/jpeg" />
+              <img
+                src={manualProcess}
+                alt={t("Ręczne procesy w firmie")}
+                width="960"
+                height="640"
+                loading="lazy"
+                decoding="async"
+                className="h-full w-full object-cover"
+                style={{ objectPosition: "left center" }}
+              />
+            </picture>
             <div
               className="absolute inset-0"
               style={{
