@@ -311,7 +311,7 @@ function Nav() {
             >
               &ldquo;
             </span>
-            <span className="font-sans text-[8px] md:text-[9px] italic font-medium leading-[1.35]">
+            <span className="font-sans text-xs italic font-medium leading-[1.35]">
               {t("Niemożliwe nie istnieje,")}
               <br />
               {t("ogranicza nas tylko kreatywność.")}
@@ -331,7 +331,7 @@ function Nav() {
             <li key={l.label}>
               <a
                 href={l.href}
-                className="block py-2 text-[10px] tracking-widest font-mono uppercase"
+                className="block py-2 text-sm tracking-widest font-mono uppercase"
                 style={{
                   color: "#8b8f98",
                   letterSpacing: "0.1em",
@@ -354,7 +354,7 @@ function Nav() {
 
         <a
           href="#contact"
-          className="nav-liquid-cta hidden md:flex items-center gap-2 text-[10px] font-mono tracking-widest uppercase px-5 py-3"
+          className="nav-liquid-cta hidden md:flex items-center gap-2 text-sm font-mono tracking-widest uppercase px-5 py-3"
           style={{ letterSpacing: "0.1em" }}
         >
           {t("Porozmawiajmy →")}
@@ -371,7 +371,7 @@ function Nav() {
               type="button"
               onClick={() => setLanguage(option.code)}
               aria-pressed={language === option.code}
-              className="min-h-9 min-w-9 px-2 py-1 font-mono text-[9px] tracking-widest md:px-2.5"
+              className="min-h-9 min-w-9 px-2 py-1 font-mono text-sm tracking-widest md:px-2.5"
               style={{
                 color: language === option.code ? "#f5f5f5" : "#7d8795",
                 borderBottom:
@@ -597,7 +597,7 @@ function Nav() {
     <div className="relative w-full h-full">
       <canvas ref={canvasRef} className="w-full h-full" style={{ opacity: 0.9 }} />
       <div className="absolute top-5 left-5 max-w-52 pointer-events-none transition-opacity duration-200" style={{ opacity: activeNode ? 1 : 0.7 }}>
-        <div className="font-mono text-[9px] tracking-[0.18em] uppercase mb-2" style={{ color: "#5b6ef5" }}>
+        <div className="font-mono text-xs tracking-[0.18em] uppercase mb-2" style={{ color: "#5b6ef5" }}>
           {activeNode ? activeNode.label : t("Interaktywna mapa")}
         </div>
         <p className="text-xs leading-relaxed" style={{ color: "#8b8f98" }}>
@@ -855,7 +855,7 @@ function Hero() {
                 style={{ background: "#5b6ef5" }}
               />
               <span
-                className="font-mono text-[10px] tracking-[0.2em] uppercase"
+                className="font-mono text-sm tracking-[0.2em] uppercase"
                 style={{ color: "#5b6ef5" }}
               >
                 {t("Dostępny dla nowych projektów")}
@@ -863,7 +863,7 @@ function Hero() {
             </div>
 
             <h1
-              className="font-sans font-bold leading-none mb-6"
+              className="font-sans font-bold leading-[1.05] mb-6"
               style={{
                 fontSize: "clamp(38px, 5.2vw, 76px)",
                 letterSpacing: "-0.03em",
@@ -894,7 +894,7 @@ function Hero() {
               )}
             </p>
 
-            <p className="font-mono text-[10px] tracking-widest mb-10" style={{ color: "#7d8795" }}>
+            <p className="font-mono text-sm tracking-widest mb-10" style={{ color: "#7d8795" }}>
               {t("Ty znasz swój biznes. Ja zajmę się technologią, wdrożeniem i utrzymaniem.")}
             </p>
 
@@ -918,17 +918,17 @@ function Hero() {
             <div className="mt-14 pt-8" style={{ borderTop: "1px solid #1a1d22" }}>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                 <span
-                  className="font-mono text-[9px] tracking-[0.15em] uppercase"
+                  className="font-mono text-xs tracking-[0.15em] uppercase"
                   style={{ color: "#b5bbc6" }}
                 >
                   {t("10+ lat doświadczenia")}
                 </span>
-                <span aria-hidden="true" className="font-mono text-[9px]" style={{ color: "#5b6ef5" }}>·</span>
-                <span className="font-mono text-[9px] tracking-[0.15em] uppercase" style={{ color: "#b5bbc6" }}>
+                <span aria-hidden="true" className="font-mono text-xs" style={{ color: "#5b6ef5" }}>·</span>
+                <span className="font-mono text-xs tracking-[0.15em] uppercase" style={{ color: "#b5bbc6" }}>
                   {t("15+ wdrożeń produkcyjnych")}
                 </span>
-                <span aria-hidden="true" className="font-mono text-[9px]" style={{ color: "#5b6ef5" }}>·</span>
-                <span className="font-mono text-[9px] tracking-[0.15em] uppercase" style={{ color: "#8b8f98" }}>
+                <span aria-hidden="true" className="font-mono text-xs" style={{ color: "#5b6ef5" }}>·</span>
+                <span className="font-mono text-xs tracking-[0.15em] uppercase" style={{ color: "#8b8f98" }}>
                   {t("Od developmentu po utrzymanie")}
                 </span>
               </div>
@@ -943,7 +943,7 @@ function Hero() {
               </Suspense>
             )}
             <div
-              className="absolute bottom-4 right-4 font-mono text-[9px] tracking-widest uppercase"
+              className="absolute bottom-4 right-4 font-mono text-xs tracking-widest uppercase"
               style={{ color: "#7d8795" }}
             >
               {t("Architektura rozwiązania")}
@@ -1003,13 +1003,13 @@ function ValueProposition() {
         <div className="grid lg:grid-cols-[0.95fr_1.05fr] gap-10 lg:gap-20 items-end mb-14 md:mb-16">
           <div>
             <div
-              className="font-mono text-[10px] tracking-[0.2em] uppercase mb-5"
+              className="font-mono text-xs tracking-[0.2em] uppercase mb-5"
               style={{ color: "#5b6ef5" }}
             >
               {t("Dlaczego warto")}
             </div>
             <h2
-              className="font-sans font-bold leading-none"
+              className="font-sans font-bold leading-[1.05]"
               style={{
                 fontSize: "clamp(34px, 4.4vw, 64px)",
                 letterSpacing: "-0.04em",
@@ -1047,7 +1047,7 @@ function ValueProposition() {
             />
             <div className="absolute inset-x-0 bottom-0 p-6">
               <div
-                className="font-mono text-[9px] tracking-[0.18em] uppercase mb-2"
+                className="font-mono text-xs tracking-[0.18em] uppercase mb-2"
                 style={{ color: "#a9b5ff" }}
               >
                 {t("Od pierwszej rozmowy")}
@@ -1106,7 +1106,7 @@ function ValueProposition() {
                     background: "linear-gradient(90deg, rgba(91,110,245,0.5), transparent)",
                   }}
                 />
-                <span className="font-mono text-[9px] tracking-widest" style={{ color: "#7d8795" }}>
+                <span className="font-mono text-xs tracking-widest" style={{ color: "#7d8795" }}>
                   {p.n}
                 </span>
               </div>
@@ -1190,7 +1190,7 @@ function ProblemFirst() {
             />
             <div className="relative h-full min-h-[510px] p-8 md:p-10 flex flex-col justify-end">
               <div
-                className="font-mono text-[10px] tracking-[0.2em] uppercase mb-6"
+                className="font-mono text-xs tracking-[0.2em] uppercase mb-6"
                 style={{ color: "#aebaff" }}
               >
                 {t("Czy to brzmi znajomo?")}
@@ -1216,7 +1216,7 @@ function ProblemFirst() {
                   style={{ background: "#5b6ef5", boxShadow: "0 0 12px #5b6ef5" }}
                 />
                 <span
-                  className="font-mono text-[9px] tracking-[0.18em] uppercase"
+                  className="font-mono text-xs tracking-[0.18em] uppercase"
                   style={{ color: "#c8d0ff" }}
                 >
                   {t("Od problemu zaczynamy")}
@@ -1252,7 +1252,7 @@ function ProblemFirst() {
                 </p>
                 <a
                   href="#contact"
-                  className="font-mono text-[9px] tracking-widest uppercase whitespace-nowrap flex-shrink-0"
+                  className="font-mono text-sm tracking-widest uppercase whitespace-nowrap flex-shrink-0"
                   style={{ color: "#7d8795", transition: "color 0.2s" }}
                   onMouseEnter={(e) => ((e.target as HTMLElement).style.color = "#5b6ef5")}
                   onMouseLeave={(e) => ((e.target as HTMLElement).style.color = "#7d8795")}
@@ -1299,18 +1299,18 @@ function DontKnowSection() {
         <div className="grid md:grid-cols-2 gap-16 lg:gap-24 items-center">
           <div className="max-w-xl">
             <div
-              className="font-mono text-[10px] tracking-[0.2em] uppercase mb-8"
+              className="font-mono text-xs tracking-[0.2em] uppercase mb-8"
               style={{ color: "#5b6ef5" }}
             >
               Nie wiesz jeszcze, czego potrzebujesz?
             </div>
             <h2
-              className="font-sans font-bold leading-none mb-8"
+              className="font-sans font-bold leading-[1.05] mb-8"
               style={{
                 fontSize: "clamp(40px, 6vw, 96px)",
                 letterSpacing: "-0.04em",
                 color: "#f5f5f5",
-                lineHeight: 0.95,
+                lineHeight: 1.05,
               }}
             >
               To żaden
@@ -1390,7 +1390,7 @@ function DontKnowSection() {
             />
             <div className="absolute bottom-0 left-0 right-0 p-7">
               <div
-                className="font-mono text-[9px] tracking-[0.18em] uppercase mb-3"
+                className="font-mono text-xs tracking-[0.18em] uppercase mb-3"
                 style={{ color: "#93a0ff" }}
               >
                 Od krótkiej rozmowy
@@ -1417,7 +1417,7 @@ function DontKnowSection() {
           ].map((t) => (
             <div key={t.label} className="py-6 pr-8">
               <div
-                className="font-mono text-[9px] tracking-widest uppercase mb-2"
+                className="font-mono text-xs tracking-widest uppercase mb-2"
                 style={{ color: "#5b6ef5" }}
               >
                 {t.label}
@@ -1495,7 +1495,7 @@ function CapabilityCard({ cap, delay }: { cap: (typeof caps)[0]; delay: number }
       ref={ref}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className="p-8 relative overflow-hidden"
+      className="relative flex h-full flex-col overflow-hidden p-8"
       style={{
         background: hovered ? "rgba(10,11,13,1)" : "rgba(10,11,13,0.5)",
         border: "1px solid",
@@ -1507,7 +1507,7 @@ function CapabilityCard({ cap, delay }: { cap: (typeof caps)[0]; delay: number }
       }}
     >
       <div
-        className="font-mono text-[9px] tracking-[0.2em] mb-6"
+        className="font-mono text-xs tracking-[0.2em] mb-6"
         style={{ color: hovered ? "#5b6ef5" : "#7d8795", transition: "color 0.3s" }}
       >
         {cap.n}
@@ -1518,14 +1518,16 @@ function CapabilityCard({ cap, delay }: { cap: (typeof caps)[0]; delay: number }
       >
         {t(cap.title)}
       </h3>
-      <p className="text-sm leading-relaxed mb-6" style={{ color: "#8b8f98", lineHeight: 1.7 }}>
+      <p className="text-sm leading-relaxed" style={{ color: "#8b8f98", lineHeight: 1.7 }}>
         {t(cap.desc)}
       </p>
-      <div
-        className="font-mono text-[9px] tracking-[0.12em] leading-relaxed"
-        style={{ color: hovered ? "#93a0ff" : "#7d8795", transition: "color 0.3s" }}
-      >
-        {t(cap.result)}
+      <div className="mt-auto pt-6">
+        <div
+          className="min-h-10 font-mono text-xs leading-relaxed tracking-[0.12em]"
+          style={{ color: hovered ? "#93a0ff" : "#7d8795", transition: "color 0.3s" }}
+        >
+          {t(cap.result)}
+        </div>
       </div>
       {hovered && (
         <div
@@ -1546,13 +1548,13 @@ function Capabilities() {
       <div className="max-w-[1400px] mx-auto">
         <div className="mb-20">
           <div
-            className="font-mono text-[10px] tracking-[0.2em] uppercase mb-6"
+            className="font-mono text-xs tracking-[0.2em] uppercase mb-6"
             style={{ color: "#8b8f98" }}
           >
             {t("W czym mogę pomóc")}
           </div>
           <h2
-            className="font-sans font-bold leading-none"
+            className="font-sans font-bold leading-[1.05]"
             style={{
               fontSize: "clamp(36px, 5vw, 72px)",
               letterSpacing: "-0.04em",
@@ -1591,7 +1593,7 @@ function Capabilities() {
           </div>
           <a
             href="#contact"
-            className="liquid-button liquid-button--secondary flex-shrink-0 px-6 py-3 text-xs font-mono tracking-widest uppercase"
+            className="liquid-button liquid-button--secondary flex-shrink-0 px-6 py-3 text-sm font-mono tracking-widest uppercase"
           >
             {t("Opowiedz o problemie →")}
           </a>
@@ -1613,13 +1615,13 @@ function VisualHighlights() {
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-14">
           <div>
             <div
-              className="font-mono text-[10px] tracking-[0.2em] uppercase mb-5"
+              className="font-mono text-xs tracking-[0.2em] uppercase mb-5"
               style={{ color: "#5b6ef5" }}
             >
               {t("Od problemu do rozwiązania")}
             </div>
             <h2
-              className="font-sans font-bold leading-none"
+              className="font-sans font-bold leading-[1.05]"
               style={{
                 fontSize: "clamp(34px, 4.5vw, 64px)",
                 letterSpacing: "-0.04em",
@@ -1657,7 +1659,7 @@ function VisualHighlights() {
             />
             <div className="relative h-full p-8 flex flex-col justify-end max-w-sm">
               <div
-                className="font-mono text-[10px] tracking-[0.18em] uppercase mb-4"
+                className="font-mono text-xs tracking-[0.18em] uppercase mb-4"
                 style={{ color: "#93a0ff" }}
               >
                 {t("01 / Najpierw zrozumienie")}
@@ -1693,7 +1695,7 @@ function VisualHighlights() {
             />
             <div className="relative h-full p-8 flex flex-col justify-end max-w-sm">
               <div
-                className="font-mono text-[10px] tracking-[0.18em] uppercase mb-4"
+                className="font-mono text-xs tracking-[0.18em] uppercase mb-4"
                 style={{ color: "#93a0ff" }}
               >
                 {t("02 / Stabilne zaplecze")}
@@ -1746,18 +1748,18 @@ function StartFromProblem() {
         >
           <div>
             <div
-              className="font-mono text-[10px] tracking-[0.2em] uppercase mb-8"
+              className="font-mono text-xs tracking-[0.2em] uppercase mb-8"
               style={{ color: "#8b8f98" }}
             >
               {t("Pierwszy kontakt")}
             </div>
             <h2
-              className="font-sans font-bold leading-none mb-8"
+              className="font-sans font-bold leading-[1.05] mb-8"
               style={{
                 fontSize: "clamp(36px, 5vw, 72px)",
                 letterSpacing: "-0.04em",
                 color: "#f5f5f5",
-                lineHeight: 0.95,
+                lineHeight: 1.05,
               }}
             >
               {t("Napisz, co chcesz")}
@@ -1804,7 +1806,7 @@ function StartFromProblem() {
             />
             <div className="absolute bottom-0 left-0 right-0 p-8">
               <div
-                className="font-mono text-[10px] tracking-[0.18em] uppercase mb-4"
+                className="font-mono text-xs tracking-[0.18em] uppercase mb-4"
                 style={{ color: "#93a0ff" }}
               >
                 {t("Bez formalności")}
@@ -1836,13 +1838,13 @@ function Process() {
       <div className="max-w-[1400px] mx-auto">
         <div className="mb-14">
           <div
-            className="font-mono text-[10px] tracking-[0.2em] uppercase mb-6"
+            className="font-mono text-xs tracking-[0.2em] uppercase mb-6"
             style={{ color: "#8b8f98" }}
           >
             {t("Jak działam")}
           </div>
           <h2
-            className="font-sans font-bold leading-none"
+            className="font-sans font-bold leading-[1.05]"
             style={{
               fontSize: "clamp(36px, 5vw, 72px)",
               letterSpacing: "-0.04em",
@@ -1887,7 +1889,7 @@ function Process() {
                   {step.n}
                 </div>
                 <h3
-                  className="font-mono text-[10px] tracking-[0.15em] mb-4"
+                  className="font-mono text-xs tracking-[0.15em] mb-4"
                   style={{ color: "#f5f5f5" }}
                 >
                   {t(step.title)}
@@ -1940,7 +1942,7 @@ function About() {
                 }}
               />
               <div
-                className="absolute top-4 left-4 flex items-center gap-2 font-mono text-[9px] tracking-widest uppercase"
+                className="absolute top-4 left-4 flex items-center gap-2 font-mono text-xs tracking-widest uppercase"
                 style={{ color: "#d9ddff" }}
               >
                 <span
@@ -1958,7 +1960,7 @@ function About() {
                 }}
               >
                 <div
-                  className="font-mono text-[9px] tracking-[0.18em] uppercase mb-2"
+                  className="font-mono text-xs tracking-[0.18em] uppercase mb-2"
                   style={{ color: "#8b8f98" }}
                 >
                   {t("Twój partner techniczny")}
@@ -1973,7 +1975,7 @@ function About() {
           {/* Bio */}
           <div>
             <div
-              className="font-mono text-[10px] tracking-[0.2em] uppercase mb-6"
+              className="font-mono text-xs tracking-[0.2em] uppercase mb-6"
               style={{ color: "#8b8f98" }}
             >
               {t("O mnie")}
@@ -2021,13 +2023,13 @@ function About() {
               ].map(([label, detail]) => (
                 <div key={label} className="pt-3" style={{ borderTop: "1px solid #303844" }}>
                   <div
-                    className="font-mono text-[10px] tracking-wide mb-1"
+                    className="font-mono text-xs tracking-wide mb-1"
                     style={{ color: "#d9ddff" }}
                   >
                     {t(label)}
                   </div>
                   <div
-                    className="font-mono text-[9px] leading-relaxed"
+                    className="font-mono text-xs leading-relaxed"
                     style={{ color: "#7d8795" }}
                   >
                     {t(detail)}
@@ -2110,7 +2112,7 @@ function Contact() {
     border: "1px solid #1a1d22",
     color: "#f5f5f5",
     padding: "14px 16px",
-    fontSize: "14px",
+    fontSize: "1rem",
     fontFamily: "inherit",
     outline: "none",
     width: "100%",
@@ -2130,7 +2132,7 @@ function Contact() {
           {/* Left */}
           <div>
             <div
-              className="font-mono text-[10px] tracking-[0.2em] uppercase mb-8"
+              className="font-mono text-xs tracking-[0.2em] uppercase mb-8"
               style={{ color: "#8b8f98" }}
             >
               {t("Zacznijmy rozmowę")}
@@ -2141,7 +2143,7 @@ function Contact() {
                 fontSize: "clamp(36px, 5vw, 72px)",
                 letterSpacing: "-0.04em",
                 color: "#f5f5f5",
-                lineHeight: 0.95,
+                lineHeight: 1.05,
               }}
             >
               {t("Masz pomysł.")}
@@ -2204,7 +2206,7 @@ function Contact() {
                 style={{ background: "linear-gradient(180deg, transparent, rgba(7,8,9,0.78))" }}
               />
               <div
-                className="absolute bottom-5 left-5 font-mono text-[9px] tracking-[0.16em] uppercase"
+                className="absolute bottom-5 left-5 font-mono text-xs tracking-[0.16em] uppercase"
                 style={{ color: "#d9ddff" }}
               >
                 {t("Odpowiadam osobiście")}
@@ -2261,7 +2263,7 @@ function Contact() {
                     </svg>
                   </div>
                   <p
-                    className="mb-4 font-mono text-[10px] tracking-[0.2em] uppercase"
+                    className="mb-4 font-mono text-xs tracking-[0.2em] uppercase"
                     style={{ color: "#93a0ff" }}
                   >
                     {t("Wiadomość dotarła")}
@@ -2288,7 +2290,7 @@ function Contact() {
                   <button
                     type="button"
                     onClick={() => setStatus("idle")}
-                    className="liquid-button liquid-button--secondary inline-flex w-fit items-center gap-2 px-5 py-3 font-mono text-[9px] tracking-[0.16em] uppercase"
+                    className="liquid-button liquid-button--secondary inline-flex w-fit items-center gap-2 px-5 py-3 font-mono text-sm tracking-[0.16em] uppercase"
                     style={{ color: "#d9ddff" }}
                   >
                     <span aria-hidden="true">+</span>
@@ -2333,7 +2335,7 @@ function Contact() {
                 <div>
                   <label
                     htmlFor="contact-name"
-                    className="block font-mono text-[9px] tracking-[0.2em] uppercase mb-2"
+                    className="block font-mono text-sm tracking-[0.2em] uppercase mb-2"
                     style={{ color: "#8b8f98" }}
                   >
                     {t("Imię / Firma")}
@@ -2356,7 +2358,7 @@ function Contact() {
                 <div>
                   <label
                     htmlFor="contact-email"
-                    className="block font-mono text-[9px] tracking-[0.2em] uppercase mb-2"
+                    className="block font-mono text-sm tracking-[0.2em] uppercase mb-2"
                     style={{ color: "#8b8f98" }}
                   >
                     {t("Email")}
@@ -2379,7 +2381,7 @@ function Contact() {
                 <div>
                   <label
                     htmlFor="contact-phone"
-                    className="block font-mono text-[9px] tracking-[0.2em] uppercase mb-2"
+                    className="block font-mono text-sm tracking-[0.2em] uppercase mb-2"
                     style={{ color: "#8b8f98" }}
                   >
                     {t("Telefon (opcjonalnie)")}
@@ -2401,7 +2403,7 @@ function Contact() {
                 </div>
                 <fieldset className="relative">
                   <legend
-                    className="font-mono text-[9px] tracking-[0.2em] uppercase mb-2"
+                    className="font-mono text-sm tracking-[0.2em] uppercase mb-2"
                     style={{ color: "#8b8f98" }}
                   >
                     {t("Orientacyjny budżet (opcjonalnie)")}
@@ -2414,7 +2416,7 @@ function Contact() {
                     aria-expanded={budgetOpen}
                     aria-controls="budget-options"
                     onClick={() => setBudgetOpen((open) => !open)}
-                    className="flex min-h-12 w-full items-center justify-between gap-4 px-4 text-left font-mono text-[10px] tracking-wide"
+                    className="flex min-h-12 w-full items-center justify-between gap-4 px-4 text-left font-mono text-base tracking-wide"
                     style={{
                       color: form.budget ? "#dce1ff" : "#8b8f98",
                       border: `1px solid ${budgetOpen ? "rgba(112, 130, 255, 0.72)" : "#1a1d22"}`,
@@ -2468,7 +2470,7 @@ function Contact() {
                               setForm((f) => ({ ...f, budget: f.budget === option ? "" : option }));
                               setBudgetOpen(false);
                             }}
-                            className="min-h-11 px-3 text-left font-mono text-[10px] tracking-wide"
+                            className="min-h-11 px-3 text-left font-mono text-base tracking-wide"
                             style={{
                               color: selected ? "#dce1ff" : "#8b8f98",
                               border: `1px solid ${selected ? "rgba(112, 130, 255, 0.72)" : "#1a1d22"}`,
@@ -2489,7 +2491,7 @@ function Contact() {
                 <div>
                   <label
                     htmlFor="contact-message"
-                    className="block font-mono text-[9px] tracking-[0.2em] uppercase mb-2"
+                    className="block font-mono text-sm tracking-[0.2em] uppercase mb-2"
                     style={{ color: "#8b8f98" }}
                   >
                     {t("Co chcesz osiągnąć?")}
@@ -2550,7 +2552,7 @@ function ReturnToTop() {
         <div className="return-to-top-wrap">
           <a
             href="#"
-            className="liquid-button liquid-button--secondary inline-flex items-center gap-3 px-5 py-3 font-mono text-[9px] tracking-[0.18em] uppercase"
+            className="liquid-button liquid-button--secondary inline-flex items-center gap-3 px-5 py-3 font-mono text-sm tracking-[0.18em] uppercase"
             style={{ color: "#c8ceff" }}
           >
             <span
@@ -2575,7 +2577,7 @@ function Footer() {
       style={{ background: "#070809", borderTop: "1px solid #1a1d22" }}
     >
       <div
-        className="max-w-[1400px] mx-auto flex flex-col gap-4 text-center font-mono text-[9px] tracking-[0.1em] md:flex-row md:items-center md:justify-between md:text-left"
+        className="max-w-[1400px] mx-auto flex flex-col gap-4 text-center font-mono text-xs tracking-[0.1em] md:flex-row md:items-center md:justify-between md:text-left"
         style={{ color: "#7d8795" }}
       >
         <div>

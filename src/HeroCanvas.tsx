@@ -129,5 +129,5 @@ export default function HeroCanvas() {
     };
   }, [language]);
 
-  return <div className="relative w-full h-full"><canvas ref={canvasRef} className="w-full h-full" style={{ opacity: 0.9 }} /><div className="absolute top-5 left-5 max-w-52 pointer-events-none transition-opacity duration-200" style={{ opacity: activeNode ? 1 : 0.7 }}><div className="font-mono text-[9px] tracking-[0.18em] uppercase mb-2" style={{ color: "#5b6ef5" }}>{activeNode ? activeNode.label : t("Interaktywna mapa")}</div><p className="text-xs leading-relaxed" style={{ color: "#8b8f98" }}>{activeNode ? activeNode.detail : t("Najedź na element, aby zobaczyć jego rolę i powiązania.")}</p></div></div>;
+  return <div className="relative w-full h-full"><canvas ref={canvasRef} className="w-full h-full" style={{ opacity: 0.9 }} /><div className="absolute top-5 left-5 max-w-52 pointer-events-none transition-opacity duration-200" style={{ opacity: activeNode ? 1 : 0.7 }}><div className="font-mono text-xs tracking-[0.18em] uppercase mb-2" style={{ color: "#5b6ef5" }}>{activeNode ? activeNode.label : t("Interaktywna mapa")}</div><p className="text-xs leading-relaxed" style={{ color: "#8b8f98" }}>{activeNode ? activeNode.detail : t("Najedź na element, aby zobaczyć jego rolę i powiązania.")}</p></div></div>;
 }
