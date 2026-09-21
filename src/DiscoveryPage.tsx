@@ -140,6 +140,7 @@ export default function DiscoveryPage({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const prepareBriefPromiseRef = useRef<Promise<void> | null>(null);
 
   const createSession = async () => {
     // The welcome question is static, so show it immediately instead of a
@@ -158,20 +159,26 @@ export default function DiscoveryPage({ onClose }: { onClose: () => void }) {
     }
   };
 
-  const prepareBrief = async () => {
-    if (!session?.id || preparingBrief || session.draftAnalysis) return;
+  const prepareBrief = (): Promise<void> => {
+    if (!session?.id || session.draftAnalysis) return Promise.resolve();
+    if (prepareBriefPromiseRef.current) return prepareBriefPromiseRef.current;
     setPreparingBrief(true);
-    try {
-      const data = await request<{ session: Session }>(
-        `?action=prepare&sessionId=${encodeURIComponent(session.id)}`,
-        { method: "POST", body: "{}" },
-      );
-      setSession(data.session);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Nie udało się przygotować briefu.");
-    } finally {
+    const task = (async () => {
+      try {
+        const data = await request<{ session: Session }>(
+          `?action=prepare&sessionId=${encodeURIComponent(session.id)}`,
+          { method: "POST", body: "{}" },
+        );
+        setSession(data.session);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Nie udało się przygotować briefu.");
+      }
+    })();
+    prepareBriefPromiseRef.current = task.finally(() => {
+      prepareBriefPromiseRef.current = null;
       setPreparingBrief(false);
-    }
+    });
+    return prepareBriefPromiseRef.current;
   };
 
   useEffect(() => {
@@ -227,11 +234,12 @@ export default function DiscoveryPage({ onClose }: { onClose: () => void }) {
   };
 
   const generateSummary = async () => {
-    if (!session?.id) return;
+    if (!session?.id || sending) return;
     setSending(true);
     setBusyAction("delivering");
     setError("");
     try {
+      if (!session.draftAnalysis) await prepareBrief();
       const data = await request<{ session: Session }>(
         `?action=complete&sessionId=${encodeURIComponent(session.id)}`,
         { method: "POST", body: "{}" },
@@ -373,7 +381,7 @@ export default function DiscoveryPage({ onClose }: { onClose: () => void }) {
                     <button
                       key={answer}
                       type="button"
-                      disabled={sending}
+                      disabled={sending || preparingBrief}
                       onClick={() => void sendMessage(answer)}
                       className="rounded-full border border-[#4d5fbd] bg-[#12182b] px-3 py-1.5 text-sm text-[#dce2ff] transition hover:border-[#8495ff] hover:bg-[#1b2450] disabled:pointer-events-none disabled:opacity-40"
                     >
@@ -442,7 +450,7 @@ export default function DiscoveryPage({ onClose }: { onClose: () => void }) {
                   <div className="mt-3 flex flex-wrap gap-2">
                     <button
                       type="button"
-                      disabled={sending}
+                      disabled={sending || preparingBrief}
                       onClick={() => void addMore(true)}
                       className="rounded-lg border border-[#5d6bcc] px-3 py-2 text-sm text-[#dbe0ff] hover:bg-[#20275a] disabled:pointer-events-none disabled:opacity-40"
                     >
@@ -450,7 +458,7 @@ export default function DiscoveryPage({ onClose }: { onClose: () => void }) {
                     </button>
                     <button
                       type="button"
-                      disabled={sending}
+                      disabled={sending || preparingBrief}
                       onClick={() => void addMore()}
                       className="rounded-lg border border-[#4a5367] px-3 py-2 text-sm text-[#cbd2de] hover:bg-[#1c212c] disabled:pointer-events-none disabled:opacity-40"
                     >
@@ -458,11 +466,15 @@ export default function DiscoveryPage({ onClose }: { onClose: () => void }) {
                     </button>
                     <button
                       type="button"
-                      disabled={sending}
+                      disabled={sending || preparingBrief}
                       onClick={() => void generateSummary()}
                       className="rounded-lg bg-[#6477fa] px-3 py-2 text-sm font-medium text-white hover:bg-[#7788ff] disabled:pointer-events-none disabled:opacity-40"
                     >
-                      {labels.sendBrief}
+                      {preparingBrief
+                        ? isEnglish
+                          ? "Analysing the brief…"
+                          : "Analizujemy brief…"
+                        : labels.sendBrief}
                     </button>
                   </div>
                 </div>
