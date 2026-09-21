@@ -2,13 +2,13 @@
 declare(strict_types=1);
 
 /**
- * Loads production configuration from above public_html and local development
- * configuration from the repository root without overwriting server variables.
+ * Loads production configuration from the PHP document root and local
+ * development configuration from the repository root without overwriting
+ * server variables. The API .htaccess denies all web access to .env files.
  */
-$apiParent = dirname(__DIR__);
-$envFile = basename($apiParent) === 'public_html'
-    ? dirname($apiParent) . '/.env'
-    : $apiParent . '/.env';
+$envFile = basename(__DIR__) === 'public_html'
+    ? __DIR__ . '/.env'
+    : dirname(__DIR__) . '/.env';
 if (is_file($envFile) && is_readable($envFile)) {
     foreach (file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [] as $line) {
         $line = trim($line);

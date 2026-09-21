@@ -10,7 +10,7 @@ The endpoint uses Responses API structured JSON schema and validates status/flag
 
 ## MyDevil production layout
 
-Deploy the built frontend to `domains/grzywniak.pl/public_nodejs/public`. Deploy the contents of the repository's `api` directory directly to `domains/api.grzywniak.pl/public_html`. Keep production secrets in `domains/api.grzywniak.pl/.env`, one level above `public_html`; do not copy `.env` into either public directory. The production frontend calls `https://api.grzywniak.pl/contact.php` and `https://api.grzywniak.pl/discovery.php`.
+Deploy the built frontend to `domains/grzywniak.pl/public_nodejs/public`. Deploy the contents of the repository's `api` directory directly to `domains/api.grzywniak.pl/public_html`. On MyDevil, keep production secrets in `domains/api.grzywniak.pl/public_html/.env`; the deployed API `.htaccess` denies all HTTP access to that file. Do not place `.env` in the frontend directory. The production frontend calls `https://api.grzywniak.pl/contact.php` and `https://api.grzywniak.pl/discovery.php`.
 
 ## Admin panel
 
