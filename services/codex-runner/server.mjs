@@ -15,6 +15,7 @@ const codexBin = process.env.CODEX_BIN || 'codex';
 const codexUid = Number(process.env.RUNNER_CODEX_UID || 10001);
 const codexGid = Number(process.env.RUNNER_CODEX_GID || codexUid);
 const port = Number(process.env.RUNNER_PORT || 3020);
+const listenHost = process.env.RUNNER_BIND_HOST || '127.0.0.1';
 const paused = process.env.RUNNER_PAUSED === 'true';
 const rates = {
   input: Number(process.env.RUNNER_INPUT_PLN_PER_MILLION || 0),
@@ -256,6 +257,6 @@ createServer(async (req, res) => {
     }
     return reply(res, 404, { message: 'Nie znaleziono zasobu.' });
   } catch (error) { console.error('Runner:', error instanceof Error ? error.message : 'unknown'); return reply(res, 500, { message: 'Operacja runnera nie została ukończona.' }); }
-}).listen(port, '127.0.0.1');
+}).listen(port, listenHost);
 setInterval(pump, 15000);
 queueMicrotask(pump);

@@ -6,6 +6,7 @@ services:
     env_file: /etc/grzywniak-runner/runner.env
     environment:
       RUNNER_PORT: "3020"
+      RUNNER_BIND_HOST: "0.0.0.0"
       RUNNER_WORK_DIR: /var/lib/grzywniak-runner
       RUNNER_GITHUB_TOKEN_FILE: /run/secrets/github-token
       RUNNER_CODEX_UID: "10001"
