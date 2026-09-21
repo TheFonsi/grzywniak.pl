@@ -9,6 +9,7 @@ function projectSettingsSchema(): array {
             'GITHUB_TEMPLATE_OWNER'=>['label'=>'Właściciel szablonu','default'=>'Grzywniak'],
             'GITHUB_TEMPLATE_REPO'=>['label'=>'Repozytorium szablonu','default'=>'web-vite-template'],
             'GITHUB_AGENT_USERNAME'=>['label'=>'Konto GitHub agenta','description'=>'Otrzymuje dostęp write wyłącznie do repozytoriów projektowych.'],
+            'GITHUB_AGENT_TEAM_SLUG'=>['label'=>'Zespół GitHub agentów','description'=>'Zespół organizacji, który otrzymuje dostęp write do nowych repozytoriów projektowych.'],
             'GITHUB_APP_ID'=>['label'=>'ID GitHub App'],
             'GITHUB_INSTALLATION_ID'=>['label'=>'ID instalacji GitHub App'],
             'GITHUB_APP_PRIVATE_KEY'=>['label'=>'Klucz prywatny GitHub App (PEM)','secret'=>true,'multiline'=>true],
@@ -97,7 +98,7 @@ function projectSettingsSave(array $input): array {
         if(!empty($field['secret']) && $value==='') continue;
         if(strlen($value)>($field['multiline']??false?16000:2000)) throw new InvalidArgumentException('Wartość pola '.$field['label'].' jest za długa.');
         if(!empty($field['number']) && ($value===''||!is_numeric($value)||!is_finite((float)$value)||(float)$value<$field['min']||(float)$value>$field['max'])) throw new InvalidArgumentException('Niepoprawny zakres pola '.$field['label'].'.');
-        if(in_array($name,['GITHUB_ORG','GITHUB_TEMPLATE_OWNER','GITHUB_TEMPLATE_REPO','GITHUB_AGENT_USERNAME'],true) && $value!=='' && !preg_match('/^[A-Za-z0-9-]+$/',$value)) throw new InvalidArgumentException('Niepoprawna nazwa GitHub.');
+        if(in_array($name,['GITHUB_ORG','GITHUB_TEMPLATE_OWNER','GITHUB_TEMPLATE_REPO','GITHUB_AGENT_USERNAME','GITHUB_AGENT_TEAM_SLUG'],true) && $value!=='' && !preg_match('/^[A-Za-z0-9-]+$/',$value)) throw new InvalidArgumentException('Niepoprawna nazwa GitHub.');
         if(in_array($name,['PREVIEW_BASE_DOMAIN','PREVIEW_ORIGIN_HOST','PRODUCTION_BASE_DOMAIN','PRODUCTION_ORIGIN_HOST'],true) && $value!=='' && !preg_match('/^[a-z0-9.-]+$/i',$value)) throw new InvalidArgumentException('Niepoprawna domena.');
         if(in_array($name,['PUBLIC_SITE_URL','PUBLIC_API_URL','VPS_CONTROL_URL','CODEX_RUNNER_URL'],true) && $value!=='' && (!filter_var($value,FILTER_VALIDATE_URL)||!str_starts_with(strtolower($value),'https://'))) throw new InvalidArgumentException('Adres usługi musi być poprawnym URL HTTPS.');
         if($name==='GITHUB_APP_PRIVATE_KEY' && $value!=='' && openssl_pkey_get_private($value)===false) throw new InvalidArgumentException('Klucz GitHub App musi być poprawnym kluczem prywatnym PEM.');

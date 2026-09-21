@@ -51,11 +51,19 @@ function repoSlug(string $name,string $id): string {
     return 'project-'.substr($slug?:'web',0,35).'-'.substr($id,0,8);
 }
 
-function grantAgentRepositoryAccess(string $path,string $token): void {
+function grantAgentRepositoryAccess(string $owner,string $repository,string $token): void {
+    $org=trim(projectSetting('GITHUB_ORG'));
+    $team=trim(projectSetting('GITHUB_AGENT_TEAM_SLUG'));
+    if($team!=='') {
+        if(!preg_match('/^[A-Za-z0-9-]+$/',$team)) throw new RuntimeException('Niepoprawna nazwa zespołu GitHub agentów.');
+        $access=githubApi('PUT','/orgs/'.rawurlencode($org).'/teams/'.rawurlencode($team).'/repos/'.rawurlencode($owner).'/'.rawurlencode($repository),['permission'=>'push'],$token);
+        if($access['status']!==204) throw new RuntimeException('Nie udało się nadać zespołowi agentów dostępu do repozytorium (HTTP '.$access['status'].').');
+        return;
+    }
     $agent=trim(projectSetting('GITHUB_AGENT_USERNAME'));
     if($agent==='') return;
     if(!preg_match('/^[A-Za-z0-9-]+$/',$agent)) throw new RuntimeException('Niepoprawna nazwa konta GitHub agenta.');
-    $access=githubApi('PUT',$path.'/collaborators/'.rawurlencode($agent),['permission'=>'push'],$token);
+    $access=githubApi('PUT','/repos/'.rawurlencode($owner).'/'.rawurlencode($repository).'/collaborators/'.rawurlencode($agent),['permission'=>'push'],$token);
     if(!in_array($access['status'],[201,204],true)) throw new RuntimeException('Nie udało się nadać agentowi dostępu do repozytorium (HTTP '.$access['status'].').');
 }
 
@@ -85,7 +93,7 @@ function createRepository(array $session,array $case): array {
     if($existing['status']!==200 && $existing['status']!==201) throw new RuntimeException('Nie udało się sprawdzić repozytorium (HTTP '.$existing['status'].').');
     if(($existing['body']['private']??false)!==true || strcasecmp((string)($existing['body']['owner']['login']??''),$org)!==0) throw new RuntimeException('Repozytorium o tej nazwie nie jest prywatne lub należy do innego właściciela.');
     if(!str_contains((string)($existing['body']['description']??''),substr($id,0,8))) throw new RuntimeException('Nazwa repozytorium jest zajęta przez inny projekt.');
-    grantAgentRepositoryAccess($path,$token);
+    grantAgentRepositoryAccess($org,$name,$token);
     if($template) { $workflow=githubApi('GET',$path.'/contents/.github/workflows/ci.yml',null,$token); if($workflow['status']!==200) throw new RuntimeException('Szablon nie zawiera .github/workflows/ci.yml.'); }
     $protection=githubApi('PUT',$path.'/branches/main/protection',['required_status_checks'=>$template?['strict'=>true,'contexts'=>['validate']]:null,'enforce_admins'=>true,'required_pull_request_reviews'=>['required_approving_review_count'=>1,'dismiss_stale_reviews'=>true],'restrictions'=>null,'required_linear_history'=>true,'allow_force_pushes'=>false,'allow_deletions'=>false,'required_conversation_resolution'=>true],$token);
     if($protection['status']!==200) throw new RuntimeException('Repozytorium istnieje, lecz ochrona main wymaga poprawy lub plan GitHub nie udostępnia tej funkcji (HTTP '.$protection['status'].').');
@@ -147,7 +155,7 @@ function publishTemplate(): void {
     }
     $updated=githubApi('PATCH',$path,['is_template'=>true],$token);
     if($updated['status']!==200) throw new RuntimeException('Pliki opublikowano, ale nie udało się oznaczyć repozytorium jako szablonu.');
-    grantAgentRepositoryAccess($path,$token);
+    grantAgentRepositoryAccess($org,$name,$token);
     echo "Template ready: https://github.com/{$org}/{$name}\n";
 }
 
