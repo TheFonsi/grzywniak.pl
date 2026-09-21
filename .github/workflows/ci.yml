@@ -115,5 +115,10 @@ jobs:
             --header 'Access-Control-Request-Method: POST' \
             'https://api.grzywniak.pl/discovery.php'
 
+      - name: Schedule project worker
+        run: |
+          set -euo pipefail
+          ssh "$DEPLOY_USER@$DEPLOY_HOST" "set -e; command -v php >/dev/null; command -v flock >/dev/null; install -d '${API_DEPLOY_PATH}logs'; (crontab -l 2>/dev/null | grep -Fv 'grzywniak-project-worker' || true; printf '%s\\n' '* * * * * flock -n /tmp/grzywniak-project-worker.lock php ${API_DEPLOY_PATH}project-worker.php --once >> ${API_DEPLOY_PATH}logs/project-worker.log 2>&1 # grzywniak-project-worker') | crontab -"
+
       - name: Restart website process
         run: ssh "$DEPLOY_USER@$DEPLOY_HOST" "devil www restart $DEPLOY_DOMAIN"

@@ -14,6 +14,8 @@ Deploy the built frontend to `domains/grzywniak.pl/public_nodejs/public`. Deploy
 
 The deployment excludes both `.env` and `storage/` from `rsync --delete`. The `storage` directory contains the SQLite database, client conversations, encrypted project settings, and the local encryption key, so it must persist across releases and be included in hosting backups.
 
+After deployment, GitHub Actions installs an idempotent MyDevil cron entry. It runs `project-worker.php --once` every minute under a non-blocking `flock` lock and writes its output to `api.grzywniak.pl/public_html/logs/project-worker.log`. The worker only processes work after the GitHub App, VPS controller and, for coding tasks, the separate Codex runner are configured.
+
 ## Admin panel
 
 Set `ADMIN_USERNAME` and a long, unique `ADMIN_PASSWORD` in the server environment (or local `.env`), then open `/api/admin.php`. The panel is protected with HTTP Basic Authentication and shows sessions, briefs, complete conversation history, risk flags, token usage, cache tokens, and last-response latency.
