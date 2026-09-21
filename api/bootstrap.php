@@ -33,6 +33,16 @@ function storage(): string {
     if (!is_writable($dir)) throw new RuntimeException('Session storage is not writable.');
     return $dir;
 }
+function apiBasePath(): string {
+    $script = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));
+    return str_starts_with($script, '/api/') ? '/api' : '';
+}
+function apiPath(string $path = ''): string {
+    return apiBasePath() . '/' . ltrim($path, '/');
+}
+function apiRewritePaths(string $html): string {
+    return apiBasePath() === '/api' ? $html : str_replace('/api/', '/', $html);
+}
 function sessionDb(): PDO { static $db; if ($db instanceof PDO) return $db; $db = new PDO('sqlite:' . storage() . '/sessions.sqlite', null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]); $db->exec('PRAGMA busy_timeout=5000'); $db->exec('CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, data TEXT NOT NULL, updated_at INTEGER NOT NULL)'); return $db; }
 function readSession(string $id): ?array { $stmt = sessionDb()->prepare('SELECT data FROM sessions WHERE id=:id'); $stmt->execute([':id'=>$id]); $row = $stmt->fetch(PDO::FETCH_ASSOC); if (!$row) return null; $data = json_decode((string)$row['data'], true); return is_array($data) ? $data : null; }
 function writeSession(array $session): void { $id = (string) ($session['id'] ?? ''); if (!preg_match('/^[a-f0-9]{32}$/', $id)) throw new RuntimeException('Invalid session id'); $session['updatedAt'] = time(); $json = json_encode($session, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR); $stmt = sessionDb()->prepare('INSERT INTO sessions (id,data,updated_at) VALUES (:id,:data,:updated) ON CONFLICT(id) DO UPDATE SET data=excluded.data,updated_at=excluded.updated_at'); $stmt->execute([':id'=>$id, ':data'=>$json, ':updated'=>$session['updatedAt']]); }

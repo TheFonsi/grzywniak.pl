@@ -1,6 +1,8 @@
 (() => {
   const id = window.PROJECT_SESSION;
-  const endpoint = `/api/project-api.php?session=${encodeURIComponent(id)}`;
+  const apiBase = location.pathname.startsWith("/api/") ? "/api" : "";
+  const apiPath = (path) => `${apiBase}/${String(path).replace(/^\/+/, "")}`;
+  const endpoint = `${apiPath("project-api.php")}?session=${encodeURIComponent(id)}`;
   const labels = { locked: "Niedostępny", ready: "Gotowy do startu", queued: "W kolejce", working: "Pracuje", needs_you: "Twoja decyzja", waiting_client: "Czeka na klienta", review: "Do przeglądu", done: "Zakończony", error: "Błąd" };
   const $ = (selector) => document.querySelector(selector);
   const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]);
@@ -112,7 +114,7 @@
     return `<ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`;
   }
   function adminLink(anchor = "") {
-    return `<p><a href="/api/admin.php?view=all&amp;session=${encodeURIComponent(id)}${anchor}">Otwórz dokument i edytor w panelu ↗</a></p>`;
+    return `<p><a href="${apiPath("admin.php")}?view=all&amp;session=${encodeURIComponent(id)}${anchor}">Otwórz dokument i edytor w panelu ↗</a></p>`;
   }
 
   function stageOutput(stageId) {
@@ -146,7 +148,7 @@
       let html = plan ? section("Architektura", `<p>${escapeHtml(plan.architecture)}</p><p><strong>Technologie:</strong> ${escapeHtml(plan.stack)}</p>`, true) + section("Kamienie milowe", lines((plan.milestones || []).map((item) => `${item.name}: ${item.outcome}`)), true) + section("Zadania agentów", `<ol>${(plan.tasks || []).map((task) => `<li><strong>${escapeHtml(task.title)}</strong> · ${escapeHtml(task.role)}<br><small>Zależy od: ${escapeHtml((task.dependencies || []).join(", ") || "brak")}</small>${lines(task.acceptance)}</li>`).join("")}</ol>`, true) : section("Plan", `<p>${job ? `Stan zadania: ${escapeHtml(labels[data.status.plan])}.` : "Plan powstanie po zatwierdzeniu startu."}</p>`, true);
       if (plan?.templateDecision) {
         const choice = plan.templateDecision;
-        html += section("Dobór szablonu", `<p>${choice.mode === "new" ? `Zaproponowano nowy szablon: <strong>${escapeHtml(choice.proposedName)}</strong>` : `Wybrano szablon: <strong>${escapeHtml(choice.templateId)}</strong>`}.</p><p>${escapeHtml(choice.reason)}</p><p><a href="/api/project-template-catalog.php">Otwórz katalog szablonów</a></p>`, true);
+        html += section("Dobór szablonu", `<p>${choice.mode === "new" ? `Zaproponowano nowy szablon: <strong>${escapeHtml(choice.proposedName)}</strong>` : `Wybrano szablon: <strong>${escapeHtml(choice.templateId)}</strong>`}.</p><p>${escapeHtml(choice.reason)}</p><p><a href="${apiPath("project-template-catalog.php")}">Otwórz katalog szablonów</a></p>`, true);
       }
       if (job?.error) html += section("Błąd planowania", `<p class="error-text">${escapeHtml(job.error)}</p><form class="form" data-action="retry_job"><input type="hidden" name="kind" value="generate_plan"><button class="primary">Ponów planowanie</button></form>`, true);
       const aiCalls = data.aiCalls || [];
@@ -158,7 +160,7 @@
       const job = data.jobs.find((item) => item.kind === kind);
       const result = parseResult(job);
       let body = job ? `<p>Stan zadania: ${escapeHtml(labels[data.status[stageId]])}; próby: ${escapeHtml(job.attempts)}; aktualizacja: ${date(job.updated_at)}.</p>` : "<p>Zadanie jeszcze nie zostało zlecone.</p>";
-      if (stageId === "repository" && data.case.templateProposalId) body += `<p>Projekt ma własne repozytorium bez narzuconego szablonu Vite. Propozycję szablonu do przyszłego wykorzystania (${escapeHtml(data.case.templateProposalId)}) zapisano w <a href="/api/project-template-catalog.php">katalogu</a>. CI i wdrożenie czekają na przygotowanie tego stosu przez agentów.</p>`;
+      if (stageId === "repository" && data.case.templateProposalId) body += `<p>Projekt ma własne repozytorium bez narzuconego szablonu Vite. Propozycję szablonu do przyszłego wykorzystania (${escapeHtml(data.case.templateProposalId)}) zapisano w <a href="${apiPath("project-template-catalog.php")}">katalogu</a>. CI i wdrożenie czekają na przygotowanie tego stosu przez agentów.</p>`;
       if (result) body += `<pre>${escapeHtml(JSON.stringify(result, null, 2))}</pre>`;
       if (job?.error) body += `<p class="error-text">${escapeHtml(job.error)}</p><form class="form" data-action="retry_job"><input type="hidden" name="kind" value="${kind}"><button class="primary">Ponów zadanie</button></form>`;
       return section(stageId === "repository" ? "GitHub i CI/CD" : "VPS, Cloudflare i TLS", body, true);

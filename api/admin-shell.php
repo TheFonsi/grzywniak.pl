@@ -11,12 +11,12 @@ CSS;
 
 function adminShellHeader(string $active): string {
     $items=[
-        'home'=>['Panel admina','/api/admin-home.php'],
-        'briefs'=>['Panel briefów','/api/admin.php'],
-        'projects'=>['Centrum projektów','/api/project-portfolio.php'],
-        'settings'=>['Ustawienia','/api/project-settings.php'],
+        'home'=>['Panel admina',apiPath('admin-home.php')],
+        'briefs'=>['Panel briefów',apiPath('admin.php')],
+        'projects'=>['Centrum projektów',apiPath('project-portfolio.php')],
+        'settings'=>['Ustawienia',apiPath('project-settings.php')],
     ];
-    $html='<header class="admin-shell"><a class="admin-shell-brand" href="/api/admin-home.php"><span class="admin-shell-mark">G</span><span>Grzywniak <span class="admin-shell-label">/ centrum zarządzania</span></span></a><nav class="admin-shell-nav" aria-label="Nawigacja panelu administracyjnego">';
+    $html='<header class="admin-shell"><a class="admin-shell-brand" href="'.apiPath('admin-home.php').'"><span class="admin-shell-mark">G</span><span>Grzywniak <span class="admin-shell-label">/ centrum zarządzania</span></span></a><nav class="admin-shell-nav" aria-label="Nawigacja panelu administracyjnego">';
     foreach($items as $id=>[$label,$href]) $html.='<a href="'.$href.'"'.($id===$active?' aria-current="page"':'').'>'.$label.'</a>';
     return $html.'</nav></header>';
 }
@@ -24,5 +24,5 @@ function adminShellHeader(string $active): string {
 function adminShellPage(string $html,string $active): string {
     $html=preg_replace('~<header(?:\s[^>]*)?>.*?</header>~s','',$html,1)??$html;
     $html=str_replace('</head>',adminShellStyles().'</head>',$html);
-    return str_replace('<body>','<body>'.adminShellHeader($active),$html);
+    return apiRewritePaths(str_replace('<body>','<body>'.adminShellHeader($active),$html));
 }

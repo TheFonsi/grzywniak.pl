@@ -92,7 +92,7 @@ try {
         $email=(string)($session['projectState']['contactEmail']??'');
         if(!filter_var($email,FILTER_VALIDATE_EMAIL)) throw new DomainException('Brak poprawnego adresu e-mail klienta.');
         $token=bin2hex(random_bytes(24));
-        $feedbackUrl=rtrim(projectSetting('PUBLIC_SITE_URL'),'/').'/api/project-feedback.php?project='.rawurlencode($id).'&token='.rawurlencode($token);
+        $feedbackUrl=rtrim(projectSetting('PUBLIC_API_URL'),'/').'/project-feedback.php?project='.rawurlencode($id).'&token='.rawurlencode($token);
         $message="Dzień dobry,\n\nPodgląd projektu: ".$result['url']."\nUwagi do tej wersji: ".$feedbackUrl."\n\nPozdrawiamy,\nGrzywniak.pl";
         $sender=getenv('MAIL_FROM')?:'kontakt@grzywniak.pl';
         if(getenv('DISCOVERY_MAIL_MOCK')!=='true' && !@mail($email,'Podgląd projektu — Grzywniak.pl',$message,"From: Grzywniak.pl <{$sender}>\r\nContent-Type: text/plain; charset=UTF-8")) throw new DomainException('Serwer pocztowy nie przyjął wiadomości.');

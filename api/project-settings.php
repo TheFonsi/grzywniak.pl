@@ -13,7 +13,7 @@ $csrf=contractToken(); $error=''; $saved=false;
 if($_SERVER['REQUEST_METHOD']==='POST') {
     if(!hash_equals($csrf,(string)($_POST['csrf']??''))) { http_response_code(403); $error='Sesja formularza wygasła. Odśwież stronę.'; }
     else {
-        try { projectSettingsSave($_POST); header('Location: /api/project-settings.php?saved=1',true,303); exit; }
+        try { projectSettingsSave($_POST); header('Location: '.apiPath('project-settings.php').'?saved=1',true,303); exit; }
         catch(Throwable $exception) { http_response_code(422); $error=$exception instanceof InvalidArgumentException?$exception->getMessage():'Nie udało się zapisać ustawień. Sprawdź uprawnienia katalogu danych i spróbuj ponownie.'; }
     }
 }

@@ -39,7 +39,7 @@ if($action==='save-profile') {
     $profile['version']++; $profile['updatedAt']=time();
     $stmt=sessionDb()->prepare('INSERT INTO contract_profile(id,data) VALUES(1,:data) ON CONFLICT(id) DO UPDATE SET data=excluded.data');
     $stmt->execute([':data'=>json_encode($profile,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR)]);
-    contractReply(['profileVersion'=>$profile['version']],'/api/admin.php?view=contract-settings&profileSaved=1');
+    contractReply(['profileVersion'=>$profile['version']],apiPath('admin.php').'?view=contract-settings&profileSaved=1');
 }
 if($action==='save-template') {
     $template=contractTemplate();
@@ -52,7 +52,7 @@ if($action==='save-template') {
     $template['version']++; $template['updatedAt']=time();
     $stmt=sessionDb()->prepare('INSERT INTO contract_templates(id,data) VALUES(1,:data) ON CONFLICT(id) DO UPDATE SET data=excluded.data');
     $stmt->execute([':data'=>json_encode($template,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR)]);
-    contractReply(['template'=>$template],'/api/admin.php?view=contract-settings&saved=1');
+    contractReply(['template'=>$template],apiPath('admin.php').'?view=contract-settings&saved=1');
 }
 $id=(string)($_GET['session']??$body['contract_session']??'');
 if(!preg_match('/^[a-f0-9]{32}$/',$id)) contractError(400,'Niepoprawny identyfikator rozmowy.');
@@ -124,7 +124,7 @@ if(in_array($action,['save','generate'],true)) {
     if($action==='generate') $c['pdfBase64']=base64_encode(contractPdf($c));
     if(is_array($s['contract']??null)) $s['contractVersions'][]=$s['contract'];
     $s['contract']=$c; writeSession($s);
-    contractReply(['contract'=>$c],'/api/admin.php?view=all&session='.$id.'#contract-panel');
+    contractReply(['contract'=>$c],apiPath('admin.php').'?view=all&session='.$id.'#contract-panel');
 }
 if($action==='send') {
     $c=$s['contract']??null;
@@ -138,6 +138,6 @@ if($action==='send') {
     if(!$mock && !@mail($to,'=?UTF-8?B?'.base64_encode('Projekt umowy — Grzywniak.pl').'?=',$message,$headers)) contractError(502,'Nie udało się przekazać wiadomości do serwera poczty.');
     $s['contract']['status']=$mock?'MOCK_SENT':'SENT'; $s['contract']['sentAt']=time(); $s['contract']['sentTo']=$to;
     $s['contract']['deliveryLog'][]=['to'=>$to,'at'=>time(),'mock'=>$mock]; writeSession($s);
-    contractReply(['contract'=>$s['contract']],'/api/admin.php?view=all&session='.$id.'#contract-panel');
+    contractReply(['contract'=>$s['contract']],apiPath('admin.php').'?view=all&session='.$id.'#contract-panel');
 }
 contractError(400,'Nieznana operacja.');

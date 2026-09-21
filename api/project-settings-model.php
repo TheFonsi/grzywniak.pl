@@ -21,7 +21,8 @@ function projectSettingsSchema(): array {
             'PRODUCTION_ORIGIN_HOST'=>['label'=>'Host origin produkcji'],
         ]],
         'vps'=>['title'=>'VPS i wdrożenia','description'=>'Prywatne API VPS musi działać przez HTTPS i potwierdzać gotowość środowiska.', 'fields'=>[
-            'PUBLIC_SITE_URL'=>['label'=>'Publiczny adres panelu i formularza uwag','default'=>'https://grzywniak.pl'],
+            'PUBLIC_SITE_URL'=>['label'=>'Publiczny adres strony','default'=>'https://grzywniak.pl'],
+            'PUBLIC_API_URL'=>['label'=>'Publiczny adres API i formularza uwag','default'=>'https://api.grzywniak.pl'],
             'VPS_CONTROL_URL'=>['label'=>'Adres API VPS'],
             'VPS_CONTROL_TOKEN'=>['label'=>'Token API VPS','secret'=>true],
         ]],
@@ -97,7 +98,7 @@ function projectSettingsSave(array $input): array {
         if(!empty($field['number']) && ($value===''||!is_numeric($value)||!is_finite((float)$value)||(float)$value<$field['min']||(float)$value>$field['max'])) throw new InvalidArgumentException('Niepoprawny zakres pola '.$field['label'].'.');
         if(in_array($name,['GITHUB_ORG','GITHUB_TEMPLATE_OWNER','GITHUB_TEMPLATE_REPO'],true) && !preg_match('/^[A-Za-z0-9_.-]+$/',$value)) throw new InvalidArgumentException('Niepoprawna nazwa GitHub.');
         if(in_array($name,['PREVIEW_BASE_DOMAIN','PREVIEW_ORIGIN_HOST','PRODUCTION_BASE_DOMAIN','PRODUCTION_ORIGIN_HOST'],true) && $value!=='' && !preg_match('/^[a-z0-9.-]+$/i',$value)) throw new InvalidArgumentException('Niepoprawna domena.');
-        if(in_array($name,['PUBLIC_SITE_URL','VPS_CONTROL_URL','CODEX_RUNNER_URL'],true) && $value!=='' && (!filter_var($value,FILTER_VALIDATE_URL)||!str_starts_with(strtolower($value),'https://'))) throw new InvalidArgumentException('Adres usługi musi być poprawnym URL HTTPS.');
+        if(in_array($name,['PUBLIC_SITE_URL','PUBLIC_API_URL','VPS_CONTROL_URL','CODEX_RUNNER_URL'],true) && $value!=='' && (!filter_var($value,FILTER_VALIDATE_URL)||!str_starts_with(strtolower($value),'https://'))) throw new InvalidArgumentException('Adres usługi musi być poprawnym URL HTTPS.');
         if($name==='GITHUB_APP_PRIVATE_KEY' && $value!=='' && openssl_pkey_get_private($value)===false) throw new InvalidArgumentException('Klucz GitHub App musi być poprawnym kluczem prywatnym PEM.');
         $changes[$name]=$value;
     }
