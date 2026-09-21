@@ -67,6 +67,28 @@ function grantAgentRepositoryAccess(string $owner,string $repository,string $tok
     if(!in_array($access['status'],[201,204],true)) throw new RuntimeException('Nie udało się nadać agentowi dostępu do repozytorium (HTTP '.$access['status'].').');
 }
 
+function ensureTemplateWorkflow(string $templateOwner,string $templateRepository,string $owner,string $repository,string $token): void {
+    $file='.github/workflows/ci.yml';
+    $targetPath='/repos/'.rawurlencode($owner).'/'.rawurlencode($repository).'/contents/'.implode('/',array_map('rawurlencode',explode('/',$file)));
+    $target=githubApi('GET',$targetPath,null,$token);
+    if($target['status']===200 && ($target['body']['type']??'')==='file') return;
+    if($target['status']!==404) throw new RuntimeException('Nie udało się sprawdzić workflow CI w repozytorium (HTTP '.$target['status'].').');
+    $sourcePath='/repos/'.rawurlencode($templateOwner).'/'.rawurlencode($templateRepository).'/contents/'.implode('/',array_map('rawurlencode',explode('/',$file)));
+    $source=githubApi('GET',$sourcePath,null,$token);
+    $content=base64_decode(preg_replace('/\s+/','',(string)($source['body']['content']??'')),true);
+    if($source['status']!==200 || ($source['body']['type']??'')!=='file' || $content===false || $content==='') throw new RuntimeException('Zatwierdzony szablon nie zawiera workflow .github/workflows/ci.yml.');
+    $created=githubApi('PUT',$targetPath,['message'=>'Add CI workflow from approved project template','content'=>base64_encode($content),'branch'=>'main'],$token);
+    if(!in_array($created['status'],[200,201],true)) throw new RuntimeException('Nie udało się uzupełnić workflow CI w repozytorium projektu (HTTP '.$created['status'].').');
+}
+
+function configureMainBranchProtection(string $path,string $token): string {
+    $protection=githubApi('PUT',$path.'/branches/main/protection',['required_status_checks'=>['strict'=>true,'contexts'=>['validate']],'enforce_admins'=>true,'required_pull_request_reviews'=>['required_approving_review_count'=>1,'dismiss_stale_reviews'=>true],'restrictions'=>null,'required_linear_history'=>true,'allow_force_pushes'=>false,'allow_deletions'=>false,'required_conversation_resolution'=>true],$token);
+    if($protection['status']===200) return 'configured';
+    $message=strtolower((string)($protection['body']['message']??''));
+    if($protection['status']===403 && str_contains($message,'upgrade to github pro')) return 'manual_review_required';
+    throw new RuntimeException('Repozytorium istnieje, lecz ochrona main wymaga poprawy lub plan GitHub nie udostępnia tej funkcji (HTTP '.$protection['status'].').');
+}
+
 function createRepository(array $session,array $case): array {
     $org=trim(projectSetting('GITHUB_ORG'));
     $decision=$case['plan']['templateDecision']??[];
@@ -94,10 +116,9 @@ function createRepository(array $session,array $case): array {
     if(($existing['body']['private']??false)!==true || strcasecmp((string)($existing['body']['owner']['login']??''),$org)!==0) throw new RuntimeException('Repozytorium o tej nazwie nie jest prywatne lub należy do innego właściciela.');
     if(!str_contains((string)($existing['body']['description']??''),substr($id,0,8))) throw new RuntimeException('Nazwa repozytorium jest zajęta przez inny projekt.');
     grantAgentRepositoryAccess($org,$name,$token);
-    if($template) { $workflow=githubApi('GET',$path.'/contents/.github/workflows/ci.yml',null,$token); if($workflow['status']!==200) throw new RuntimeException('Szablon nie zawiera .github/workflows/ci.yml.'); }
-    $protection=githubApi('PUT',$path.'/branches/main/protection',['required_status_checks'=>$template?['strict'=>true,'contexts'=>['validate']]:null,'enforce_admins'=>true,'required_pull_request_reviews'=>['required_approving_review_count'=>1,'dismiss_stale_reviews'=>true],'restrictions'=>null,'required_linear_history'=>true,'allow_force_pushes'=>false,'allow_deletions'=>false,'required_conversation_resolution'=>true],$token);
-    if($protection['status']!==200) throw new RuntimeException('Repozytorium istnieje, lecz ochrona main wymaga poprawy lub plan GitHub nie udostępnia tej funkcji (HTTP '.$protection['status'].').');
-    return ['name'=>$name,'url'=>(string)$existing['body']['html_url'],'repositoryId'=>(int)$existing['body']['id'],'private'=>true,'ci'=>$template?'configured':'awaiting_project_scaffold','branchProtection'=>'configured','templateId'=>$template['id']??null,'templateProposalId'=>$case['templateProposalId']??null];
+    if($template) ensureTemplateWorkflow($templateOwner,$templateRepo,$org,$name,$token);
+    $branchProtection=configureMainBranchProtection($path,$token);
+    return ['name'=>$name,'url'=>(string)$existing['body']['html_url'],'repositoryId'=>(int)$existing['body']['id'],'private'=>true,'ci'=>$template?'configured':'awaiting_project_scaffold','branchProtection'=>$branchProtection,'templateId'=>$template['id']??null,'templateProposalId'=>$case['templateProposalId']??null];
 }
 
 function configureScaffold(string $id,array $repository): array {
@@ -110,9 +131,8 @@ function configureScaffold(string $id,array $repository): array {
         $check=githubApi('GET',$path.'/contents/'.implode('/',array_map('rawurlencode',explode('/',$file))),null,$token);
         if($check['status']!==200 || ($check['body']['type']??'')!=='file') throw new RuntimeException('Scaffold nie zawiera pliku '.$file.' na gałęzi main.');
     }
-    $protection=githubApi('PUT',$path.'/branches/main/protection',['required_status_checks'=>['strict'=>true,'contexts'=>['validate']],'enforce_admins'=>true,'required_pull_request_reviews'=>['required_approving_review_count'=>1,'dismiss_stale_reviews'=>true],'restrictions'=>null,'required_linear_history'=>true,'allow_force_pushes'=>false,'allow_deletions'=>false,'required_conversation_resolution'=>true],$token);
-    if($protection['status']!==200) throw new RuntimeException('Nie udało się włączyć wymaganej kontroli validate dla main (HTTP '.$protection['status'].').');
-    return ['ci'=>'configured','workflow'=>'.github/workflows/ci.yml','dockerfile'=>'Dockerfile'];
+    $branchProtection=configureMainBranchProtection($path,$token);
+    return ['ci'=>'configured','workflow'=>'.github/workflows/ci.yml','dockerfile'=>'Dockerfile','branchProtection'=>$branchProtection];
 }
 
 function publishTemplate(): void {
@@ -268,6 +288,7 @@ function runOneJob(): bool {
         }
         if($job['kind']==='create_repository') {
             projectSeedAgentTasks($id,($result['ci']??'')==='awaiting_project_scaffold'?projectTasksWithScaffold($case['plan']['tasks']??[]):($case['plan']['tasks']??[]));
+            if(($result['branchProtection']??'')==='manual_review_required') projectEvent($id,'repository','manual_review_required','System','Plan GitHub nie obsługuje ochrony main dla prywatnego repozytorium. CI działa, a każdy pull request wymaga ręcznej kontroli i scalenia przed następnym etapem.');
             if(($result['ci']??'')==='configured') { projectEnqueue($id,'provision_preview'); projectEvent($id,'environment','queued','System','Zlecono przygotowanie VPS i subdomeny Cloudflare.'); }
             else projectEvent($id,'environment','waiting','System','CI i środowisko czekają na przygotowanie nowego stosu w repozytorium.');
         }

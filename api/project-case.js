@@ -92,7 +92,7 @@
     const repoResult = parseResult(repoJob);
     if (repoResult?.url && /^https:\/\/github\.com\//.test(repoResult.url)) {
       $("#repo-value").innerHTML = `<a href="${escapeHtml(repoResult.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(repoResult.name || "Otwórz repozytorium")}</a>`;
-      $("#repo-detail").textContent = "Prywatne repozytorium projektu.";
+      $("#repo-detail").textContent = repoResult.branchProtection === "manual_review_required" ? "Prywatne repozytorium. GitHub Free: CI działa, a pull request wymaga ręcznej kontroli i scalenia." : "Prywatne repozytorium projektu.";
     } else {
       $("#repo-value").textContent = repoJob ? labels[project.status.repository] : "Jeszcze nie utworzono";
     }
@@ -161,6 +161,7 @@
       const result = parseResult(job);
       let body = job ? `<p>Stan zadania: ${escapeHtml(labels[data.status[stageId]])}; próby: ${escapeHtml(job.attempts)}; aktualizacja: ${date(job.updated_at)}.</p>` : "<p>Zadanie jeszcze nie zostało zlecone.</p>";
       if (stageId === "repository" && data.case.templateProposalId) body += `<p>Projekt ma własne repozytorium bez narzuconego szablonu Vite. Propozycję szablonu do przyszłego wykorzystania (${escapeHtml(data.case.templateProposalId)}) zapisano w <a href="${apiPath("project-template-catalog.php")}">katalogu</a>. CI i wdrożenie czekają na przygotowanie tego stosu przez agentów.</p>`;
+      if (result?.branchProtection === "manual_review_required") body += `<p><strong>Tryb GitHub Free:</strong> workflow CI działa, ale GitHub nie może technicznie chronić gałęzi <code>main</code> w prywatnym repozytorium. Sprawdź pull request i scal go ręcznie przed kolejnym zadaniem.</p>`;
       if (result) body += `<pre>${escapeHtml(JSON.stringify(result, null, 2))}</pre>`;
       if (job?.error) body += `<p class="error-text">${escapeHtml(job.error)}</p><form class="form" data-action="retry_job"><input type="hidden" name="kind" value="${kind}"><button class="primary">Ponów zadanie</button></form>`;
       return section(stageId === "repository" ? "GitHub i CI/CD" : "VPS, Cloudflare i TLS", body, true);
