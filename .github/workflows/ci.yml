@@ -100,7 +100,16 @@ jobs:
       - name: Deploy contact endpoint
         run: |
           set -euo pipefail
-          rsync -az --delete ./api/ "$DEPLOY_USER@$DEPLOY_HOST:${API_DEPLOY_PATH}"
+          rsync -az --delete --exclude '.env' ./api/ "$DEPLOY_USER@$DEPLOY_HOST:${API_DEPLOY_PATH}"
+
+      - name: Verify PHP API deployment
+        run: |
+          set -euo pipefail
+          ssh "$DEPLOY_USER@$DEPLOY_HOST" "test -f '${API_DEPLOY_PATH}discovery.php' && php -l '${API_DEPLOY_PATH}discovery.php'"
+          curl --fail-with-body --retry 3 --retry-delay 2 --request OPTIONS \
+            --header 'Origin: https://grzywniak.pl' \
+            --header 'Access-Control-Request-Method: POST' \
+            'https://api.grzywniak.pl/discovery.php'
 
       - name: Restart website process
         run: ssh "$DEPLOY_USER@$DEPLOY_HOST" "devil www restart $DEPLOY_DOMAIN"
