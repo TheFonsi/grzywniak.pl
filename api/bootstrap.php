@@ -17,7 +17,7 @@ if (is_file($envFile) && is_readable($envFile)) {
         $line = trim($line);
         if ($line === '' || str_starts_with($line, '#') || !str_contains($line, '=')) continue;
         [$name, $value] = explode('=', $line, 2);
-        $name = trim($name);
+        $name = ltrim(trim($name), "\xEF\xBB\xBF");
         $value = trim($value);
         if ($name === '' || getenv($name) !== false) continue;
         if (strlen($value) >= 2 && (($value[0] === '"' && substr($value, -1) === '"') || ($value[0] === "'" && substr($value, -1) === "'"))) $value = substr($value, 1, -1);
