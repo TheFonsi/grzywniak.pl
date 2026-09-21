@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import DiscoveryPage from "./DiscoveryPage";
 import { I18nProvider, languages, t, useLanguage } from "./i18n";
 import aboutPortrait from "./assets/about-consultant.jpg";
 import firstConversation from "./assets/first-conversation.jpg";
@@ -353,13 +354,20 @@ function Nav() {
           ))}
         </ul>
 
-        <a
-          href="#contact"
-          className="nav-liquid-cta hidden md:flex items-center gap-2 text-sm font-mono tracking-widest uppercase px-5 py-3"
-          style={{ letterSpacing: "0.1em" }}
-        >
-          {t("Porozmawiajmy →")}
-        </a>
+        <div className="group relative hidden pb-14 -mb-14 md:block">
+          <a
+            href="#discovery"
+            className="nav-liquid-cta inline-flex items-center gap-2 px-5 py-3 font-mono text-sm uppercase"
+            style={{ letterSpacing: "0.1em" }}
+            aria-describedby="ai-consultant-note"
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-[#aeb9ff] shadow-[0_0_12px_#7484ff]" aria-hidden="true" />
+            {t("Konsultant AI")}
+          </a>
+          <span id="ai-consultant-note" className="pointer-events-none absolute right-0 top-[calc(100%-3rem)] z-20 w-60 translate-y-1 rounded-xl border border-[#38425a] bg-[#0d1018] px-4 py-3 text-left font-sans text-xs normal-case tracking-normal text-[#d4daea] opacity-0 shadow-2xl shadow-black/50 transition duration-200 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100 before:absolute before:-top-1.5 before:right-7 before:h-3 before:w-3 before:rotate-45 before:border-l before:border-t before:border-[#38425a] before:bg-[#0d1018]">
+            {t("Konsultant AI pomoże przygotować brief dla naszego zespołu, abyśmy mogli sprawnie określić zakres, harmonogram i wycenę.")}
+          </span>
+        </div>
 
         <div
           className="flex shrink-0 items-center gap-1"
@@ -423,13 +431,15 @@ function Nav() {
             </a>
           ))}
           <a
-            href="#contact"
-            className="block mt-4 py-3 text-center text-sm font-mono tracking-widest uppercase"
+            href="#discovery"
+            className="mt-4 flex items-center justify-center gap-2 py-3 text-center font-mono text-sm tracking-widest uppercase"
             style={{ border: "1px solid #1a1d22", color: "#f5f5f5", letterSpacing: "0.1em" }}
             onClick={() => setMenuOpen(false)}
           >
-            {t("Porozmawiajmy →")}
+            <span className="h-1.5 w-1.5 rounded-full bg-[#aeb9ff] shadow-[0_0_12px_#7484ff]" aria-hidden="true" />
+            {t("Konsultant AI")}
           </a>
+          <p className="mt-2 text-center text-xs leading-relaxed text-[#a8b0bf]">{t("Konsultant AI pomoże przygotować brief dla naszego zespołu, abyśmy mogli sprawnie określić zakres, harmonogram i wycenę.")}</p>
         </div>
       )}
     </nav>
@@ -901,7 +911,7 @@ function Hero() {
 
             <div className="flex flex-wrap gap-4">
               <a
-                href="#contact"
+                href="#discovery"
                 className="liquid-button liquid-button--primary px-7 py-3.5 text-sm font-sans font-medium"
                 style={{ letterSpacing: "-0.01em" }}
               >
@@ -961,6 +971,35 @@ function Hero() {
 }
 
 // ─── Value Proposition ────────────────────────────────────────────────────────
+function AiDiscoveryInvite() {
+  return (
+    <section className="relative px-6 py-12 md:px-12 md:py-16">
+      <div className="mx-auto max-w-[1400px] overflow-hidden rounded-3xl border border-[#303844] bg-[#0b0d14] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.25)] md:p-10">
+        <div className="grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+          <div>
+            <div className="flex items-center gap-3 font-mono text-xs uppercase tracking-[.16em] text-[#94a2ff]"><span className="ai-entry-signal" aria-hidden="true"><i /><i /><i /></span>Nowość · AI analityk projektu</div>
+            <h2 className="mt-5 max-w-xl text-3xl font-semibold leading-tight tracking-tight text-white md:text-4xl">Nie wiesz jeszcze, jak opisać projekt? Zacznij od zwykłej rozmowy.</h2>
+            <p className="mt-5 max-w-2xl text-base leading-7 text-[#adb4c1]">Opisz problem własnymi słowami. Analityk AI zada kilka prostych pytań, pomoże uporządkować potrzeby i przekaże zespołowi gotowy brief.</p>
+            <div className="mt-7 grid gap-3 text-sm text-[#d2d7e1] sm:grid-cols-3">
+              {["Bez specyfikacji", "Krótka rozmowa", "Brief dla zespołu"].map((item, index) => <div key={item} className="flex items-center gap-2 rounded-xl border border-[#29303a] bg-[#11151d] px-3 py-3"><span className="font-mono text-xs text-[#8fa0ff]">0{index + 1}</span>{item}</div>)}
+            </div>
+            <a href="#discovery" className="liquid-button liquid-button--primary mt-8 inline-flex items-center gap-3 px-6 py-3.5 text-sm font-medium">Rozpocznij rozmowę o projekcie <span aria-hidden="true">→</span></a>
+            <p className="mt-3 text-xs text-[#7e8797]">Rozmowa prowadzona jest przez AI. Nie podawaj haseł ani sekretów.</p>
+          </div>
+          <div className="relative rounded-2xl border border-[#384159] bg-[#0e1119] p-5 md:p-6">
+            <div className="mb-5 flex items-center justify-between border-b border-[#272d39] pb-4"><span className="font-mono text-[11px] uppercase tracking-[.14em] text-[#aeb9ff]">Jak to wygląda</span><span className="rounded-full bg-[#18204a] px-2.5 py-1 text-[11px] text-[#c7d0ff]">Prowadzona rozmowa</span></div>
+            <div className="space-y-4 text-sm leading-6">
+              <div className="ml-auto max-w-[88%] rounded-2xl rounded-br-sm bg-[#5d70e8] px-4 py-3 text-white">Potrzebuję systemu do obsługi zleceń w firmie transportowej.</div>
+              <div className="max-w-[92%] rounded-2xl rounded-bl-sm border border-[#2d3441] bg-[#171b23] px-4 py-3 text-[#e2e6ed]"><p>Jasne — pomogę Ci to uporządkować.</p><p className="mt-3 font-semibold text-white">Jak dziś wygląda obsługa zleceń w Twojej firmie — od zgłoszenia do realizacji?</p></div>
+              <div className="flex items-center gap-2 pt-1 text-xs text-[#8e98aa]"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#7587ff]" />AI pomaga zebrać konkrety krok po kroku</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function ValueProposition() {
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
@@ -1339,7 +1378,7 @@ function DontKnowSection() {
 
             <div className="flex flex-wrap gap-4">
               <a
-                href="#contact"
+                href="#discovery"
                 className="px-7 py-3.5 text-sm font-sans font-medium"
                 style={{
                   background: "#5b6ef5",
@@ -2610,9 +2649,23 @@ function Footer() {
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 function AppContent() {
-  useLanguage();
+  const { language } = useLanguage();
+  const [discovery, setDiscovery] = useState(() => window.location.hash === "#discovery");
+  useEffect(() => {
+    let scrollTimer = 0;
+    const update = () => {
+      setDiscovery(window.location.hash === "#discovery");
+      if (window.location.hash === "#contact") {
+        scrollTimer = window.setTimeout(() => document.getElementById("contact")?.scrollIntoView({ behavior: "smooth" }), 0);
+      }
+    };
+    update();
+    window.addEventListener("hashchange", update);
+    return () => { window.removeEventListener("hashchange", update); window.clearTimeout(scrollTimer); };
+  }, []);
+  if (discovery) return <DiscoveryPage onClose={() => { window.location.hash = ""; }} />;
   return (
-    <div className="noise relative isolate">
+    <div key={language} className="noise relative isolate">
       <AmbientSignals />
       <CustomCursor />
       <ScrollProgress />
@@ -2620,6 +2673,9 @@ function AppContent() {
       <Nav />
       <main id="main-content" className="relative z-10 page-content">
         <Hero />
+        <ScrollReveal>
+          <AiDiscoveryInvite />
+        </ScrollReveal>
         <ScrollReveal>
           <ValueProposition />
         </ScrollReveal>

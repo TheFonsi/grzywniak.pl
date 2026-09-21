@@ -33,3 +33,8 @@ $RECYCLE.BIN/
 
 # PHP tooling caches
 /.phpunit.cache/
+
+# Runtime-only AI discovery sessions (contain client conversation data)
+/api/storage/
+/services/vps-control/data/
+.local-dev.pids.json

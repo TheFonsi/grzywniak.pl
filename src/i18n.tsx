@@ -25,6 +25,8 @@ const english: Record<string, string> = {
   "Ty znasz swój biznes. Ja zajmę się technologią, wdrożeniem i utrzymaniem.":
     "You know your business. I take care of the technology, launch and maintenance.",
   "Porozmawiajmy →": "Let's talk →",
+  "Konsultant AI": "AI Consultant",
+  "Konsultant AI pomoże przygotować brief dla naszego zespołu, abyśmy mogli sprawnie określić zakres, harmonogram i wycenę.": "The AI Consultant will prepare a brief for our team so we can efficiently define the scope, schedule and estimate.",
   "Porozmawiajmy o projekcie →": "Let's discuss your project →",
   "Porozmawiajmy o Twoim projekcie →": "Let's discuss your project →",
   "Zobacz, w czym mogę pomóc": "See how I can help",

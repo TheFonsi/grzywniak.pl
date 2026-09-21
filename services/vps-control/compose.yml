@@ -1,0 +1,50 @@
+services:
+  traefik:
+    image: traefik:v3.3
+    restart: unless-stopped
+    command:
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --accesslog=true
+      - --accesslog.format=json
+      - --providers.file.directory=/dynamic
+      - --providers.file.watch=true
+      - --certificatesresolvers.cf.acme.email=${ACME_EMAIL}
+      - --certificatesresolvers.cf.acme.storage=/acme/acme.json
+      - --certificatesresolvers.cf.acme.dnschallenge=true
+      - --certificatesresolvers.cf.acme.dnschallenge.provider=cloudflare
+    environment:
+      CF_DNS_API_TOKEN: ${CF_DNS_API_TOKEN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./data/dynamic:/dynamic:ro
+      - ./data/acme:/acme
+    networks:
+      - edge
+
+  vps-control:
+    build: .
+    container_name: vps-control
+    restart: unless-stopped
+    environment:
+      VPS_CONTROL_TOKEN: ${VPS_CONTROL_TOKEN}
+      VPS_CONTROL_HOST: ${VPS_CONTROL_HOST}
+      GITHUB_ORG: ${GITHUB_ORG}
+      PREVIEW_BASE_DOMAIN: ${PREVIEW_BASE_DOMAIN}
+      PRODUCTION_BASE_DOMAIN: ${PRODUCTION_BASE_DOMAIN}
+      VPS_DATA_DIR: /data
+      TRAEFIK_DYNAMIC_DIR: /dynamic
+      VPS_DOCKER_NETWORK: grzywniak-edge
+    volumes:
+      - ./data/state:/data
+      - ./data/dynamic:/dynamic
+      - ./data/docker-config:/root/.docker:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - edge
+
+networks:
+  edge:
+    name: grzywniak-edge

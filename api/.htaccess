@@ -1,0 +1,4 @@
+Options -Indexes
+<FilesMatch "(\.(json|log|sqlite|sqlite-wal|sqlite-shm|key)$|^sess_)">
+  Require all denied
+</FilesMatch>

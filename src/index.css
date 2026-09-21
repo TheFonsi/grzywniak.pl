@@ -77,8 +77,79 @@ body {
   outline-offset: 4px;
 }
 
+button:not(:disabled),
+a[href],
+[role="button"] {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
 .font-mono {
   font-family: "JetBrains Mono", "Fira Code", monospace;
+}
+
+/* A compact visual handoff from the main offer to AI project discovery. */
+.ai-entry-signal {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 2.65rem;
+  height: 0.8rem;
+}
+
+.ai-entry-signal::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  transform: translateY(-50%);
+  background: linear-gradient(90deg, transparent, rgba(124, 141, 255, 0.95), transparent);
+  background-size: 200% 100%;
+  animation: ai-entry-flow 2.2s ease-in-out infinite;
+}
+
+.ai-entry-signal i {
+  position: absolute;
+  z-index: 1;
+  width: 0.42rem;
+  height: 0.42rem;
+  border: 1px solid rgba(184, 195, 255, 0.9);
+  border-radius: 999px;
+  background: #11172d;
+  box-shadow: 0 0 12px rgba(116, 132, 255, 0.9);
+  animation: ai-entry-node 2.2s ease-in-out infinite;
+}
+
+.ai-entry-signal i:nth-child(1) { left: 0; }
+.ai-entry-signal i:nth-child(2) { left: calc(50% - 0.21rem); animation-delay: 160ms; }
+.ai-entry-signal i:nth-child(3) { right: 0; animation-delay: 320ms; }
+
+@keyframes ai-entry-flow {
+  0%, 100% { background-position: 100% 0; opacity: 0.38; }
+  50% { background-position: 0 0; opacity: 1; }
+}
+
+@keyframes ai-entry-node {
+  0%, 100% { transform: scale(0.75); opacity: 0.5; }
+  50% { transform: scale(1.18); opacity: 1; }
+}
+
+@keyframes discovery-page-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.discovery-page-enter {
+  animation: discovery-page-enter 160ms ease-out both;
 }
 
 /* Noise texture overlay */
@@ -732,6 +803,12 @@ body {
   .infrastructure-orbit__core,
   .infrastructure-orbit__particle,
   .return-to-top-wrap::before {
+    animation: none;
+  }
+  .ai-entry-signal::before,
+  .ai-entry-signal i,
+  .discovery-page-enter,
+  .home-leave-for-discovery {
     animation: none;
   }
   .signal-wave {
