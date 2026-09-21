@@ -111,7 +111,7 @@ function publishTemplate(): void {
     }
     if(!in_array($repo['status'],[200,201],true) || ($repo['body']['private']??false)!==true) throw new RuntimeException('Repozytorium szablonu musi być prywatne.');
     if(($repo['body']['default_branch']??'main')!=='main') throw new RuntimeException('Repozytorium szablonu musi używać gałęzi main.');
-    $root=realpath(__DIR__.'/../templates/web-vite');
+    $root=realpath(__DIR__.'/../project-templates/web-vite') ?: realpath(__DIR__.'/../templates/web-vite');
     if($root===false) throw new RuntimeException('Nie znaleziono lokalnego szablonu.');
     $iterator=new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root,FilesystemIterator::SKIP_DOTS));
     foreach($iterator as $file) {

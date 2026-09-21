@@ -100,16 +100,22 @@ jobs:
       - name: Deploy PHP API
         run: |
           set -euo pipefail
-          ssh "$DEPLOY_USER@$DEPLOY_HOST" "install -d -m 700 '${API_DEPLOY_PATH}storage'"
+          API_ROOT_PATH="${API_DEPLOY_PATH%public_html/}"
+          PROJECT_TEMPLATES_PATH="${API_ROOT_PATH}project-templates/"
+          ssh "$DEPLOY_USER@$DEPLOY_HOST" "install -d -m 700 '${API_DEPLOY_PATH}storage' '${PROJECT_TEMPLATES_PATH}'"
           rsync -az --delete \
             --exclude '.env' \
             --exclude 'storage/' \
             ./api/ "$DEPLOY_USER@$DEPLOY_HOST:${API_DEPLOY_PATH}"
+          rsync -az --delete \
+            --exclude 'dist/' \
+            --exclude 'node_modules/' \
+            ./templates/ "$DEPLOY_USER@$DEPLOY_HOST:${PROJECT_TEMPLATES_PATH}"
 
       - name: Verify PHP API deployment
         run: |
           set -euo pipefail
-          ssh "$DEPLOY_USER@$DEPLOY_HOST" "test -f '${API_DEPLOY_PATH}discovery.php' && test -d '${API_DEPLOY_PATH}storage' && test -w '${API_DEPLOY_PATH}storage' && php -l '${API_DEPLOY_PATH}discovery.php'"
+          ssh "$DEPLOY_USER@$DEPLOY_HOST" "test -f '${API_DEPLOY_PATH}discovery.php' && test -f '${API_DEPLOY_PATH%public_html/}project-templates/web-vite/.github/workflows/ci.yml' && test -d '${API_DEPLOY_PATH}storage' && test -w '${API_DEPLOY_PATH}storage' && php -l '${API_DEPLOY_PATH}discovery.php'"
           curl --fail-with-body --retry 3 --retry-delay 2 --request OPTIONS \
             --header 'Origin: https://grzywniak.pl' \
             --header 'Access-Control-Request-Method: POST' \
