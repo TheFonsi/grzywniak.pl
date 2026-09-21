@@ -97,15 +97,19 @@ jobs:
           set -euo pipefail
           rsync -az --delete --exclude 'api/' ./dist/ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH"
 
-      - name: Deploy contact endpoint
+      - name: Deploy PHP API
         run: |
           set -euo pipefail
-          rsync -az --delete --exclude '.env' ./api/ "$DEPLOY_USER@$DEPLOY_HOST:${API_DEPLOY_PATH}"
+          ssh "$DEPLOY_USER@$DEPLOY_HOST" "install -d -m 700 '${API_DEPLOY_PATH}storage'"
+          rsync -az --delete \
+            --exclude '.env' \
+            --exclude 'storage/' \
+            ./api/ "$DEPLOY_USER@$DEPLOY_HOST:${API_DEPLOY_PATH}"
 
       - name: Verify PHP API deployment
         run: |
           set -euo pipefail
-          ssh "$DEPLOY_USER@$DEPLOY_HOST" "test -f '${API_DEPLOY_PATH}discovery.php' && php -l '${API_DEPLOY_PATH}discovery.php'"
+          ssh "$DEPLOY_USER@$DEPLOY_HOST" "test -f '${API_DEPLOY_PATH}discovery.php' && test -d '${API_DEPLOY_PATH}storage' && test -w '${API_DEPLOY_PATH}storage' && php -l '${API_DEPLOY_PATH}discovery.php'"
           curl --fail-with-body --retry 3 --retry-delay 2 --request OPTIONS \
             --header 'Origin: https://grzywniak.pl' \
             --header 'Access-Control-Request-Method: POST' \

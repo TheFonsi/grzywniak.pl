@@ -12,6 +12,8 @@ The endpoint uses Responses API structured JSON schema and validates status/flag
 
 Deploy the built frontend to `domains/grzywniak.pl/public_nodejs/public`. Deploy the contents of the repository's `api` directory directly to `domains/api.grzywniak.pl/public_html`. On MyDevil, keep production secrets in `domains/api.grzywniak.pl/public_html/.env`; the deployed API `.htaccess` denies all HTTP access to that file. Do not place `.env` in the frontend directory. The production frontend calls `https://api.grzywniak.pl/contact.php` and `https://api.grzywniak.pl/discovery.php`.
 
+The deployment excludes both `.env` and `storage/` from `rsync --delete`. The `storage` directory contains the SQLite database, client conversations, encrypted project settings, and the local encryption key, so it must persist across releases and be included in hosting backups.
+
 ## Admin panel
 
 Set `ADMIN_USERNAME` and a long, unique `ADMIN_PASSWORD` in the server environment (or local `.env`), then open `/api/admin.php`. The panel is protected with HTTP Basic Authentication and shows sessions, briefs, complete conversation history, risk flags, token usage, cache tokens, and last-response latency.
