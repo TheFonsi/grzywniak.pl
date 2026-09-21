@@ -72,7 +72,10 @@ function suggestedAnswersFor(session: Session | null, isEnglish: boolean): strin
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`/api/discovery.php${path}`, {
+  const endpoint = import.meta.env.PROD
+    ? "https://api.grzywniak.pl/discovery.php"
+    : "/api/discovery.php";
+  const response = await fetch(`${endpoint}${path}`, {
     headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
     ...init,
   });

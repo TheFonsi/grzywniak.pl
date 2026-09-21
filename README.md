@@ -8,6 +8,10 @@ For local XAMPP development, paste the key after `OPENAI_API_KEY=` in the Git-ig
 
 The endpoint uses Responses API structured JSON schema and validates status/flags before it persists a state update. When the visitor finishes the short discovery, `DISCOVERY_TO` receives a plain-text brief by email; set `CONTACT_FROM` to an address verified by the hosting provider. Run `npm run typecheck` and `npm run build` before release.
 
+## MyDevil production layout
+
+Deploy the built frontend to `domains/grzywniak.pl/public_nodejs/public`. Deploy the contents of the repository's `api` directory directly to `domains/api.grzywniak.pl/public_html`. Keep production secrets in `domains/api.grzywniak.pl/.env`, one level above `public_html`; do not copy `.env` into either public directory. The production frontend calls `https://api.grzywniak.pl/contact.php` and `https://api.grzywniak.pl/discovery.php`.
+
 ## Admin panel
 
 Set `ADMIN_USERNAME` and a long, unique `ADMIN_PASSWORD` in the server environment (or local `.env`), then open `/api/admin.php`. The panel is protected with HTTP Basic Authentication and shows sessions, briefs, complete conversation history, risk flags, token usage, cache tokens, and last-response latency.

@@ -2,10 +2,13 @@
 declare(strict_types=1);
 
 /**
- * Loads local development configuration without overwriting real server variables.
- * The root .env file is Git-ignored and must never be published.
+ * Loads production configuration from above public_html and local development
+ * configuration from the repository root without overwriting server variables.
  */
-$envFile = dirname(__DIR__) . '/.env';
+$apiParent = dirname(__DIR__);
+$envFile = basename($apiParent) === 'public_html'
+    ? dirname($apiParent) . '/.env'
+    : $apiParent . '/.env';
 if (is_file($envFile) && is_readable($envFile)) {
     foreach (file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [] as $line) {
         $line = trim($line);

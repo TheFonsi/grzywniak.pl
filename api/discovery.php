@@ -7,8 +7,20 @@ header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
 header('Cache-Control: no-store');
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-if ($origin !== '' && !in_array($origin, ['https://grzywniak.pl', 'https://www.grzywniak.pl', 'http://localhost:8443'], true)) {
+$allowedOrigins = ['https://grzywniak.pl', 'https://www.grzywniak.pl', 'http://localhost:8443'];
+if ($origin !== '' && !in_array($origin, $allowedOrigins, true)) {
   http_response_code(403); echo json_encode(['message' => 'Origin not allowed.']); exit;
+}
+if ($origin !== '') {
+  header("Access-Control-Allow-Origin: {$origin}");
+  header('Vary: Origin');
+}
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+  header('Access-Control-Allow-Methods: POST, OPTIONS');
+  header('Access-Control-Allow-Headers: Content-Type, Authorization');
+  header('Access-Control-Max-Age: 86400');
+  http_response_code(204);
+  exit;
 }
 
 const MAX_MESSAGE = 4000;
