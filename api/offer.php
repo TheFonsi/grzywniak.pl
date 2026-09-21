@@ -16,12 +16,15 @@ header('Cache-Control: no-store');
 $id = preg_replace('/[^a-f0-9]/', '', (string) ($_GET['session'] ?? ''));
 $file = __DIR__ . '/storage/' . $id . '.json';
 if (!preg_match('/^[a-f0-9]{32}$/', $id) || (!is_file($file) && readSession($id) === null)) { http_response_code(404); echo json_encode(['message' => 'Nie znaleziono briefu.']); exit; }
-$sessionLock=fopen(__DIR__.'/storage/'.$id.'.lock','c');
-if($sessionLock===false || !flock($sessionLock,LOCK_EX|LOCK_NB)) { if(is_resource($sessionLock)) fclose($sessionLock); http_response_code(409); echo json_encode(['message'=>'Sprawa jest teraz przetwarzana.']); exit; }
+$sessionLock=null;
+if($_SERVER['REQUEST_METHOD']==='POST') {
+    $sessionLock=fopen(__DIR__.'/storage/'.$id.'.lock','c');
+    if($sessionLock===false || !flock($sessionLock,LOCK_EX|LOCK_NB)) { if(is_resource($sessionLock)) fclose($sessionLock); http_response_code(409); echo json_encode(['message'=>'Sprawa jest teraz przetwarzana.']); exit; }
+}
 $session = readSession($id) ?? json_decode((string) file_get_contents($file), true);
 if (!is_array($session)) { http_response_code(500); exit; }
 if ($_SERVER['REQUEST_METHOD'] === 'POST') register_shutdown_function(static function () use (&$session): void { if (is_array($session) && isset($session['id'])) writeSession($session); });
-register_shutdown_function(static function() use ($sessionLock): void { flock($sessionLock,LOCK_UN); fclose($sessionLock); });
+if (is_resource($sessionLock)) register_shutdown_function(static function() use ($sessionLock): void { flock($sessionLock,LOCK_UN); fclose($sessionLock); });
 if (normalizeSessionData($session) && $_SERVER['REQUEST_METHOD'] === 'POST') file_put_contents($file, json_encode($session, JSON_UNESCAPED_UNICODE), LOCK_EX);
 $analysisReady = (($session['internalAnalysis']['status'] ?? '') === 'COMPLETED');
 $requestedVersion = max(0, (int) ($_GET['version'] ?? 0));
