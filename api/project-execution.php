@@ -38,7 +38,7 @@ function projectDispatchAgentTask(): bool {
     try {
         $max=max(1,(int)projectSetting('AGENT_MAX_CONCURRENCY'));
         $running=(int)$db->query("SELECT COUNT(*) FROM project_agent_tasks WHERE state='running'")->fetchColumn()+(int)$db->query("SELECT COUNT(*) FROM project_ai_calls WHERE state='reserved'")->fetchColumn();
-        if($running>=$max) { $db->commit(); return false; }
+        if($running>=$max) { $db->exec('COMMIT'); return false; }
         $tasks=$db->query("SELECT * FROM project_agent_tasks WHERE state='pending' ORDER BY id")->fetchAll(PDO::FETCH_ASSOC);
         $selected=null; $case=[]; $repo=[];
         foreach($tasks as $task) {
@@ -57,7 +57,7 @@ function projectDispatchAgentTask(): bool {
             }
             $selected=$task; break;
         }
-        if(!$selected) { $db->commit(); return false; }
+        if(!$selected) { $db->exec('COMMIT'); return false; }
         [$url,$token]=projectRunnerConfig();
         $id=(string)$selected['session_id'];
         [$projectTotal,$monthlyTotal]=projectTaskTotals($db,$id);
@@ -66,18 +66,18 @@ function projectDispatchAgentTask(): bool {
         if($reserve<=0 || $projectTotal+$reserve>$projectCap+0.0001 || $monthlyTotal+$reserve>$monthlyCap+0.0001) {
             $db->prepare("UPDATE project_agent_tasks SET state='failed',error=?,updated_at=? WHERE id=?")->execute(['Limit kosztu projektu, miesiąca lub zadania nie pozwala uruchomić pracy.',time(),$selected['id']]);
             projectEvent($id,projectTaskStage((string)$selected['role']),'limit','System','Zadanie '.$selected['task_key'].' wstrzymane przez limit kosztów.');
-            $db->commit(); return true;
+            $db->exec('COMMIT'); return true;
         }
         $key=$id.':'.$selected['task_key'].':'.((int)$selected['attempts']+1);
         $db->prepare("UPDATE project_agent_tasks SET state='running',runner_id=?,attempts=attempts+1,reserved_pln=?,started_at=?,updated_at=? WHERE id=? AND state='pending'")->execute([$key,$reserve,time(),time(),$selected['id']]);
         projectEvent($id,projectTaskStage((string)$selected['role']),'started','Agent '.$selected['role'],'Zlecono zadanie: '.$selected['title'].'.');
-        $db->commit();
+        $db->exec('COMMIT');
         $body=['id'=>$key,'projectId'=>$id,'taskId'=>$selected['task_key'],'role'=>$selected['role'],'title'=>$selected['title'],'dependencies'=>json_decode((string)$selected['dependencies'],true)?:[],'acceptance'=>json_decode((string)$selected['acceptance'],true)?:[],'repository'=>$repo['url'],'approvedScope'=>$case['scope']??'','maxCostPln'=>$reserve,'timeoutMinutes'=>(int)projectSetting('AGENT_TASK_TIMEOUT_MIN')];
         $response=workerRequest('POST',$url.'/v1/tasks',$body,['Authorization: Bearer '.$token,'Idempotency-Key: '.$key,'Content-Type: application/json','Accept: application/json']);
         if(!in_array($response['status'],[200,201,202],true) || ($response['body']['id']??'')!==$key) throw new RuntimeException('Runner nie potwierdził identyfikatora zadania.');
         return true;
     } catch(Throwable $error) {
-        if($db->inTransaction()) $db->rollBack();
+        try { $db->exec('ROLLBACK'); } catch(Throwable) {}
         if(isset($selected) && $selected) projectEvent((string)$selected['session_id'],projectTaskStage((string)$selected['role']),'runner_error','System','Nie udało się zlecić zadania. Runner musi obsługiwać ponowienie z tym samym Idempotency-Key.');
         throw $error;
     }
@@ -150,8 +150,8 @@ function projectPollAgentTask(): bool {
             projectEvent((string)$task['session_id'],projectTaskStage((string)$task['role']),$state==='done'?'completed':'failed','Agent '.$task['role'],$state==='done'?'Ukończono zadanie '.$task['task_key'].'.':'Nie udało się ukończyć zadania '.$task['task_key'].'.');
             if($overspent) projectEvent((string)$task['session_id'],projectTaskStage((string)$task['role']),'limit_exceeded','System','Runner zgłosił koszt '.$spent.' PLN ponad rezerwację '.$task['reserved_pln'].' PLN.');
         }
-        $db->commit();
-    } catch(Throwable $error) { $db->rollBack(); throw $error; }
+        $db->exec('COMMIT');
+    } catch(Throwable $error) { try { $db->exec('ROLLBACK'); } catch(Throwable) {} throw $error; }
     return true;
 }
 

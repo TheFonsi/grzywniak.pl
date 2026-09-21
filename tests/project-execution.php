@@ -4,6 +4,9 @@ if(PHP_SAPI!=='cli') { http_response_code(404); exit; }
 require_once __DIR__.'/../api/project-execution.php';
 require_once __DIR__.'/../api/project-provision.php';
 
+$executionSource=(string)file_get_contents(__DIR__.'/../api/project-execution.php');
+if(str_contains($executionSource,'->commit()') || str_contains($executionSource,'->rollBack()')) throw new RuntimeException('BEGIN IMMEDIATE musi być kończony przez SQL COMMIT lub ROLLBACK.');
+
 $db=new PDO('sqlite::memory:');
 $db->setAttribute(PDO::ATTR_ERRMODE,PDO::ERRMODE_EXCEPTION);
 $db->exec('CREATE TABLE project_agent_tasks(session_id TEXT,spent_pln REAL,reserved_pln REAL,started_at INTEGER,state TEXT)');
