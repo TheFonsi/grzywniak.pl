@@ -1,0 +1,25 @@
+services:
+  codex-runner:
+    build: .
+    container_name: codex-runner
+    restart: unless-stopped
+    env_file: /etc/grzywniak-runner/runner.env
+    environment:
+      RUNNER_PORT: "3020"
+      RUNNER_WORK_DIR: /var/lib/grzywniak-runner
+      RUNNER_GITHUB_TOKEN_FILE: /run/secrets/github-token
+      RUNNER_CODEX_UID: "10001"
+      RUNNER_CODEX_GID: "10001"
+      RUNNER_CODEX_HOME: /home/codex/.codex
+      CODEX_BIN: /usr/local/bin/codex
+    volumes:
+      - /var/lib/grzywniak-runner:/var/lib/grzywniak-runner
+      - /var/lib/grzywniak-runner/codex-home:/home/codex/.codex
+      - /etc/grzywniak-runner/github-token:/run/secrets/github-token:ro
+    networks:
+      - edge
+
+networks:
+  edge:
+    external: true
+    name: grzywniak-edge
