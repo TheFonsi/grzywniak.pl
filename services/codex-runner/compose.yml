@@ -9,6 +9,7 @@ services:
       RUNNER_BIND_HOST: "0.0.0.0"
       RUNNER_WORK_DIR: /var/lib/grzywniak-runner
       RUNNER_GITHUB_TOKEN_FILE: /run/secrets/github-token
+      RUNNER_OPENAI_API_KEY_FILE: /run/secrets/openai-api-key
       RUNNER_CODEX_UID: "10001"
       RUNNER_CODEX_GID: "10001"
       RUNNER_CODEX_HOME: /home/codex/.codex
@@ -17,6 +18,7 @@ services:
       - /var/lib/grzywniak-runner:/var/lib/grzywniak-runner
       - /var/lib/grzywniak-runner/codex-home:/home/codex/.codex
       - /etc/grzywniak-runner/github-token:/run/secrets/github-token:ro
+      - /etc/grzywniak-runner/openai-api-key:/run/secrets/openai-api-key:ro
     networks:
       - edge
 
