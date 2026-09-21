@@ -17,9 +17,9 @@ function projectSettingsSchema(): array {
         'cloudflare'=>['title'=>'Cloudflare i domeny','description'=>'Token ogranicz do zarządzania DNS właściwej strefy.', 'fields'=>[
             'CLOUDFLARE_ZONE_ID'=>['label'=>'ID strefy Cloudflare'],
             'CLOUDFLARE_DNS_TOKEN'=>['label'=>'Token DNS Cloudflare','secret'=>true],
-            'PREVIEW_BASE_DOMAIN'=>['label'=>'Domena podglądów','default'=>'preview.grzywniak.pl'],
+            'PREVIEW_BASE_DOMAIN'=>['label'=>'Główna domena podglądów','default'=>'grzywniak.pl','description'=>'System utworzy adres p-<id>.<domena>. Domena główna zapewnia zgodność z darmowym Universal SSL Cloudflare.'],
             'PREVIEW_ORIGIN_HOST'=>['label'=>'Host origin dla CNAME'],
-            'PRODUCTION_BASE_DOMAIN'=>['label'=>'Domena produkcyjna projektów','default'=>'app.grzywniak.pl'],
+            'PRODUCTION_BASE_DOMAIN'=>['label'=>'Główna domena produkcyjna','default'=>'grzywniak.pl','description'=>'System utworzy adres a-<id>.<domena>. Domena główna zapewnia zgodność z darmowym Universal SSL Cloudflare.'],
             'PRODUCTION_ORIGIN_HOST'=>['label'=>'Host origin produkcji'],
         ]],
         'vps'=>['title'=>'VPS i wdrożenia','description'=>'Prywatne API VPS musi działać przez HTTPS i potwierdzać gotowość środowiska.', 'fields'=>[
