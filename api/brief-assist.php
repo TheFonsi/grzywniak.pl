@@ -24,7 +24,12 @@ $sessionLock=fopen(__DIR__.'/storage/'.$id.'.lock','c');
 if($sessionLock===false || !flock($sessionLock,LOCK_EX|LOCK_NB)) { if(is_resource($sessionLock)) fclose($sessionLock); http_response_code(409); echo json_encode(['message'=>'Sprawa jest teraz przetwarzana.']); exit; }
 $session = readSession($id) ?? (json_decode((string) file_get_contents($file), true) ?: []);
 register_shutdown_function(static function () use (&$session): void { if (is_array($session) && isset($session['id'])) writeSession($session); });
-register_shutdown_function(static function() use ($sessionLock): void { flock($sessionLock,LOCK_UN); fclose($sessionLock); });
+register_shutdown_function(static function() use (&$sessionLock): void {
+    if (is_resource($sessionLock)) {
+        flock($sessionLock, LOCK_UN);
+        fclose($sessionLock);
+    }
+});
 if (normalizeSessionData($session)) file_put_contents($file, json_encode($session, JSON_UNESCAPED_UNICODE), LOCK_EX);
 $action = (string) ($data['action'] ?? '');
 $autoConfirm = false; // Propozycja AI zawsze wymaga świadomej decyzji administratora.
@@ -78,6 +83,11 @@ $previous = (string) ($session['adminProposals'][$question]['answer'] ?? '');
 $instruction = 'Jesteś analitykiem projektu. Na podstawie briefu zaproponuj jedną krótką, konkretną odpowiedź na brakujące pytanie. To hipoteza do zatwierdzenia przez zespół, nie fakt. Dopasuj odpowiedź do celu, budżetu i faktów z briefu. Dla niskiego budżetu wybierz najprostsze rozwiązanie dające wartość. Nie używaj ogólników typu „to istotne”, „tak” ani „nie”. Zwróć wyłącznie odpowiedź po polsku.';
 if ($action === 'regenerate' && $previous !== '') $instruction .= ' Poprzednia propozycja brzmiała: „' . $previous . '”. Zaproponuj inne, rozsądne rozwiązanie.';
 $payload = ['model' => getenv('OPENAI_MODEL') ?: 'gpt-5.6-luna', 'store' => false, 'reasoning' => ['effort' => 'low'], 'max_output_tokens' => 180, 'input' => [['role' => 'system', 'content' => $instruction], ['role' => 'user', 'content' => json_encode(['brief' => $session['projectState'] ?? [], 'question' => $question], JSON_UNESCAPED_UNICODE)]]];
+// The brief lock protects file reads and writes, not the external AI request.
+// This lets another administrator action save while the model is responding.
+flock($sessionLock, LOCK_UN);
+fclose($sessionLock);
+$sessionLock = null;
 $ch = curl_init('https://api.openai.com/v1/responses');
 curl_setopt_array($ch, [CURLOPT_POST => true, CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $key, 'Content-Type: application/json'], CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE), CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 20]);
 $raw = curl_exec($ch);
@@ -86,6 +96,16 @@ $response = json_decode((string) $raw, true) ?: [];
 $proposal = trim((string) ($response['output_text'] ?? ''));
 if ($proposal === '') foreach (($response['output'] ?? []) as $item) foreach (($item['content'] ?? []) as $content) if (($content['type'] ?? '') === 'output_text' && is_string($content['text'] ?? null)) { $proposal = trim($content['text']); break 2; }
 if ($proposal === '') { http_response_code($code >= 400 ? $code : 503); echo json_encode(['message' => 'Nie udało się wygenerować propozycji.']); exit; }
+$sessionLock = fopen(__DIR__.'/storage/'.$id.'.lock', 'c');
+if ($sessionLock === false || !flock($sessionLock, LOCK_EX)) {
+    if (is_resource($sessionLock)) fclose($sessionLock);
+    http_response_code(503);
+    echo json_encode(['message' => 'Nie udało się zapisać propozycji. Spróbuj ponownie.']);
+    exit;
+}
+$session = readSession($id) ?? (json_decode((string) file_get_contents($file), true) ?: []);
+$session['adminProposals'] = is_array($session['adminProposals'] ?? null) ? $session['adminProposals'] : [];
+$session['adminDecisions'] = is_array($session['adminDecisions'] ?? null) ? $session['adminDecisions'] : [];
 $session['adminProposals'][$question] = ['answer' => $proposal, 'at' => time()];
 if ($autoConfirm) { $session['adminDecisions'][$question] = ['answer' => $proposal, 'at' => time(), 'source' => 'AI_AUTO']; archiveOfferAfterBriefChange($session, $question, $proposal); }
 file_put_contents($file, json_encode($session, JSON_UNESCAPED_UNICODE), LOCK_EX);
