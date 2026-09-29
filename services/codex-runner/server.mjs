@@ -82,15 +82,22 @@ async function reviewPullRequest(task, directory, pr, branch) {
   const [reviewIdentity, authorIdentity] = await Promise.all([githubRequestAs(reviewer, 'GET', '/user'), githubRequestAs(author, 'GET', '/user')]);
   if (!reviewIdentity.id || reviewIdentity.id === authorIdentity.id) throw new Error('To samo konto GitHub nie może być autorem i niezależnym recenzentem PR.');
   await update(task, { phase: 'reviewing' });
-  await run('chown', ['-R', `${codexUid}:${codexGid}`, directory], { env: safeGitEnv() });
-  const resultPath = join(directory, '.review-result.json');
+  await run('chown', ['-R', `0:${codexGid}`, directory], { env: safeGitEnv() });
+  await run('chmod', ['-R', 'a-w', directory], { env: safeGitEnv() });
+  const resultPath = join('/tmp', `.grzywniak-review-${task.id.replace(/[^A-Za-z0-9_-]/g, '-')}.json`);
   const prompt = `Jesteś niezależnym agentem przeglądu kodu. Sprawdź zmiany gałęzi ${branch} względem main, bezpieczeństwo, zgodność z zadaniem i kryteriami oraz testy. Nie edytuj plików. Odpowiedz approved=true tylko jeśli nie ma problemów blokujących. W summary podaj konkretne uzasadnienie. Zadanie: ${task.title}. Kryteria: ${task.acceptance.join('; ')}.`;
   let reviewRun;
-  try { reviewRun = await run(codexBin, ['exec', '--json', '--ephemeral', '--sandbox', 'read-only', '--output-schema', join(workRoot, 'review-schema.json'), '-o', resultPath, '-C', directory, prompt], { cwd: directory, env: await codexEnvironment(), uid: codexUid, gid: codexGid, timeoutMs: task.timeoutMinutes * 60000, onChild: (child) => active.set(task.id, child) }); }
-  finally { active.delete(task.id); await run('chown', ['-R', '0:0', directory], { env: safeGitEnv() }); }
+  let reviewText;
+  const statusBefore = await run('git', ['status', '--porcelain=v1', '--untracked-files=all'], { cwd: directory, env: safeGitEnv() });
+  try {
+    reviewRun = await run(codexBin, ['exec', '--json', '--ephemeral', '--approve-for-me', '--output-schema', join(workRoot, 'review-schema.json'), '-o', resultPath, '-C', directory, prompt], { cwd: directory, env: await codexEnvironment(), uid: codexUid, gid: codexGid, timeoutMs: task.timeoutMinutes * 60000, onChild: (child) => active.set(task.id, child) });
+    reviewText = await readFile(resultPath, 'utf8');
+  }
+  finally { active.delete(task.id); await unlink(resultPath).catch(() => {}); await run('chown', ['-R', '0:0', directory], { env: safeGitEnv() }); }
+  const statusAfter = await run('git', ['status', '--porcelain=v1', '--untracked-files=all'], { cwd: directory, env: safeGitEnv() });
+  if (statusAfter.stdout !== statusBefore.stdout) throw new Error('Przegląd zmienił katalog roboczy; zmiany nie zostaną zaakceptowane.');
   const cost = costFromUsage(usageFromJsonl(reviewRun.stdout));
-  const verdict = JSON.parse(await readFile(resultPath, 'utf8'));
-  await unlink(resultPath);
+  const verdict = JSON.parse(reviewText);
   await update(task, { costPln: (task.costPln || 0) + cost });
   if (task.costPln > task.maxCostPln) throw new Error('Przegląd przekroczył limit kosztu zadania.');
   if (typeof verdict.approved !== 'boolean' || typeof verdict.summary !== 'string' || verdict.summary.trim().length < 10) throw new Error('Agent przeglądu nie podał poprawnego werdyktu.');
