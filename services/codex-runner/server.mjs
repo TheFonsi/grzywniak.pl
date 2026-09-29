@@ -176,8 +176,7 @@ async function pollExternal(task) {
       await reviewPullRequest(task, directory, pr, branch);
     }
     else if (task.phase === 'waiting_merge_auto' && task.result?.reviewApproved === true) {
-      const checks = await githubRequestAs(await reviewToken(), 'GET', `/repos/${encodeURIComponent(githubOrg)}/${encodeURIComponent(name)}/commits/${pr.head.sha}/check-runs`);
-      if ((checks.check_runs || []).some((check) => check.name === 'validate' && check.conclusion === 'success')) {
+      if (await workflowJobSucceeded(await reviewToken(), name, pr.head.sha, 'validate', 'pull_request')) {
         const merged = await githubRequestAs(await reviewToken(), 'PUT', `/repos/${encodeURIComponent(githubOrg)}/${encodeURIComponent(name)}/pulls/${task.pullRequestNumber}/merge`, { sha: pr.head.sha, merge_method: 'squash' });
         if (merged.merged === true && /^[a-f0-9]{40}$/.test(merged.sha || '')) await update(task, { state: 'done', phase: 'finished', result: { ...task.result, commitSha: merged.sha } });
       }
@@ -186,11 +185,21 @@ async function pollExternal(task) {
   if (task.phase === 'waiting_image') {
     const sha = task.result?.commitSha;
     if (!/^[a-f0-9]{40}$/.test(sha || '')) throw new Error('Brak commita QA.');
-    const checks = await githubRequest('GET', `/repos/${encodeURIComponent(githubOrg)}/${encodeURIComponent(name)}/commits/${sha}/check-runs`);
-    if (!(checks.check_runs || []).some((check) => check.name === 'publish' && check.conclusion === 'success')) return;
+    if (!(await workflowJobSucceeded(await reviewToken(), name, sha, 'publish', 'push'))) return;
     const digest = await registryDigest(name, sha);
     await update(task, { state: 'done', phase: 'finished', result: { ...task.result, imageDigest: digest } });
   }
+}
+
+async function workflowJobSucceeded(credential, name, sha, jobName, event) {
+  const base = `/repos/${encodeURIComponent(githubOrg)}/${encodeURIComponent(name)}/actions`;
+  const runs = await githubRequestAs(credential, 'GET', `${base}/runs?head_sha=${encodeURIComponent(sha)}&per_page=100`);
+  for (const run of runs.workflow_runs || []) {
+    if (run.head_sha !== sha || run.event !== event || run.status !== 'completed' || run.conclusion !== 'success') continue;
+    const jobs = await githubRequestAs(credential, 'GET', `${base}/runs/${encodeURIComponent(run.id)}/jobs?per_page=100`);
+    if ((jobs.jobs || []).some((job) => job.name === jobName && job.conclusion === 'success')) return true;
+  }
+  return false;
 }
 
 async function registryDigest(name, sha) {
