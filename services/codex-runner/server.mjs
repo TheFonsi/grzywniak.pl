@@ -176,7 +176,7 @@ async function pollExternal(task) {
       await reviewPullRequest(task, directory, pr, branch);
     }
     else if (task.phase === 'waiting_merge_auto' && task.result?.reviewApproved === true) {
-      const checks = await githubRequest('GET', `/repos/${encodeURIComponent(githubOrg)}/${encodeURIComponent(name)}/commits/${pr.head.sha}/check-runs`);
+      const checks = await githubRequestAs(await reviewToken(), 'GET', `/repos/${encodeURIComponent(githubOrg)}/${encodeURIComponent(name)}/commits/${pr.head.sha}/check-runs`);
       if ((checks.check_runs || []).some((check) => check.name === 'validate' && check.conclusion === 'success')) {
         const merged = await githubRequestAs(await reviewToken(), 'PUT', `/repos/${encodeURIComponent(githubOrg)}/${encodeURIComponent(name)}/pulls/${task.pullRequestNumber}/merge`, { sha: pr.head.sha, merge_method: 'squash' });
         if (merged.merged === true && /^[a-f0-9]{40}$/.test(merged.sha || '')) await update(task, { state: 'done', phase: 'finished', result: { ...task.result, commitSha: merged.sha } });
