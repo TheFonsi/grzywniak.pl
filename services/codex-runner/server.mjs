@@ -168,6 +168,13 @@ async function pollExternal(task) {
       if (task.role === 'qa') await update(task, { phase: 'waiting_image', result });
       else await update(task, { state: 'done', phase: 'finished', result });
     } else if (pr.state === 'closed') await update(task, { state: 'failed', phase: 'finished', error: 'Pull request zamknięto bez połączenia.' });
+    else if (task.phase === 'waiting_merge' && reviewTokenFile && task.result?.reviewApproved !== true) {
+      const match = task.id.match(taskPattern);
+      if (!match) throw new Error('Niepoprawny identyfikator zadania do niezależnego przeglądu.');
+      const directory = join(workRoot, 'work', `${match[1]}-${match[2]}-${match[3]}`);
+      const branch = `agent/${match[2]}-${match[3]}`;
+      await reviewPullRequest(task, directory, pr, branch);
+    }
     else if (task.phase === 'waiting_merge_auto' && task.result?.reviewApproved === true) {
       const checks = await githubRequest('GET', `/repos/${encodeURIComponent(githubOrg)}/${encodeURIComponent(name)}/commits/${pr.head.sha}/check-runs`);
       if ((checks.check_runs || []).some((check) => check.name === 'validate' && check.conclusion === 'success')) {
