@@ -48,7 +48,14 @@ function deploymentEvidence(array $tasks): array {
     $imageSha=(string)($result['imageCommitSha']??'');
     $port=filter_var($result['appPort']??null,FILTER_VALIDATE_INT);
     $healthPath=(string)($result['healthPath']??'');
-    if(!preg_match('/^[a-f0-9]{40}$/',$sha) || $imageSha!==$sha || !preg_match('/^sha256:[a-f0-9]{64}$/',$digest) || ($result['qaPassed']??false)!==true || !$port || $port>65535 || !preg_match('~^/[a-zA-Z0-9/_-]{1,100}$~',$healthPath)) throw new RuntimeException('QA musi potwierdzić obraz zbudowany dla tego samego commita, port, ścieżkę zdrowia i wynik kontroli.');
+    $missing=[];
+    if(!preg_match('/^[a-f0-9]{40}$/',$sha)) $missing[]='poprawny commit QA';
+    if($imageSha!==$sha) $missing[]='potwierdzenie imageCommitSha zgodnego z commitSha';
+    if(!preg_match('/^sha256:[a-f0-9]{64}$/',$digest)) $missing[]='digest opublikowanego obrazu';
+    if(($result['qaPassed']??false)!==true) $missing[]='qaPassed=true';
+    if(!$port || $port>65535) $missing[]='poprawny port aplikacji';
+    if(!preg_match('~^/[a-zA-Z0-9/_-]{1,100}$~',$healthPath)) $missing[]='poprawna ścieżka zdrowia';
+    if($missing) throw new RuntimeException('Wynik QA jest niekompletny: '.implode(', ',$missing).'.');
     return ['commitSha'=>$sha,'imageDigest'=>$digest,'appPort'=>$port,'healthPath'=>$healthPath];
 }
 

@@ -24,6 +24,17 @@ $sha=str_repeat('a',40); $digest='sha256:'.str_repeat('b',64);
 $verifiedQa=['summary'=>'QA PASS','qaPassed'=>true,'appPort'=>8080,'healthPath'=>'/health','commitSha'=>$sha,'imageCommitSha'=>$sha,'imageDigest'=>$digest];
 if(!projectRunnerQaResultIsValid($verifiedQa)) throw new RuntimeException('Poprawny wynik QA runnera nie przeszedł synchronizacji.');
 if(projectRunnerQaResultIsValid(array_merge($verifiedQa,['imageDigest'=>null]))) throw new RuntimeException('Wynik QA bez digestu obrazu nie powinien zostać zsynchronizowany.');
+$repairDb=new PDO('sqlite::memory:');
+$repairDb->setAttribute(PDO::ATTR_ERRMODE,PDO::ERRMODE_EXCEPTION);
+$repairDb->exec('CREATE TABLE project_agent_tasks(id INTEGER PRIMARY KEY,session_id TEXT,task_key TEXT,state TEXT,role TEXT,runner_id TEXT,spent_pln REAL,result TEXT,updated_at INTEGER)');
+$repairDb->exec('CREATE TABLE project_agent_costs(runner_id TEXT PRIMARY KEY,session_id TEXT,task_key TEXT,amount_pln REAL,incurred_at INTEGER)');
+$repairDb->prepare('INSERT INTO project_agent_tasks VALUES(1,?,?,?,?,?,?,?,?)')->execute(['case-a','qa-task','done','qa','case-a:qa-task:1',1.73,json_encode(['summary'=>'Old incomplete result']),time()]);
+$repairDb->prepare('INSERT INTO project_agent_costs VALUES(?,?,?,?,?)')->execute(['case-a:qa-task:1','case-a','qa-task',1.73,time()]);
+$repairTask=$repairDb->query('SELECT * FROM project_agent_tasks WHERE id=1')->fetch(PDO::FETCH_ASSOC);
+if(!projectReconcileCompletedQaResult($repairDb,$repairTask,$verifiedQa,1.77)) throw new RuntimeException('Poprawny, uzupełniony wynik QA nie został odzyskany.');
+$repairTask=$repairDb->query('SELECT * FROM project_agent_tasks WHERE id=1')->fetch(PDO::FETCH_ASSOC);
+if(abs((float)$repairTask['spent_pln']-1.77)>0.0001 || abs((float)$repairDb->query('SELECT amount_pln FROM project_agent_costs')->fetchColumn()-1.77)>0.0001) throw new RuntimeException('Odzyskanie QA nie zaksięgowało wyłącznie różnicy kosztu.');
+if(!projectReconcileCompletedQaResult($repairDb,$repairTask,$verifiedQa,1.77) || abs((float)$repairDb->query('SELECT spent_pln FROM project_agent_tasks')->fetchColumn()-1.77)>0.0001) throw new RuntimeException('Ponowne odzyskanie QA podwoiło koszt.');
 $accountingTask=['runner_id'=>'d036a6fbdef7324f0ebbf9fd8da6d1b9:runtime-hardening:4-code-unreported','reserved_pln'=>0];
 if(projectTaskAffectsStageStatus($accountingTask)) throw new RuntimeException('Rozliczona próba księgowa nadal blokuje status etapu.');
 $accountingTask['reserved_pln']=9.96;
@@ -43,5 +54,5 @@ if($evidence['commitSha']!==$sha || $evidence['imageDigest']!==$digest) throw ne
 try { deploymentEvidence([['role'=>'qa','state'=>'done','result'=>['summary'=>'OK','qaPassed'=>false,'commitSha'=>$sha,'imageDigest'=>$digest,'appPort'=>8080,'healthPath'=>'/healthz']]]); throw new RuntimeException('QA bez akceptacji przeszło bramkę.'); }
 catch(RuntimeException $error) { if($error->getMessage()==='QA bez akceptacji przeszło bramkę.') throw $error; }
 try { deploymentEvidence([['role'=>'qa','state'=>'done','result'=>['summary'=>'OK','qaPassed'=>true,'commitSha'=>$sha,'imageCommitSha'=>str_repeat('c',40),'imageDigest'=>$digest,'appPort'=>8080,'healthPath'=>'/healthz']]]); throw new RuntimeException('Image from a different commit passed the gate.'); }
-catch(RuntimeException $error) { if($error->getMessage()==='Image from a different commit passed the gate.') throw $error; }
+catch(RuntimeException $error) { if($error->getMessage()==='Image from a different commit passed the gate.') throw $error; if(!str_contains($error->getMessage(),'imageCommitSha')) throw new RuntimeException('Błąd QA nie wskazuje brakującego powiązania obrazu z commitem.'); }
 echo "Project execution gates OK\n";
