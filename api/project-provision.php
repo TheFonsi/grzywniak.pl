@@ -19,7 +19,10 @@ function provisionProjectEnvironment(array $session,array $case,array $repositor
     if(!filter_var($control,FILTER_VALIDATE_URL)) throw new RuntimeException('Niepoprawny adres API VPS.');
     $id=(string)$session['id'];
     $hostname=($kind==='preview'?'p-':'a-').substr($id,0,12).'.'.$base;
-    $vps=workerRequest('POST',$control.'/v1/projects',['projectId'=>$id,'hostname'=>$hostname,'repository'=>(string)($repository['url']??''),'kind'=>$kind,'limitPln'=>(float)($case['budgetPln']??0)],['Authorization: Bearer '.$controlToken,'Idempotency-Key: '.$id.':'.$kind,'Content-Type: application/json','Accept: application/json']);
+    $previewPassword=$kind==='preview'?bin2hex(random_bytes(16)):null;
+    $payload=['projectId'=>$id,'hostname'=>$hostname,'repository'=>(string)($repository['url']??''),'kind'=>$kind,'limitPln'=>(float)($case['budgetPln']??0)];
+    if($previewPassword!==null) $payload['previewPassword']=$previewPassword;
+    $vps=workerRequest('POST',$control.'/v1/projects',$payload,['Authorization: Bearer '.$controlToken,'Idempotency-Key: '.$id.':'.$kind,'Content-Type: application/json','Accept: application/json']);
     if(!in_array($vps['status'],[200,201],true)||($vps['body']['ready']??false)!==true||($vps['body']['routingReady']??false)!==true||($vps['body']['tlsReady']??false)!==true||($vps['body']['hostname']??'')!==$hostname) throw new RuntimeException('VPS nie potwierdził routingu i TLS środowiska (HTTP '.$vps['status'].').');
     $dnsUrl='https://api.cloudflare.com/client/v4/zones/'.rawurlencode($zone).'/dns_records';
     $auth=['Authorization: Bearer '.$token,'Content-Type: application/json','Accept: application/json'];
@@ -36,7 +39,9 @@ function provisionProjectEnvironment(array $session,array $case,array $repositor
         if(($created['body']['success']??false)!==true) throw new RuntimeException('Cloudflare nie potwierdził utworzenia rekordu DNS.');
         $record=$created['body']['result']??[];
     }
-    return ['hostname'=>$hostname,'url'=>'https://'.$hostname,'dnsRecordId'=>(string)($record['id']??''),'origin'=>$origin,'vpsProjectId'=>(string)($vps['body']['projectId']??$id),'state'=>'infrastructure_ready'];
+    $environment=['hostname'=>$hostname,'url'=>'https://'.$hostname,'dnsRecordId'=>(string)($record['id']??''),'origin'=>$origin,'vpsProjectId'=>(string)($vps['body']['projectId']??$id),'state'=>'infrastructure_ready'];
+    if($previewPassword!==null) $environment['previewPasswordEncrypted']=projectEncryptSecret($previewPassword);
+    return $environment;
 }
 
 function deploymentEvidence(array $tasks): array {
@@ -71,14 +76,16 @@ function verifyGithubCi(array $repository,string $sha): void {
     throw new RuntimeException('Wskazany commit nie ma pozytywnych kontroli validate i publish.');
 }
 
-function verifyPublicDeployment(string $hostname,string $projectId,string $digest,string $commitSha,string $healthPath): void {
+function verifyPublicDeployment(string $hostname,string $projectId,string $digest,string $commitSha,string $healthPath,?string $previewPassword=null): void {
     $curl=curl_init('https://'.$hostname.'/.well-known/grzywniak/deployment');
     curl_setopt_array($curl,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_TIMEOUT=>20,CURLOPT_CONNECTTIMEOUT=>5,CURLOPT_FOLLOWLOCATION=>false,CURLOPT_SSL_VERIFYPEER=>true,CURLOPT_SSL_VERIFYHOST=>2]);
     $raw=curl_exec($curl); $status=(int)curl_getinfo($curl,CURLINFO_HTTP_CODE); curl_close($curl);
     $body=is_string($raw)?json_decode($raw,true):null;
     if($status!==200 || !is_array($body) || ($body['projectId']??'')!==$projectId || ($body['imageDigest']??'')!==$digest || ($body['commitSha']??'')!==$commitSha) throw new RuntimeException('Publiczny adres HTTPS nie potwierdza uruchomienia dokładnie zatwierdzonego obrazu i commita.');
     $curl=curl_init('https://'.$hostname.$healthPath);
-    curl_setopt_array($curl,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_TIMEOUT=>20,CURLOPT_CONNECTTIMEOUT=>5,CURLOPT_FOLLOWLOCATION=>false,CURLOPT_SSL_VERIFYPEER=>true,CURLOPT_SSL_VERIFYHOST=>2]);
+    $healthOptions=[CURLOPT_RETURNTRANSFER=>true,CURLOPT_TIMEOUT=>20,CURLOPT_CONNECTTIMEOUT=>5,CURLOPT_FOLLOWLOCATION=>false,CURLOPT_SSL_VERIFYPEER=>true,CURLOPT_SSL_VERIFYHOST=>2];
+    if($previewPassword!==null) { $healthOptions[CURLOPT_USERPWD]='client:'.$previewPassword; $healthOptions[CURLOPT_HTTPAUTH]=CURLAUTH_BASIC; }
+    curl_setopt_array($curl,$healthOptions);
     $healthy=curl_exec($curl); $healthStatus=(int)curl_getinfo($curl,CURLINFO_HTTP_CODE); curl_close($curl);
     if($healthy===false || $healthStatus!==200) throw new RuntimeException('Publiczna ścieżka zdrowia aplikacji nie odpowiada poprawnie.');
 }
@@ -93,7 +100,9 @@ function deployProjectVersion(array $session,array $case,array $repository,array
     $response=workerRequest('POST',$control.'/v1/deployments',['projectId'=>$id,'kind'=>$kind,'hostname'=>$hostname,'repository'=>$repository['url'],'commitSha'=>$evidence['commitSha'],'imageDigest'=>$evidence['imageDigest'],'appPort'=>$evidence['appPort'],'healthPath'=>$evidence['healthPath']],['Authorization: Bearer '.$token,'Idempotency-Key: '.$id.':'.$kind.':'.$evidence['imageDigest'],'Content-Type: application/json','Accept: application/json'],180);
     $deploymentId=(string)($response['body']['deploymentId']??'');
     if(!in_array($response['status'],[200,201],true) || ($response['body']['ready']??false)!==true || ($response['body']['imageDigest']??'')!==$evidence['imageDigest'] || ($response['body']['hostname']??'')!==$hostname || !preg_match('/^[A-Za-z0-9_-]{4,100}$/',$deploymentId)) throw new RuntimeException('VPS nie potwierdził gotowego wdrożenia wskazanego obrazu.');
-    try { verifyPublicDeployment($hostname,$id,$evidence['imageDigest'],$evidence['commitSha'],$evidence['healthPath']); }
+    $previewPassword=null;
+    if($kind==='preview') { $stored=(string)($environment['previewPasswordEncrypted']??$environment['previewPassword']??''); $previewPassword=$stored!==''?projectDecryptSecret($stored):null; }
+    try { verifyPublicDeployment($hostname,$id,$evidence['imageDigest'],$evidence['commitSha'],$evidence['healthPath'],$previewPassword); }
     catch(Throwable $error) {
         $rollback=workerRequest('POST',$control.'/v1/deployments/'.rawurlencode($deploymentId).'/rollback',[],['Authorization: Bearer '.$token,'Content-Type: application/json','Accept: application/json']);
         if($rollback['status']!==200 || ($rollback['body']['rolledBack']??false)!==true) throw new RuntimeException('Kontrola publiczna nie powiodła się, a VPS nie potwierdził powrotu do poprzedniej wersji.');

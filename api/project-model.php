@@ -19,6 +19,7 @@ function projectDb(): PDO {
     $feedbackColumns=$db->query('PRAGMA table_info(project_feedback)')->fetchAll(PDO::FETCH_ASSOC);
     if(!in_array('category',array_column($feedbackColumns,'name'),true)) $db->exec('ALTER TABLE project_feedback ADD COLUMN category TEXT');
     if(!in_array('analysis',array_column($feedbackColumns,'name'),true)) $db->exec('ALTER TABLE project_feedback ADD COLUMN analysis TEXT');
+    if(!in_array('annotation_json',array_column($feedbackColumns,'name'),true)) $db->exec('ALTER TABLE project_feedback ADD COLUMN annotation_json TEXT');
     return $db;
 }
 
@@ -95,9 +96,9 @@ function projectAiCalls(string $id): array {
 }
 
 function projectFeedback(string $id): array {
-    $stmt=projectDb()->prepare('SELECT id,image_digest,message,page_url,state,category,analysis,created_at,updated_at FROM project_feedback WHERE session_id=? ORDER BY id DESC LIMIT 100');
+    $stmt=projectDb()->prepare('SELECT id,image_digest,message,page_url,state,category,analysis,annotation_json,created_at,updated_at FROM project_feedback WHERE session_id=? ORDER BY id DESC LIMIT 100');
     $stmt->execute([$id]); $rows=$stmt->fetchAll(PDO::FETCH_ASSOC);
-    foreach($rows as &$row) $row['analysis']=json_decode((string)($row['analysis']??''),true);
+    foreach($rows as &$row) { $row['analysis']=json_decode((string)($row['analysis']??''),true); $row['annotation']=json_decode((string)($row['annotation_json']??''),true); unset($row['annotation_json']); }
     return $rows;
 }
 
@@ -112,6 +113,7 @@ function projectTasksWithScaffold(array $tasks): array {
         'Dodaj kod startowy w technologii wybranej w planie, bez danych klienta i sekretów.',
         'Dodaj .github/workflows/ci.yml z kontrolą validate dla pull requestów i publikacją obrazu GHCR po połączeniu do main.',
         'Dodaj Dockerfile, działającą ścieżkę zdrowia oraz dokumentację portu aplikacji.',
+        'Każdy preview musi zawierać skrypt /grzywniak-feedback.js z przyciskiem uwag, zaznaczaniem obszaru i wysyłką do formularza projektu.',
     ]];
     foreach($tasks as &$task) $task['dependencies']=array_values(array_unique(array_merge(['scaffold'],$task['dependencies']??[])));
     unset($task);

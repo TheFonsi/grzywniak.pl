@@ -112,6 +112,11 @@ jobs:
             --exclude 'node_modules/' \
             ./templates/ "$DEPLOY_USER@$DEPLOY_HOST:${PROJECT_TEMPLATES_PATH}"
 
+      - name: Publish project templates to GitHub
+        run: |
+          set -euo pipefail
+          ssh "$DEPLOY_USER@$DEPLOY_HOST" "php '${API_DEPLOY_PATH}project-worker.php' --publish-template"
+
       - name: Verify PHP API deployment
         run: |
           set -euo pipefail

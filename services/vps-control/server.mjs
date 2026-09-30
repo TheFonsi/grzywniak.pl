@@ -3,7 +3,7 @@ import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
 import { join } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { timingSafeEqual } from 'node:crypto';
+import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { connect as tlsConnect } from 'node:tls';
 
 const exec = promisify(execFile);
@@ -20,6 +20,7 @@ const stateFile = join(directory, 'state.json');
 const idPattern = /^[a-f0-9]{32}$/;
 const digestPattern = /^sha256:[a-f0-9]{64}$/;
 const commitPattern = /^[a-f0-9]{40}$/;
+const feedbackTokenPattern = /^[a-f0-9]{48}$/;
 let state = { projects: {}, deployments: {} };
 let mutation = Promise.resolve();
 
@@ -67,7 +68,22 @@ const routeConfig = (project) => {
   const name = routeName(project.projectId, project.kind);
   const current = project.current ? state.deployments[project.current] : null;
   const upstream = current ? `http://${current.container}:${current.appPort}` : 'http://vps-control:3010';
-  return `http:\n  routers:\n    ${name}-metadata:\n      rule: "Host(\`${project.hostname}\`) && Path(\`/.well-known/grzywniak/deployment\`)"\n      entryPoints: [websecure]\n      middlewares: [${name}-metadata-path]\n      service: ${name}-metadata\n      priority: 100\n      tls:\n        certResolver: cf\n    ${name}-app:\n      rule: "Host(\`${project.hostname}\`)"\n      entryPoints: [websecure]\n      service: ${name}-app\n      priority: 1\n      tls:\n        certResolver: cf\n  middlewares:\n    ${name}-metadata-path:\n      replacePath:\n        path: /metadata/${project.projectId}/${project.kind}\n  services:\n    ${name}-metadata:\n      loadBalancer:\n        servers:\n          - url: http://vps-control:3010\n    ${name}-app:\n      loadBalancer:\n        servers:\n          - url: ${upstream}\n`;
+  const authMiddleware = project.kind === 'preview' ? `${name}-preview-auth` : null;
+  const previewRoutes = project.kind === 'preview' ? `    ${name}-feedback-config:\n      rule: "Host(\`${project.hostname}\`) && Path(\`/.well-known/grzywniak/feedback-config\`)"\n      entryPoints: [websecure]\n      middlewares: [${name}-preview-auth, ${name}-feedback-config-path]\n      service: ${name}-metadata\n      priority: 110\n      tls:\n        certResolver: cf\n` : '';
+  const previewMiddlewares = authMiddleware ? `    ${name}-preview-auth:\n      forwardAuth:\n        address: http://vps-control:3010/internal/preview-auth?key=${encodeURIComponent(token)}\n        trustForwardHeader: true\n        authRequestHeaders:\n          - Authorization\n          - X-Forwarded-Host\n    ${name}-feedback-config-path:\n      replacePath:\n        path: /internal/feedback-config\n` : '';
+  const appMiddlewares = authMiddleware ? `      middlewares: [${authMiddleware}]\n` : '';
+  return `http:\n  routers:\n    ${name}-metadata:\n      rule: "Host(\`${project.hostname}\`) && Path(\`/.well-known/grzywniak/deployment\`)"\n      entryPoints: [websecure]\n      middlewares: [${name}-metadata-path]\n      service: ${name}-metadata\n      priority: 100\n      tls:\n        certResolver: cf\n${previewRoutes}    ${name}-app:\n      rule: "Host(\`${project.hostname}\`)"\n      entryPoints: [websecure]\n${appMiddlewares}      service: ${name}-app\n      priority: 1\n      tls:\n        certResolver: cf\n  middlewares:\n    ${name}-metadata-path:\n      replacePath:\n        path: /metadata/${project.projectId}/${project.kind}\n${previewMiddlewares}  services:\n    ${name}-metadata:\n      loadBalancer:\n        servers:\n          - url: http://vps-control:3010\n    ${name}-app:\n      loadBalancer:\n        servers:\n          - url: ${upstream}\n`;
+};
+const previewPasswordHash = (password, salt = randomBytes(16).toString('hex')) => ({ salt, hash: scryptSync(password, salt, 32).toString('hex') });
+const previewPasswordMatches = (project, authorization) => {
+  if (!project.previewAuthSalt || !project.previewAuthHash || typeof authorization !== 'string' || !authorization.startsWith('Basic ')) return false;
+  let decoded;
+  try { decoded = Buffer.from(authorization.slice(6), 'base64').toString('utf8'); } catch { return false; }
+  const split = decoded.indexOf(':');
+  if (split < 1 || decoded.slice(0, split) !== project.previewAuthUser) return false;
+  const supplied = scryptSync(decoded.slice(split + 1), project.previewAuthSalt, 32);
+  const expected = Buffer.from(project.previewAuthHash, 'hex');
+  return supplied.length === expected.length && timingSafeEqual(supplied, expected);
 };
 const writeRoute = async (project) => {
   await mkdir(dynamic, { recursive: true });
@@ -126,6 +142,21 @@ for (const project of Object.values(state.projects)) await writeRoute(project);
 createServer(async (request, response) => {
   try {
     const url = new URL(request.url || '/', 'http://localhost');
+    if (request.method === 'GET' && url.pathname === '/internal/preview-auth') {
+      if (url.searchParams.get('key') !== token) return json(response, 404, { message: 'Nie znaleziono zasobu.' });
+      const hostname = String(request.headers['x-forwarded-host'] || '').split(',')[0].trim().toLowerCase();
+      const project = Object.values(state.projects).find((item) => item.kind === 'preview' && item.hostname === hostname);
+      if (!project) return json(response, 404, { message: 'Nie znaleziono podglądu.' });
+      if (previewPasswordMatches(project, request.headers.authorization || '')) { response.writeHead(200, { 'cache-control': 'no-store' }); return response.end(); }
+      response.writeHead(401, { 'www-authenticate': 'Basic realm="Project preview", charset="UTF-8"', 'cache-control': 'no-store', 'content-type': 'text/plain; charset=utf-8' });
+      return response.end('Wymagane hasło do podglądu.');
+    }
+    if (request.method === 'GET' && url.pathname === '/internal/feedback-config') {
+      const hostname = String(request.headers['x-forwarded-host'] || request.headers.host || '').split(',')[0].split(':')[0].trim().toLowerCase();
+      const project = Object.values(state.projects).find((item) => item.kind === 'preview' && item.hostname === hostname);
+      if (!project || !previewPasswordMatches(project, request.headers.authorization || '') || !feedbackTokenPattern.test(project.feedbackToken || '')) return json(response, 404, { message: 'Konfiguracja uwag nie jest dostępna.' });
+      return json(response, 200, { projectId: project.projectId, feedbackToken: project.feedbackToken, feedbackUrl: project.feedbackUrl || '' });
+    }
     const metadata = /^\/metadata\/([a-f0-9]{32})\/(preview|production)$/.exec(url.pathname);
     if (request.method === 'GET' && metadata) {
       const project = state.projects[`${metadata[1]}:${metadata[2]}`];
@@ -137,17 +168,31 @@ createServer(async (request, response) => {
     if (request.method === 'POST' && url.pathname === '/v1/projects') {
       const body = await readBody(request);
       if (!idPattern.test(body.projectId) || !validKind(body.kind) || body.hostname !== expectedHostname(body.projectId, body.kind) || !repositoryName(body.repository) || request.headers['idempotency-key'] !== `${body.projectId}:${body.kind}`) return json(response, 400, { message: 'Niepoprawna konfiguracja projektu.' });
+      if (body.kind === 'preview' && (typeof body.previewPassword !== 'string' || body.previewPassword.length < 16 || body.previewPassword.length > 128)) return json(response, 400, { message: 'Podgląd wymaga unikalnego hasła o długości 16–128 znaków.' });
       const project = await serialized(async () => {
         const key = `${body.projectId}:${body.kind}`;
         const existing = state.projects[key];
         if (existing && (existing.hostname !== body.hostname || existing.repository !== body.repository)) throw new Error('Zasób jest przypisany do innego projektu.');
         const value = existing || { projectId: body.projectId, kind: body.kind, hostname: body.hostname, repository: body.repository, current: null, previous: null };
+        if (body.kind === 'preview') { value.previewAuthUser = 'client'; Object.assign(value, previewPasswordHash(body.previewPassword)); }
         state.projects[key] = value;
         await writeRoute(value); await save();
         return value;
       });
       const cert = await readyCertificate(project.hostname);
       return json(response, cert ? 200 : 503, { projectId: project.projectId, hostname: project.hostname, ready: cert, routingReady: true, tlsReady: cert });
+    }
+    if (request.method === 'POST' && url.pathname === '/v1/projects/feedback-token') {
+      const body = await readBody(request);
+      if (!idPattern.test(body.projectId) || !feedbackTokenPattern.test(body.feedbackToken) || typeof body.feedbackUrl !== 'string' || body.feedbackUrl.length > 2000) return json(response, 400, { message: 'Niepoprawna konfiguracja formularza uwag.' });
+      const project = await serialized(async () => {
+        const value = state.projects[`${body.projectId}:preview`];
+        if (!value || value.hostname !== expectedHostname(body.projectId, 'preview') || !value.previewAuthHash) throw new Error('Najpierw zabezpiecz środowisko podglądu hasłem.');
+        value.feedbackToken = body.feedbackToken; value.feedbackUrl = body.feedbackUrl;
+        await save();
+        return value;
+      });
+      return json(response, 200, { projectId: project.projectId, ready: true });
     }
     if (request.method === 'POST' && url.pathname === '/v1/deployments') {
       const body = await readBody(request);

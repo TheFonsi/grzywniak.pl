@@ -68,6 +68,19 @@ function projectSettingsKey(): string {
     if($key===false||strlen($key)!==32) throw new RuntimeException('Nie można odczytać klucza ustawień.');
     return $key;
 }
+function projectEncryptSecret(string $plain): string {
+    $nonce=random_bytes(12); $tag=''; $cipher=openssl_encrypt($plain,'aes-256-gcm',projectSettingsKey(),OPENSSL_RAW_DATA,$nonce,$tag);
+    if($cipher===false) throw new RuntimeException('Nie udało się zaszyfrować sekretu projektu.');
+    return 'enc:'.base64_encode($nonce.$tag.$cipher);
+}
+function projectDecryptSecret(string $encrypted): string {
+    if(!str_starts_with($encrypted,'enc:')) return $encrypted;
+    $blob=base64_decode(substr($encrypted,4),true);
+    if($blob===false||strlen($blob)<28) throw new RuntimeException('Nie można odczytać zaszyfrowanego sekretu projektu.');
+    $plain=openssl_decrypt(substr($blob,28),'aes-256-gcm',projectSettingsKey(),OPENSSL_RAW_DATA,substr($blob,0,12),substr($blob,12,16));
+    if($plain===false) throw new RuntimeException('Nie można odszyfrować sekretu projektu.');
+    return $plain;
+}
 function projectSetting(string $name): string {
     if(!array_key_exists($name,projectSettingsFields())) throw new InvalidArgumentException('Nieznane ustawienie.');
     $stmt=projectSettingsDb()->prepare('SELECT value,is_secret FROM project_settings WHERE name=?');

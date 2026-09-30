@@ -14,6 +14,9 @@ try {
     $stmt->execute([$name]);
     $stored=$stmt->fetch(PDO::FETCH_ASSOC);
     if(!$stored||(int)$stored['is_secret']!==1||str_contains((string)$stored['value'],$testValue)||projectSetting($name)!==$testValue) throw new RuntimeException('Secret encryption roundtrip failed.');
+    $previewSecret='preview-'.bin2hex(random_bytes(16));
+    $encryptedPreview=projectEncryptSecret($previewSecret);
+    if($encryptedPreview===$previewSecret||projectDecryptSecret($encryptedPreview)!==$previewSecret) throw new RuntimeException('Project credential encryption roundtrip failed.');
     try { projectSettingsSave(['VPS_CONTROL_URL'=>'http://insecure.example']); throw new RuntimeException('Invalid URL was accepted.'); }
     catch(InvalidArgumentException) {}
     echo "Project settings encryption and validation OK\n";

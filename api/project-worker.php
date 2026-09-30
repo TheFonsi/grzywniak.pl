@@ -229,10 +229,11 @@ function runOneJob(): bool {
         $callKey='job:'.$job['id'].':'.((int)$job['attempts']+1);
         $result=$isFeedback?(static function() use ($db,$id,$case,$feedbackMatch,$callKey): array {
                 $feedbackId=(int)$feedbackMatch[1];
-                $find=$db->prepare("SELECT id,session_id,message,page_url,image_digest,state FROM project_feedback WHERE id=? AND session_id=?");
+                $find=$db->prepare("SELECT id,session_id,message,page_url,image_digest,annotation_json,state FROM project_feedback WHERE id=? AND session_id=?");
                 $find->execute([$feedbackId,$id]); $feedback=$find->fetch(PDO::FETCH_ASSOC);
                 if(!$feedback) throw new RuntimeException('Nie znaleziono uwagi klienta.');
                 if($feedback['state']!=='new') throw new RuntimeException('Uwaga nie czeka już na klasyfikację.');
+                $feedback['annotation']=json_decode((string)($feedback['annotation_json']??''),true);
                 $analysis=classifyProjectFeedback($feedback,$case,$callKey);
                 return ['feedbackId'=>$feedbackId]+$analysis;
             })():($isPreview?(static function() use ($id,$session,$case,$job): array {
