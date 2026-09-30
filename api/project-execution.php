@@ -11,6 +11,16 @@ function projectRunnerConfig(): array {
     return [$url,$token];
 }
 
+function projectRunnerQaResultIsValid(mixed $result): bool {
+    return is_array($result) && ($result['qaPassed']??null)===true
+        && filter_var($result['appPort']??null,FILTER_VALIDATE_INT)!==false
+        && (int)($result['appPort']??0)>0 && (int)($result['appPort']??0)<=65535
+        && preg_match('~^/[A-Za-z0-9/_-]{1,100}$~',(string)($result['healthPath']??''))===1
+        && preg_match('/^[a-f0-9]{40}$/',(string)($result['commitSha']??''))===1
+        && preg_match('/^sha256:[a-f0-9]{64}$/',(string)($result['imageDigest']??''))===1
+        && trim((string)($result['summary']??''))!=='';
+}
+
 function projectTaskStage(string $role): string {
     return match($role) { 'ux','ui'=>'design','qa','security','performance','documentation'=>'qa',default=>'build' };
 }
@@ -92,12 +102,15 @@ function projectDispatchAgentTask(): bool {
 
 function projectPollAgentTask(): bool {
     $db=projectDb();
-    $task=$db->query("SELECT * FROM project_agent_tasks WHERE state='running' ORDER BY updated_at,id LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    $find=$db->prepare("SELECT * FROM project_agent_tasks WHERE state='running' OR (state='failed' AND role='qa' AND runner_id IS NOT NULL AND reserved_pln=0 AND error=? AND updated_at<=?) ORDER BY CASE WHEN state='running' THEN 0 ELSE 1 END,updated_at,id LIMIT 1");
+    $find->execute(['Niezależny przegląd odrzucił pull request.',time()-20]);
+    $task=$find->fetch(PDO::FETCH_ASSOC);
     if(!$task) return false;
     [$url,$token]=projectRunnerConfig();
     $key=(string)$task['runner_id'];
     try { $response=workerRequest('GET',$url.'/v1/tasks/'.rawurlencode($key),null,['Authorization: Bearer '.$token,'Accept: application/json']); }
     catch(Throwable $error) {
+        if($task['state']==='failed') { $db->prepare("UPDATE project_agent_tasks SET updated_at=? WHERE id=? AND state='failed'")->execute([time(),$task['id']]); return false; }
         if(time()-(int)$task['started_at']>max(1,(int)projectSetting('AGENT_TASK_TIMEOUT_MIN'))*60) {
             $db->prepare("UPDATE project_agent_tasks SET state='failed',error='Runner jest niedostępny po limicie czasu. Sprawdź zadanie i rozlicz rezerwację.',updated_at=? WHERE id=? AND state='running'")->execute([time(),$task['id']]);
             projectEvent((string)$task['session_id'],projectTaskStage((string)$task['role']),'reconcile_needed','System','Runner jest niedostępny po limicie czasu zadania '.$task['task_key'].'.');
@@ -106,12 +119,40 @@ function projectPollAgentTask(): bool {
         throw $error;
     }
     if($response['status']===404) {
+        if($task['state']==='failed') { $db->prepare("UPDATE project_agent_tasks SET updated_at=? WHERE id=? AND state='failed'")->execute([time(),$task['id']]); return true; }
         $db->prepare("UPDATE project_agent_tasks SET state='failed',error='Runner nie znajduje zadania. Sprawdź stan i rozlicz rezerwację przed ponowieniem.',updated_at=? WHERE id=? AND state='running'")->execute([time(),$task['id']]);
         projectEvent((string)$task['session_id'],projectTaskStage((string)$task['role']),'reconcile_needed','System','Runner nie znajduje zadania '.$task['task_key'].'; rezerwacja kosztu pozostaje zablokowana.');
         return true;
     }
     if($response['status']!==200 || ($response['body']['id']??'')!==$key) throw new RuntimeException('Runner nie zwrócił stanu zadania.');
     $body=$response['body']; $state=(string)($body['state']??'');
+    if($task['state']==='failed') {
+        $runnerResult=$body['result']??null;
+        $spent=$body['costPln']??null;
+        $canRestore=$state==='done' && projectRunnerQaResultIsValid($runnerResult)
+            && is_numeric($spent) && is_finite((float)$spent) && (float)$spent>=0;
+        if(!$canRestore) {
+            $db->prepare("UPDATE project_agent_tasks SET updated_at=? WHERE id=? AND state='failed'")->execute([time(),$task['id']]);
+            return true;
+        }
+        $db->exec('BEGIN IMMEDIATE');
+        try {
+            $ledger=$db->prepare('SELECT amount_pln FROM project_agent_costs WHERE runner_id=?');
+            $ledger->execute([$key]); $recorded=$ledger->fetchColumn();
+            $previousCost=$recorded===false?0.0:max(0.0,(float)$recorded);
+            $actualCost=max($previousCost,(float)$spent);
+            $additionalCost=max(0.0,$actualCost-$previousCost);
+            $update=$db->prepare("UPDATE project_agent_tasks SET state='done',runner_phase='finished',result=?,error=NULL,spent_pln=spent_pln+?,reserved_pln=0,updated_at=? WHERE id=? AND state='failed' AND runner_id=?");
+            $update->execute([json_encode($runnerResult,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),$additionalCost,time(),$task['id'],$key]);
+            if($update->rowCount()===1) {
+                if($recorded===false) $db->prepare('INSERT OR IGNORE INTO project_agent_costs(runner_id,session_id,task_key,amount_pln,incurred_at) VALUES(?,?,?,?,?)')->execute([$key,$task['session_id'],$task['task_key'],$actualCost,time()]);
+                elseif($actualCost>$previousCost) $db->prepare('UPDATE project_agent_costs SET amount_pln=?,incurred_at=? WHERE runner_id=?')->execute([$actualCost,time(),$key]);
+                projectEvent((string)$task['session_id'],'qa','completed','Runner','Uzgodniono zakończony wynik QA po wznowieniu runnera. Koszt skorygowano tylko o niezaksięgowaną różnicę.');
+            }
+            $db->exec('COMMIT');
+        } catch(Throwable $error) { try { $db->exec('ROLLBACK'); } catch(Throwable) {} throw $error; }
+        return true;
+    }
     $timeout=max(1,(int)projectSetting('AGENT_TASK_TIMEOUT_MIN'))*60;
     if(in_array($state,['queued','running'],true) && time()-(int)$task['started_at']>$timeout) {
         try { $cancel=workerRequest('POST',$url.'/v1/tasks/'.rawurlencode($key).'/cancel',[],['Authorization: Bearer '.$token,'Content-Type: application/json','Accept: application/json']); }

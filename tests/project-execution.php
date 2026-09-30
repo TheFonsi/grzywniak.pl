@@ -21,6 +21,9 @@ $db->exec("INSERT INTO project_ai_calls VALUES('job:1:1','a','generate_plan','se
 [$project,$monthly]=projectTaskTotals($db,'a');
 if($project!==17.0 || $monthly!==28.0) throw new RuntimeException('Niepoprawne rozliczenie projektu lub miesiąca.');
 $sha=str_repeat('a',40); $digest='sha256:'.str_repeat('b',64);
+$verifiedQa=['summary'=>'QA PASS','qaPassed'=>true,'appPort'=>8080,'healthPath'=>'/health','commitSha'=>$sha,'imageDigest'=>$digest];
+if(!projectRunnerQaResultIsValid($verifiedQa)) throw new RuntimeException('Poprawny wynik QA runnera nie przeszedł synchronizacji.');
+if(projectRunnerQaResultIsValid(array_merge($verifiedQa,['imageDigest'=>null]))) throw new RuntimeException('Wynik QA bez digestu obrazu nie powinien zostać zsynchronizowany.');
 $accountingTask=['runner_id'=>'d036a6fbdef7324f0ebbf9fd8da6d1b9:runtime-hardening:4-code-unreported','reserved_pln'=>0];
 if(projectTaskAffectsStageStatus($accountingTask)) throw new RuntimeException('Rozliczona próba księgowa nadal blokuje status etapu.');
 $accountingTask['reserved_pln']=9.96;
