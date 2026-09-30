@@ -1,4 +1,4 @@
-import { createServer } from 'node:http';
+import { createServer, request as httpRequest } from 'node:http';
 import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
 import { join } from 'node:path';
 import { execFile } from 'node:child_process';
@@ -22,6 +22,7 @@ const idPattern = /^[a-f0-9]{32}$/;
 const digestPattern = /^sha256:[a-f0-9]{64}$/;
 const commitPattern = /^[a-f0-9]{40}$/;
 const feedbackTokenPattern = /^[a-f0-9]{48}$/;
+const feedbackScript = await readFile(new URL('./feedback.js', import.meta.url));
 let state = { projects: {}, deployments: {} };
 let mutation = Promise.resolve();
 
@@ -68,7 +69,7 @@ const routeFile = (id, kind) => join(dynamic, `${routeName(id, kind)}.yml`);
 const routeConfig = (project) => {
   const name = routeName(project.projectId, project.kind);
   const current = project.current ? state.deployments[project.current] : null;
-  const upstream = current ? `http://${current.container}:${current.appPort}` : 'http://vps-control:3010';
+  const upstream = project.kind === 'preview' ? 'http://vps-control:3010' : (current ? `http://${current.container}:${current.appPort}` : 'http://vps-control:3010');
   const authMiddleware = project.kind === 'preview' ? `${name}-preview-auth` : null;
   const previewRoutes = project.kind === 'preview' ? `    ${name}-feedback-config:\n      rule: "Host(\`${project.hostname}\`) && Path(\`/.well-known/grzywniak/feedback-config\`)"\n      entryPoints: [websecure]\n      middlewares: [${name}-preview-auth, ${name}-feedback-config-path]\n      service: ${name}-metadata\n      priority: 110\n      tls:\n        certResolver: cf\n` : '';
   const previewMiddlewares = authMiddleware ? `    ${name}-preview-auth:\n      forwardAuth:\n        address: http://vps-control:3010/internal/preview-auth?key=${encodeURIComponent(token)}\n        trustForwardHeader: true\n        authRequestHeaders:\n          - Authorization\n          - X-Forwarded-Host\n    ${name}-feedback-config-path:\n      replacePath:\n        path: /internal/feedback-config\n` : '';
@@ -93,6 +94,49 @@ const readyCertificate = async (hostname) => {
     await sleep(1500);
   }
   return false;
+};
+const previewProjectForHost = (host) => {
+  const hostname = String(host || '').split(',')[0].split(':')[0].trim().toLowerCase();
+  return Object.values(state.projects).find((item) => item.kind === 'preview' && item.hostname === hostname);
+};
+const proxyPreview = (request, response, project) => {
+  const deployment = project.current ? state.deployments[project.current] : null;
+  if (!deployment) return json(response, 503, { message: 'Podgląd nie ma aktywnego wdrożenia.' });
+  if (!previewPasswordMatches(project, request.headers.authorization || '')) {
+    response.writeHead(401, { 'www-authenticate': 'Basic realm="Project preview", charset="UTF-8"', 'cache-control': 'no-store', 'content-type': 'text/plain; charset=utf-8' });
+    return response.end('Wymagane hasło do podglądu.');
+  }
+  if (request.method === 'GET' && request.url?.split('?')[0] === '/grzywniak-feedback.js') {
+    response.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'content-length': feedbackScript.length, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
+    return response.end(feedbackScript);
+  }
+  const headers = { ...request.headers, host: `${deployment.container}:${deployment.appPort}`, 'accept-encoding': '' };
+  for (const name of ['connection', 'keep-alive', 'proxy-authenticate', 'proxy-authorization', 'te', 'trailer', 'transfer-encoding', 'upgrade']) delete headers[name];
+  const upstream = httpRequest({ hostname: deployment.container, port: deployment.appPort, path: request.url || '/', method: request.method, headers, timeout: 30000 }, (upstreamResponse) => {
+    const responseHeaders = { ...upstreamResponse.headers };
+    for (const name of ['connection', 'keep-alive', 'proxy-authenticate', 'proxy-authorization', 'te', 'trailer', 'transfer-encoding', 'upgrade']) delete responseHeaders[name];
+    const contentType = String(responseHeaders['content-type'] || '').toLowerCase();
+    if (request.method === 'GET' && upstreamResponse.statusCode === 200 && contentType.includes('text/html')) {
+      const chunks = []; let size = 0;
+      upstreamResponse.on('data', (chunk) => { size += chunk.length; if (size > 2 * 1024 * 1024) { upstream.destroy(new Error('Dokument HTML podglądu przekracza limit.')); return; } chunks.push(chunk); });
+      upstreamResponse.on('end', () => {
+        const html = Buffer.concat(chunks).toString('utf8');
+        const tag = '<script src="/grzywniak-feedback.js" defer></script>';
+        const injected = /<script\s+src=["']\/grzywniak-feedback\.js["']/i.test(html) ? html : (/<\/body\s*>/i.test(html) ? html.replace(/<\/body\s*>/i, `${tag}</body>`) : `${html}${tag}`);
+        delete responseHeaders['content-length']; delete responseHeaders.etag;
+        responseHeaders['cache-control'] = 'private, no-cache';
+        responseHeaders['content-length'] = Buffer.byteLength(injected);
+        response.writeHead(upstreamResponse.statusCode || 200, responseHeaders);
+        response.end(injected);
+      });
+    } else {
+      response.writeHead(upstreamResponse.statusCode || 502, responseHeaders);
+      upstreamResponse.pipe(response);
+    }
+  });
+  upstream.on('timeout', () => upstream.destroy(new Error('Przekroczono czas odpowiedzi aplikacji.')));
+  upstream.on('error', () => { if (!response.headersSent) json(response, 502, { message: 'Nie udało się pobrać podglądu aplikacji.' }); else response.destroy(); });
+  request.pipe(upstream);
 };
 const containerName = (id, kind, digest) => `gw-${id.slice(0, 16)}-${kind}-${digest.slice(7, 19)}`;
 const ensureContainer = async (name, image) => {
@@ -147,6 +191,8 @@ createServer(async (request, response) => {
       if (!project || !previewPasswordMatches(project, request.headers.authorization || '') || !feedbackTokenPattern.test(project.feedbackToken || '')) return json(response, 404, { message: 'Konfiguracja uwag nie jest dostępna.' });
       return json(response, 200, { projectId: project.projectId, feedbackToken: project.feedbackToken, feedbackUrl: project.feedbackUrl || '' });
     }
+    const previewProject = previewProjectForHost(request.headers['x-forwarded-host'] || request.headers.host);
+    if (previewProject && !url.pathname.startsWith('/internal/') && !url.pathname.startsWith('/metadata/')) return proxyPreview(request, response, previewProject);
     const metadata = /^\/metadata\/([a-f0-9]{32})\/(preview|production)$/.exec(url.pathname);
     if (request.method === 'GET' && metadata) {
       const project = state.projects[`${metadata[1]}:${metadata[2]}`];

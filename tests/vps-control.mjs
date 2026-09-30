@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { createServer } from 'node:http';
 import { mkdtemp, readFile, rm, realpath, mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
@@ -7,15 +8,24 @@ import { previewPasswordHash, previewPasswordMatches } from '../services/vps-con
 
 const root = await mkdtemp(join(tmpdir(), 'grzywniak-vps-test-'));
 const port = 31000 + Math.floor(Math.random() * 1000);
+const appPort = port + 1200;
 const token = 'test-token-' + 'x'.repeat(40);
 const projectId = 'a'.repeat(32);
 const password = 'preview-test-password-123456';
 const salt = '00112233445566778899aabbccddeeff';
+assert.deepEqual(await readFile(resolve('services/vps-control/feedback.js')), await readFile(resolve('templates/web-vite/public/grzywniak-feedback.js')), 'Skrypt dołączany przez bramę musi być zsynchronizowany z szablonem projektu.');
 const generatedAuth = { previewAuthUser: 'client', ...previewPasswordHash(password, salt) };
 assert.equal(previewPasswordMatches(generatedAuth, `Basic ${Buffer.from(`client:${password}`).toString('base64')}`), true, 'Wygenerowane dane muszą być zapisane w polach odczytywanych przez bramkę logowania.');
 assert.equal(previewPasswordMatches(generatedAuth, `Basic ${Buffer.from(`wrong:${password}`).toString('base64')}`), false);
 await mkdir(join(root, 'state'), { recursive: true });
-await writeFile(join(root, 'state', 'state.json'), JSON.stringify({ projects: { [`${projectId}:preview`]: { projectId, kind: 'preview', hostname: 'p-aaaaaaaaaaaa.grzywniak.pl', repository: 'https://github.com/Grzywniak/test', current: null, previous: null, ...generatedAuth, feedbackToken: 'b'.repeat(48), feedbackUrl: 'https://api.grzywniak.pl/api/project-feedback.php?project=x' } }, deployments: {} }));
+const deploymentId = 'test-preview-deployment';
+await writeFile(join(root, 'state', 'state.json'), JSON.stringify({ projects: { [`${projectId}:preview`]: { projectId, kind: 'preview', hostname: 'p-aaaaaaaaaaaa.grzywniak.pl', repository: 'https://github.com/Grzywniak/test', current: deploymentId, previous: null, ...generatedAuth, feedbackToken: 'b'.repeat(48), feedbackUrl: 'https://api.grzywniak.pl/api/project-feedback.php?project=x' } }, deployments: { [deploymentId]: { projectId, kind: 'preview', container: '127.0.0.1', appPort, imageDigest: `sha256:${'c'.repeat(64)}` } } }));
+const app = createServer((request, response) => {
+  if (request.url === '/health') { response.writeHead(200, { 'content-type': 'text/plain' }); return response.end('ok'); }
+  if (request.url === '/asset.js') { response.writeHead(200, { 'content-type': 'text/javascript' }); return response.end('window.assetLoaded=true'); }
+  response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); response.end('<!doctype html><html><body><main>Preview app</main></body></html>');
+});
+await new Promise((resolve) => app.listen(appPort, '127.0.0.1', resolve));
 const server = spawn(process.execPath, [resolve('services/vps-control/server.mjs')], { cwd: resolve('.'), env: { ...process.env, VPS_DATA_DIR: join(root, 'state'), TRAEFIK_DYNAMIC_DIR: join(root, 'dynamic'), VPS_LISTEN_PORT: String(port), VPS_CONTROL_TOKEN: token, VPS_CONTROL_HOST: 'control.grzywniak.pl' }, stdio: 'ignore' });
 try {
   let ready = false;
@@ -33,6 +43,7 @@ try {
   const route = await readFile(join(root, 'dynamic', 'gw-aaaaaaaaaaaaaaaa-preview.yml'), 'utf8');
   assert(route.includes('forwardAuth:'));
   assert(route.includes('/internal/preview-auth?key=' + encodeURIComponent(token)));
+  assert(route.includes('http://vps-control:3010'), 'Podglądy powinny przechodzić przez bramę nakładki uwag.');
   const headers = { 'x-forwarded-host': 'p-aaaaaaaaaaaa.grzywniak.pl' };
   const blocked = await fetch(`http://127.0.0.1:${port}/internal/preview-auth?key=${encodeURIComponent(token)}`, { headers });
   assert.equal(blocked.status, 401, 'Podgląd bez hasła powinien zostać zablokowany.');
@@ -41,9 +52,22 @@ try {
   const config = await fetch(`http://127.0.0.1:${port}/internal/feedback-config`, { headers: { ...headers, authorization: `Basic ${Buffer.from(`client:${password}`).toString('base64')}` } });
   assert.equal(config.status, 200);
   assert.equal((await config.json()).feedbackToken, 'b'.repeat(48));
-  console.log('VPS control auth, password gate and feedback configuration checks OK');
+  const appHeaders = { host: 'p-aaaaaaaaaaaa.grzywniak.pl', 'x-forwarded-host': 'p-aaaaaaaaaaaa.grzywniak.pl', authorization: `Basic ${Buffer.from(`client:${password}`).toString('base64')}` };
+  const preview = await fetch(`http://127.0.0.1:${port}/`, { headers: appHeaders });
+  const html = await preview.text();
+  assert.equal(preview.status, 200);
+  assert.match(html, /<script src="\/grzywniak-feedback\.js" defer><\/script><\/body>/, 'Bramka powinna dołączać skrypt nakładki przed zamknięciem body.');
+  const script = await fetch(`http://127.0.0.1:${port}/grzywniak-feedback.js`, { headers: appHeaders });
+  assert.equal(script.status, 200);
+  assert.match(await script.text(), /gw-feedback-launcher/);
+  const asset = await fetch(`http://127.0.0.1:${port}/asset.js`, { headers: appHeaders });
+  assert.equal(await asset.text(), 'window.assetLoaded=true', 'Pozostałe zasoby powinny być przekazywane do aplikacji bez zmian.');
+  const blockedPreview = await fetch(`http://127.0.0.1:${port}/`, { headers: { host: 'p-aaaaaaaaaaaa.grzywniak.pl', 'x-forwarded-host': 'p-aaaaaaaaaaaa.grzywniak.pl' } });
+  assert.equal(blockedPreview.status, 401, 'Bramka musi wymagać hasła przed pokazaniem strony i nakładki.');
+  console.log('VPS control auth, feedback configuration and preview overlay checks OK');
 } finally {
   server.kill();
+  app.close();
   const target = await realpath(root);
   const parent = await realpath(tmpdir());
   if (!target.startsWith(parent + sep)) throw new Error('Odmowa usunięcia katalogu poza temp.');
