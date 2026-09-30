@@ -7,9 +7,11 @@
   const $ = (selector) => document.querySelector(selector);
   const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]);
   const date = (seconds) => seconds ? new Date(Number(seconds) * 1000).toLocaleString("pl-PL") : "—";
+  const pln = (value) => new Intl.NumberFormat("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value) || 0);
   let project;
   let csrf;
   let defaults = {};
+  let lastSnapshot = "";
   let currentStage;
   let zoom = 1;
   let previousFocus;
@@ -79,12 +81,18 @@
       const response = await fetch(endpoint, { credentials: "same-origin", cache: "no-store" });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || "Nie udało się pobrać sprawy.");
+      const nextDefaults = data.defaults || {};
+      const snapshot = JSON.stringify({ project: data.project, defaults: nextDefaults });
+      const changed = snapshot !== lastSnapshot;
       project = data.project;
-      defaults = data.defaults || {};
+      defaults = nextDefaults;
       csrf = data.csrf || csrf;
-      render();
+      if (changed) {
+        render();
+        lastSnapshot = snapshot;
+      }
       $("#last-updated").textContent = `Aktualizacja ${new Date().toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit", second: "2-digit" })} · odświeżanie co 5 s`;
-      if (keepModal && currentStage) {
+      if (changed && keepModal && currentStage) {
         openStage(currentStage, false);
         restoreModalForms(formStates);
       }
@@ -253,7 +261,7 @@
       }
       if (job?.error) html += section("Błąd planowania", `<p class="error-text">${escapeHtml(job.error)}</p><form class="form" data-action="retry_job"><input type="hidden" name="kind" value="generate_plan"><button class="primary">Ponów planowanie</button></form>`, true);
       const aiCalls = data.aiCalls || [];
-      if (aiCalls.length) html += section("Koszt modeli projektu", aiCalls.map((call) => `<div class="event"><p>${escapeHtml(call.task_kind)} · ${escapeHtml(call.state)} · koszt ${escapeHtml(call.spent_pln)} PLN · rezerwacja ${escapeHtml(call.reserved_pln)} PLN</p>${call.state === "reserved" && data.jobs.find((item) => Number(item.id) === Number(call.call_key.split(":")[1]))?.state === "failed" ? `<form class="form" data-action="reconcile_ai_call"><input type="hidden" name="callKey" value="${escapeHtml(call.call_key)}"><label>Rzeczywisty koszt w PLN (do ${escapeHtml(call.reserved_pln)})<input name="cost" type="number" min="0" max="${escapeHtml(call.reserved_pln)}" step="0.0001" required></label><label>Podstawa sprawdzenia rozliczenia<textarea name="evidence" rows="2" minlength="8" maxlength="1000" required></textarea></label><button class="primary">Rozlicz po sprawdzeniu dostawcy</button></form>` : ""}</div>`).join(""), true);
+      if (aiCalls.length) html += section("Koszt modeli projektu", aiCalls.map((call) => `<div class="event"><p>${escapeHtml(call.task_kind)} · ${escapeHtml(call.state)} · koszt ${pln(call.spent_pln)} PLN · rezerwacja ${pln(call.reserved_pln)} PLN</p>${call.state === "reserved" && data.jobs.find((item) => Number(item.id) === Number(call.call_key.split(":")[1]))?.state === "failed" ? `<form class="form" data-action="reconcile_ai_call"><input type="hidden" name="callKey" value="${escapeHtml(call.call_key)}"><label>Rzeczywisty koszt w PLN (do ${escapeHtml(call.reserved_pln)})<input name="cost" type="number" min="0" max="${escapeHtml(call.reserved_pln)}" step="0.0001" required></label><label>Podstawa sprawdzenia rozliczenia<textarea name="evidence" rows="2" minlength="8" maxlength="1000" required></textarea></label><button class="primary">Rozlicz po sprawdzeniu dostawcy</button></form>` : ""}</div>`).join(""), true);
       return html;
     }
     if (stageId === "repository" || stageId === "environment") {
@@ -272,7 +280,7 @@
       const tasks = (data.agentTasks || []).filter((task) => roles.includes(task.role));
       const spent = [...(data.agentTasks || []), ...(data.aiCalls || [])].reduce((sum, task) => sum + Number(task.spent_pln || 0), 0);
       const reserved = [...(data.agentTasks || []), ...(data.aiCalls || [])].reduce((sum, task) => sum + Number(task.reserved_pln || 0), 0);
-      let html = section("Koszty agentów", `<p>Rozliczono według stawek runnera i modelu: ${escapeHtml(spent.toFixed(2))} PLN · zarezerwowano: ${escapeHtml(reserved.toFixed(2))} PLN · limit projektu: ${escapeHtml(data.case.budgetPln || 0)} PLN.</p>`, true);
+      let html = section("Koszty agentów", `<p>Rozliczono według stawek runnera i modelu: ${pln(spent)} PLN · zarezerwowano: ${pln(reserved)} PLN · limit projektu: ${pln(data.case.budgetPln || 0)} PLN.</p>`, true);
       const taskCards = tasks.map((task) => {
         const accountingOnly = String(task.runner_id || "").endsWith("-code-unreported");
         const accountingClosed = accountingOnly && Number(task.reserved_pln) <= 0;
@@ -284,7 +292,7 @@
         if (task.error && Number(task.reserved_pln) > 0) action = `<form class="form" data-action="reconcile_agent_task"><input type="hidden" name="task" value="${escapeHtml(task.task_key)}"><label>Rzeczywisty koszt w PLN (do ${escapeHtml(task.reserved_pln)})<input name="cost" type="number" min="0" max="${escapeHtml(task.reserved_pln)}" step="0.01" required></label><label>Podstawa sprawdzenia stanu runnera<textarea name="evidence" rows="2" minlength="8" maxlength="1000" required></textarea></label><button class="primary">Rozlicz rezerwację</button></form>`;
         else if (task.error && !accountingOnly) action = `<form class="form" data-action="retry_agent_task"><input type="hidden" name="task" value="${escapeHtml(task.task_key)}"><button class="primary">Ponów zadanie</button></form>`;
         const state = accountingClosed ? "rozliczono · zastąpiono poprawką PR #13" : phase;
-        return `<div class="event"><strong>${escapeHtml(task.title)}</strong><p>${escapeHtml(task.role)} · ${escapeHtml(state)} · koszt ${escapeHtml(task.spent_pln)} PLN · zależności: ${escapeHtml(task.dependencies.join(", ") || "brak")}</p>${resultDetails}${error}${action}</div>`;
+        return `<div class="event"><strong>${escapeHtml(task.title)}</strong><p>${escapeHtml(task.role)} · ${escapeHtml(state)} · koszt ${pln(task.spent_pln)} PLN · zależności: ${escapeHtml(task.dependencies.join(", ") || "brak")}</p>${resultDetails}${error}${action}</div>`;
       });
       html += section("Zadania", taskCards.length ? taskCards.join("") : "<p>Zadania pojawią się po utworzeniu repozytorium.</p>", true);      return html;
     }
