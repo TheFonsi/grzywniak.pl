@@ -30,7 +30,7 @@ function projectSettingsSchema(): array {
         ]],
         'agents'=>['title'=>'Agenci i modele','description'=>'Konto Codex agentów działa poza tym panelem. Poniższe dane runnera są przygotowane na jego podłączenie.', 'fields'=>[
             'OPENAI_API_KEY'=>['label'=>'Klucz OpenAI dla planisty projektu','secret'=>true],
-            'OPENAI_MODEL'=>['label'=>'Model planisty','default'=>'gpt-5.6-luna'],
+            'OPENAI_MODEL'=>['label'=>'Model planisty i agentów projektu','default'=>'gpt-6-luna'],
             'CODEX_RUNNER_URL'=>['label'=>'Adres oddzielnego runnera Codex'],
             'CODEX_RUNNER_TOKEN'=>['label'=>'Token runnera Codex','secret'=>true],
             'AGENT_MAX_CONCURRENCY'=>['label'=>'Równoległe zadania agentów','default'=>'2','number'=>true,'min'=>1,'max'=>20],

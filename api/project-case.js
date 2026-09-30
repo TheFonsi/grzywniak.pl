@@ -13,6 +13,8 @@
   let currentStage;
   let zoom = 1;
   let previousFocus;
+  let previousStatus = null;
+  let refreshing = false;
   const mapShell = $("#map-shell");
   const mapBoard = $("#map-board");
   const mapSizer = document.createElement("div");
@@ -35,14 +37,68 @@
   document.head.append(miniStyle);
 
   async function load(keepModal = false) {
-    const response = await fetch(endpoint, { credentials: "same-origin", cache: "no-store" });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.message || "Nie udało się pobrać sprawy.");
-    project = data.project;
-    defaults = data.defaults || {};
-    csrf = data.csrf || csrf;
-    render();
-    if (keepModal && currentStage) openStage(currentStage, false);
+    if (refreshing) return;
+    refreshing = true;
+    $("#live-state").classList.add("syncing");
+    try {
+      const response = await fetch(endpoint, { credentials: "same-origin", cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Nie udało się pobrać sprawy.");
+      project = data.project;
+      defaults = data.defaults || {};
+      csrf = data.csrf || csrf;
+      render();
+      $("#last-updated").textContent = `Aktualizacja ${new Date().toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit", second: "2-digit" })} · odświeżanie co 5 s`;
+      if (keepModal && currentStage) openStage(currentStage, false);
+    } finally {
+      refreshing = false;
+      $("#live-state").classList.remove("syncing");
+    }
+  }
+
+  const stageTasks = {
+    plan: ["plan"], repository: ["repository"], environment: ["environment"],
+    design: ["ux", "ui"], build: ["architect", "frontend", "backend", "integration"],
+    qa: ["qa", "security", "performance", "documentation"], preview: ["preview"],
+    feedback: ["feedback"], release: ["release"], handover: ["handover"],
+  };
+  const stageJobs = {
+    plan: ["generate_plan"], repository: ["create_repository"], environment: ["provision_preview", "configure_scaffold"],
+    preview: ["publish_preview"], release: ["publish_production"],
+  };
+  function stageIssue(stageId) {
+    const job = project.jobs.find((item) => (stageJobs[stageId] || []).some((kind) => item.kind === kind || (kind === "publish_preview" && /^publish_preview_[a-f0-9]{12}$/.test(item.kind))));
+    if (job?.error) return job.error;
+    const roles = stageTasks[stageId] || [];
+    const task = project.agentTasks.find((item) => roles.includes(item.role) && item.error);
+    return task?.error || "Sprawdź szczegóły tego etapu.";
+  }
+  function overallStatus() {
+    const order = ["error", "needs_you", "working", "queued", "review", "ready", "waiting_client", "done"];
+    let stage = null;
+    let state = "locked";
+    for (const candidate of order) {
+      stage = project.stages.find((item) => project.status[item.id] === candidate);
+      if (stage) { state = candidate; break; }
+    }
+    stage ||= project.stages.at(-1);
+    let detail = "";
+    if (state === "error") detail = stageIssue(stage.id);
+    else if (state === "working") {
+      const roles = stageTasks[stage.id] || [];
+      const task = project.agentTasks.find((item) => roles.includes(item.role) && item.state === "running");
+      detail = task ? `${task.title}${task.runner_phase ? ` · ${phaseLabel(task.runner_phase)}` : ""}` : "Agent wykonuje zadanie. Szczegóły i postęp znajdziesz po kliknięciu etapu.";
+    } else if (state === "queued") detail = "Etap czeka w kolejce na rozpoczęcie pracy.";
+    else if (state === "needs_you") detail = "Ten etap wymaga Twojej decyzji; inne niezależne zadania mogą nadal trwać.";
+    else if (state === "waiting_client") detail = "Dalszy krok należy do klienta.";
+    else if (state === "review") detail = "Wynik czeka na sprawdzenie.";
+    else if (state === "ready") detail = "Wszystkie zależności są gotowe. Etap może się rozpocząć.";
+    else if (state === "done") detail = "Wszystkie widoczne etapy projektu są zakończone.";
+    const titles = { error: "Praca zatrzymana · błąd", needs_you: "Oczekuje na Twoją decyzję", working: "Projekt jest realizowany", queued: "Następny etap czeka w kolejce", review: "Wynik wymaga przeglądu", ready: "Gotowy do rozpoczęcia", waiting_client: "Oczekuje na klienta", done: "Projekt zakończony", locked: "Projekt jeszcze się nie rozpoczął" };
+    return { stage, state, title: titles[state] || "Projekt oczekuje", detail };
+  }
+  function phaseLabel(phase) {
+    return ({ waiting_merge: "PR czeka na scalenie", reviewing: "trwa niezależny przegląd", waiting_merge_auto: "PR czeka na CI i scalenie", waiting_image: "oczekuje na obraz z CI" })[phase] || "agent pracuje";
   }
 
   function render() {
@@ -53,6 +109,11 @@
     stageList.innerHTML = "";
     const nodes = $("#nodes");
     nodes.innerHTML = "";
+    const overview = overallStatus();
+    const statusBox = $("#overall-status");
+    statusBox.dataset.state = overview.state;
+    $("#overall-title").textContent = `${overview.title} · ${overview.stage.name}`;
+    $("#overall-detail").textContent = overview.detail;
     const byId = Object.fromEntries(project.stages.map((stage) => [stage.id, stage]));
     const paths = [];
     project.stages.forEach((stage, index) => {
@@ -65,7 +126,8 @@
       stageList.append(side);
       const node = document.createElement("button");
       node.type = "button";
-      node.className = `node ${state}`;
+      const changed = previousStatus && previousStatus[stage.id] !== state;
+      node.className = `node ${state}${changed ? " changed" : ""}`;
       node.style.left = `${stage.x}px`;
       node.style.top = `${stage.y}px`;
       node.dataset.stage = stage.id;
@@ -81,11 +143,12 @@
         paths.push(`<path d="M${x1} ${y1} C${x1 + mid} ${y1},${x2 - mid} ${y2},${x2} ${y2}" fill="none" stroke="#4e6286" stroke-width="2" marker-end="url(#arrow)"/>`);
       });
     });
+    previousStatus = { ...project.status };
     paths.push('<path d="M2770 315 C2780 425,2050 435,2050 390" fill="none" stroke="#b973ad" stroke-width="2" stroke-dasharray="7 7" marker-end="url(#loopArrow)"/>');
     $("#connections").innerHTML = `<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#7189b0"/></marker><marker id="loopArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#b973ad"/></marker></defs>${paths.join("")}`;
     $("#mini-nodes").innerHTML = project.stages.map((stage) => `<rect x="${stage.x}" y="${stage.y}" width="196" height="118" rx="20" fill="${project.status[stage.id] === "done" ? "#46d99a" : project.status[stage.id] === "needs_you" ? "#ffbc63" : "#627da9"}"/>`).join("");
     updateMinimap();
-    const active = project.stages.find((stage) => ["needs_you", "error", "working", "queued", "ready"].includes(project.status[stage.id])) || project.stages.at(-1);
+    const active = project.stages.find((stage) => ["error", "needs_you", "working", "queued", "review", "ready"].includes(project.status[stage.id])) || project.stages.at(-1);
     $("#next-action").textContent = active.name;
     $("#next-detail").textContent = labels[project.status[active.id]] || "";
     const repoJob = project.jobs.find((job) => job.kind === "create_repository");
@@ -265,10 +328,14 @@
   function updateMinimap() { const viewport = $("#mini-viewport"); viewport.setAttribute("x", String(mapShell.scrollLeft / zoom)); viewport.setAttribute("width", String(Math.min(3390, mapShell.clientWidth / zoom))); }
   mapShell.addEventListener("scroll", updateMinimap);
   minimap.addEventListener("click", (event) => { const rect = minimap.getBoundingClientRect(); const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left - 5) / Math.max(1, rect.width - 10))); mapShell.scrollTo({ left: ratio * 3390 * zoom - mapShell.clientWidth / 2, behavior: "smooth" }); });
-  function showError(error) { $("#summary").textContent = error.message || "Nie udało się pobrać sprawy."; }
+  function showError(error) {
+    $("#summary").textContent = error.message || "Nie udało się pobrać sprawy.";
+    $("#last-updated").textContent = "Nie można pobrać aktualnego stanu";
+    $("#live-state").classList.remove("syncing");
+  }
   load().then(focusCurrent).catch(showError);
   setInterval(() => {
     if (document.hidden || $("#dialog-content form :focus")) return;
     load(Boolean(currentStage)).catch(showError);
-  }, 10000);
+  }, 5000);
 })();

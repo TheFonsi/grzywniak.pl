@@ -41,7 +41,7 @@ PROMPT;
     // Only contract-relevant data: no conversation history, credentials or bank account.
     $private=['provider','party','paymentDetails','clientAddress','clientTaxId','clientRepresentative'];
     $input=['today'=>date('Y-m-d'),'offer'=>array_intersect_key($offer,array_flip(['project','sections','pricing','payment','contractTerms'])), 'draft'=>array_diff_key($draft,array_flip($private)), 'facts'=>array_diff_key($facts,array_flip($private)), 'template'=>array_diff_key($template,array_flip(['provider'])), 'accepted'=>array_diff_key($accepted,array_flip($private))];
-    $payload=['model'=>getenv('OPENAI_CONTRACT_MODEL')?:getenv('OPENAI_MODEL')?:'gpt-5.6-luna','store'=>false,'max_output_tokens'=>8000,'input'=>[['role'=>'system','content'=>$prompt],['role'=>'user','content'=>json_encode($input,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR)]],'text'=>['format'=>['type'=>'json_schema','name'=>'contract_draft','strict'=>true,'schema'=>$schema]]];
+    $payload=['model'=>getenv('OPENAI_CONTRACT_MODEL')?:getenv('OPENAI_MODEL')?:'gpt-6-luna','store'=>false,'max_output_tokens'=>8000,'input'=>[['role'=>'system','content'=>$prompt],['role'=>'user','content'=>json_encode($input,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR)]],'text'=>['format'=>['type'=>'json_schema','name'=>'contract_draft','strict'=>true,'schema'=>$schema]]];
     @set_time_limit(100);
     $ch=curl_init('https://api.openai.com/v1/responses');
     curl_setopt_array($ch,[CURLOPT_POST=>true,CURLOPT_HTTPHEADER=>['Authorization: Bearer '.$key,'Content-Type: application/json'],CURLOPT_POSTFIELDS=>json_encode($payload,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),CURLOPT_RETURNTRANSFER=>true,CURLOPT_CONNECTTIMEOUT=>10,CURLOPT_TIMEOUT=>85]);

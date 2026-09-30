@@ -82,7 +82,7 @@ if ($key === '') { http_response_code(503); echo json_encode(['message' => 'Brak
 $previous = (string) ($session['adminProposals'][$question]['answer'] ?? '');
 $instruction = 'Jesteś analitykiem projektu. Na podstawie briefu zaproponuj jedną krótką, konkretną odpowiedź na brakujące pytanie. To hipoteza do zatwierdzenia przez zespół, nie fakt. Dopasuj odpowiedź do celu, budżetu i faktów z briefu. Dla niskiego budżetu wybierz najprostsze rozwiązanie dające wartość. Nie używaj ogólników typu „to istotne”, „tak” ani „nie”. Zwróć wyłącznie odpowiedź po polsku.';
 if ($action === 'regenerate' && $previous !== '') $instruction .= ' Poprzednia propozycja brzmiała: „' . $previous . '”. Zaproponuj inne, rozsądne rozwiązanie.';
-$payload = ['model' => getenv('OPENAI_MODEL') ?: 'gpt-5.6-luna', 'store' => false, 'reasoning' => ['effort' => 'low'], 'max_output_tokens' => 180, 'input' => [['role' => 'system', 'content' => $instruction], ['role' => 'user', 'content' => json_encode(['brief' => $session['projectState'] ?? [], 'question' => $question], JSON_UNESCAPED_UNICODE)]]];
+$payload = ['model' => getenv('OPENAI_MODEL') ?: 'gpt-6-luna', 'store' => false, 'reasoning' => ['effort' => 'low'], 'max_output_tokens' => 180, 'input' => [['role' => 'system', 'content' => $instruction], ['role' => 'user', 'content' => json_encode(['brief' => $session['projectState'] ?? [], 'question' => $question], JSON_UNESCAPED_UNICODE)]]];
 // The brief lock protects file reads and writes, not the external AI request.
 // This lets another administrator action save while the model is responding.
 flock($sessionLock, LOCK_UN);
