@@ -240,7 +240,7 @@ function runOneJob(): bool {
                 $repo=$results['create_repository']??[]; $environment=$results['provision_preview']??[];
                 $tasks=projectAgentTasks($id);
                 $incomplete=projectIncompleteAgentTasksMessage($tasks);
-                if($incomplete!=='') throw new RuntimeException($incomplete);
+                if(!projectAgentTasksCompleteForPreview($tasks)) throw new RuntimeException($incomplete!==''?$incomplete:'Nie ma zakończonych zadań QA wymaganych do podglądu.');
                 $evidence=deploymentEvidence($tasks); $requested=json_decode((string)$job['input'],true)?:[];
                 if($requested && ($requested['imageDigest']??'')!==$evidence['imageDigest']) throw new RuntimeException('Wersja QA zmieniła się po zleceniu wdrożenia.');
                 return deployProjectVersion($session,$case,$repo,$environment,$evidence,'preview');

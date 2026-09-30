@@ -28,7 +28,8 @@ function projectTaskStage(string $role): string {
 
 function projectIncompleteAgentTasksMessage(array $tasks): string {
     if(!$tasks) return 'Nie utworzono jeszcze zadań agentów.';
-    $pending=array_values(array_filter($tasks,static fn($task)=>($task['state']??'')!=='done'));
+    $blocking=array_values(array_filter($tasks,'projectTaskAffectsStageStatus'));
+    $pending=array_values(array_filter($blocking,static fn($task)=>($task['state']??'')!=='done'));
     if(!$pending) return '';
     $phaseLabels=['waiting_merge'=>'PR czeka na przegląd i scalenie','reviewing'=>'trwa niezależny przegląd PR','waiting_merge_auto'=>'PR zaakceptowany, czeka na CI i scalenie','waiting_image'=>'czeka na obraz z CI'];
     $items=[];
@@ -43,6 +44,11 @@ function projectIncompleteAgentTasksMessage(array $tasks): string {
     }
     $remaining=count($pending)-count($items);
     return 'Zadania agentów nie są zakończone: '.implode('; ',$items).($remaining>0?'; oraz '.$remaining.' kolejnych':'').'.';
+}
+
+function projectAgentTasksCompleteForPreview(array $tasks): bool {
+    $blocking=array_values(array_filter($tasks,'projectTaskAffectsStageStatus'));
+    return $blocking!==[] && count(array_filter($blocking,static fn($task)=>($task['state']??'')!=='done'))===0;
 }
 
 function projectTaskTotals(PDO $db,string $id): array {
@@ -240,7 +246,7 @@ function projectQueueReadyPreviews(): void {
     $ids=$db->query("SELECT DISTINCT session_id FROM project_agent_tasks WHERE role='qa'")->fetchAll(PDO::FETCH_COLUMN);
     foreach($ids as $id) {
         $tasks=projectAgentTasks((string)$id);
-        if(!$tasks || count(array_filter($tasks,static fn($task)=>$task['state']==='done'))!==count($tasks)) continue;
+        if(!projectAgentTasksCompleteForPreview($tasks)) continue;
         $jobs=projectJobs((string)$id); $states=[];
         foreach($jobs as $job) $states[$job['kind']]=$job['state'];
         if(($states['provision_preview']??'')!=='done') continue;

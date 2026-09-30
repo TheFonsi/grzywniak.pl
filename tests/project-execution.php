@@ -34,6 +34,10 @@ $blocker=projectIncompleteAgentTasksMessage([
 ]);
 if(!str_contains($blocker,'Niezależne QA runtime') || !str_contains($blocker,'running') || !str_contains($blocker,'czeka na obraz z CI')) throw new RuntimeException('Blokada podglądu nie wskazuje konkretnego zadania i przyczyny.');
 if(projectIncompleteAgentTasksMessage([])==='') throw new RuntimeException('Brak zadań agentów powinien wyjaśniać blokadę.');
+$accountedAttempt=['task_key'=>'runtime-hardening-vps-parity','title'=>'Rozliczenie niezaksięgowanej pracy z PR #12 (próba 4)','role'=>'qa','state'=>'failed','runner_id'=>'d036:runtime-hardening-vps-parity:4-code-unreported','reserved_pln'=>0,'error'=>'Koszt został już ujęty.'];
+$completedQa=['task_key'=>'qa-container-runtime','title'=>'Niezależne QA','role'=>'qa','state'=>'done','runner_id'=>'d036:qa-container-runtime:1','reserved_pln'=>0,'result'=>['qaPassed'=>true]];
+if(!projectAgentTasksCompleteForPreview([$completedQa,$accountedAttempt]) || projectIncompleteAgentTasksMessage([$completedQa,$accountedAttempt])!=='') throw new RuntimeException('Rozliczona próba kodująca nadal blokuje podgląd.');
+if(projectAgentTasksCompleteForPreview([$completedQa,array_merge($accountedAttempt,['runner_id'=>'d036:runtime-hardening-vps-parity:4','reserved_pln'=>0])])) throw new RuntimeException('Nierozliczone zadanie robocze nie blokuje podglądu.');
 $evidence=deploymentEvidence([['role'=>'qa','state'=>'done','result'=>['summary'=>'OK','qaPassed'=>true,'commitSha'=>$sha,'imageCommitSha'=>$sha,'imageDigest'=>$digest,'appPort'=>8080,'healthPath'=>'/healthz']]]);
 if($evidence['commitSha']!==$sha || $evidence['imageDigest']!==$digest) throw new RuntimeException('Niepoprawna wersja wdrożenia.');
 try { deploymentEvidence([['role'=>'qa','state'=>'done','result'=>['summary'=>'OK','qaPassed'=>false,'commitSha'=>$sha,'imageDigest'=>$digest,'appPort'=>8080,'healthPath'=>'/healthz']]]); throw new RuntimeException('QA bez akceptacji przeszło bramkę.'); }
