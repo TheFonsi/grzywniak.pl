@@ -72,7 +72,14 @@ function projectDispatchAgentTask(): bool {
         $db->prepare("UPDATE project_agent_tasks SET state='running',runner_id=?,attempts=attempts+1,reserved_pln=?,started_at=?,updated_at=? WHERE id=? AND state='pending'")->execute([$key,$reserve,time(),time(),$selected['id']]);
         projectEvent($id,projectTaskStage((string)$selected['role']),'started','Agent '.$selected['role'],'Zlecono zadanie: '.$selected['title'].'.');
         $db->exec('COMMIT');
-        $body=['id'=>$key,'projectId'=>$id,'taskId'=>$selected['task_key'],'role'=>$selected['role'],'title'=>$selected['title'],'dependencies'=>json_decode((string)$selected['dependencies'],true)?:[],'acceptance'=>json_decode((string)$selected['acceptance'],true)?:[],'repository'=>$repo['url'],'approvedScope'=>$case['scope']??'','maxCostPln'=>$reserve,'timeoutMinutes'=>(int)projectSetting('AGENT_TASK_TIMEOUT_MIN')];
+        $dependencyResults=[];
+        foreach(json_decode((string)$selected['dependencies'],true)?:[] as $dependency) {
+            $dependencyStmt=$db->prepare("SELECT title,role,result FROM project_agent_tasks WHERE session_id=? AND task_key=? AND state='done'");
+            $dependencyStmt->execute([$id,$dependency]);
+            $dependencyRow=$dependencyStmt->fetch(PDO::FETCH_ASSOC);
+            if($dependencyRow) $dependencyResults[]=['taskId'=>$dependency,'title'=>$dependencyRow['title'],'role'=>$dependencyRow['role'],'result'=>json_decode((string)$dependencyRow['result'],true)?:[]];
+        }
+        $body=['id'=>$key,'projectId'=>$id,'taskId'=>$selected['task_key'],'role'=>$selected['role'],'title'=>$selected['title'],'dependencies'=>json_decode((string)$selected['dependencies'],true)?:[],'dependencyResults'=>$dependencyResults,'acceptance'=>json_decode((string)$selected['acceptance'],true)?:[],'repository'=>$repo['url'],'approvedScope'=>$case['scope']??'','maxCostPln'=>$reserve,'timeoutMinutes'=>(int)projectSetting('AGENT_TASK_TIMEOUT_MIN')];
         $response=workerRequest('POST',$url.'/v1/tasks',$body,['Authorization: Bearer '.$token,'Idempotency-Key: '.$key,'Content-Type: application/json','Accept: application/json']);
         if(!in_array($response['status'],[200,201,202],true) || ($response['body']['id']??'')!==$key) throw new RuntimeException('Runner nie potwierdził identyfikatora zadania.');
         return true;
@@ -142,8 +149,17 @@ function projectPollAgentTask(): bool {
     }
     $overspent=(float)$spent>(float)$task['reserved_pln']+0.0001;
     if($overspent) { $state='failed'; $body['error']='Runner przekroczył limit kosztu zadania. Rozliczono rzeczywisty koszt; dalsza praca wymaga decyzji.'; }
-    $result=$state==='done'?($body['result']??null):null;
+    $runnerResult=$body['result']??null;
+    $result=$state==='done'?$runnerResult:null;
     if($state==='done' && (!is_array($result) || empty($result['summary']))) throw new RuntimeException('Runner nie podał wyniku zadania.');
+    if($state==='failed' && ($task['role']??'')==='qa' && is_array($runnerResult)) {
+        $result=[
+            'summary'=>mb_substr(trim((string)($runnerResult['summary']??'')),0,2000),
+            'qaPassed'=>($runnerResult['qaPassed']??null)===true,
+            'appPort'=>filter_var($runnerResult['appPort']??null,FILTER_VALIDATE_INT)?:null,
+            'healthPath'=>mb_substr((string)($runnerResult['healthPath']??''),0,120),
+        ];
+    }
     $db->exec('BEGIN IMMEDIATE');
     try {
         $update=$db->prepare("UPDATE project_agent_tasks SET state=?,runner_phase='finished',result=?,error=?,spent_pln=spent_pln+?,reserved_pln=0,updated_at=? WHERE id=? AND state='running' AND runner_id=?");

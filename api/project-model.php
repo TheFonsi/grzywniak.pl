@@ -125,6 +125,12 @@ function projectEnqueue(string $id,string $kind,array $input=[]): void {
     $stmt->execute([$id,$kind,json_encode($input,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),$now,$now]);
 }
 
+function projectTaskAffectsStageStatus(array $task): bool {
+    $runnerId=(string)($task['runner_id']??'');
+    $accountingOnly=str_ends_with($runnerId,'-code-unreported');
+    return !$accountingOnly || (float)($task['reserved_pln']??0)>0;
+}
+
 function projectSnapshot(array $session): array {
     $id=(string)$session['id'];
     $case=projectCase($id);
@@ -158,7 +164,7 @@ function projectSnapshot(array $session): array {
     $agentTasks=projectAgentTasks($id);
     if($status['repository']==='done') {
         foreach(['design'=>['ux','ui'],'build'=>['architect','frontend','backend','integration'],'qa'=>['qa','security','performance','documentation']] as $stage=>$roles) {
-            $relevant=array_values(array_filter($agentTasks,static fn($task)=>in_array($task['role'],$roles,true)));
+            $relevant=array_values(array_filter($agentTasks,static fn($task)=>in_array($task['role'],$roles,true) && projectTaskAffectsStageStatus($task)));
             if(!$relevant) { $status[$stage]=$stage==='qa'?'review':'ready'; continue; }
             $states=array_column($relevant,'state');
             $status[$stage]=in_array('failed',$states,true)?'error':(count(array_filter($relevant,static fn($task)=>$task['state']==='running' && $task['runner_phase']==='waiting_merge'))?'needs_you':(in_array('running',$states,true)?'working':(in_array('queued',$states,true)?'queued':(count(array_filter($states,static fn($state)=>$state==='done'))===count($states)?'done':'ready'))));
