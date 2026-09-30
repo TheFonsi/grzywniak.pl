@@ -230,6 +230,21 @@ function projectQueueReadyPreviews(): void {
         $latestResult=$latest && $latest['state']==='done'?json_decode((string)$latest['result'],true):null;
         if(($latestResult['imageDigest']??'')===$evidence['imageDigest']) continue;
         $kind=$latest?'publish_preview_'.substr($evidence['imageDigest'],7,12):'publish_preview';
+        $environmentJob=null;
+        foreach($jobs as $candidate) if($candidate['kind']==='provision_preview' && $candidate['state']==='done') { $environmentJob=$candidate; break; }
+        $environment=$environmentJob?json_decode((string)$environmentJob['result'],true):null;
+        $hostname=is_array($environment)?(string)($environment['hostname']??''):'';
+        if(preg_match('/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$/i',$hostname)) {
+            try {
+                verifyPublicDeployment($hostname,(string)$id,$evidence['imageDigest'],$evidence['commitSha'],$evidence['healthPath']);
+                $result=['url'=>'https://'.$hostname,'hostname'=>$hostname,'commitSha'=>$evidence['commitSha'],'imageDigest'=>$evidence['imageDigest'],'appPort'=>$evidence['appPort'],'healthPath'=>$evidence['healthPath'],'deployedAt'=>time(),'reconciled'=>true];
+                $now=time();
+                $stmt=$db->prepare("INSERT INTO project_jobs(session_id,kind,state,input,result,error,created_at,updated_at) VALUES(?,?,'done',?,?,NULL,?,?) ON CONFLICT(session_id,kind) DO UPDATE SET state='done',input=excluded.input,result=excluded.result,error=NULL,updated_at=excluded.updated_at");
+                $stmt->execute([(string)$id,$kind,json_encode($evidence,JSON_THROW_ON_ERROR),json_encode($result,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),$now,$now]);
+                projectEvent((string)$id,'preview','reconciled','System','Potwierdzono działający podgląd dla aktualnego commita i obrazu; zapisano wynik wdrożenia.');
+                continue;
+            } catch(Throwable $error) {}
+        }
         if(isset($states[$kind])) continue;
         projectEnqueue((string)$id,$kind,$evidence);
         projectEvent((string)$id,'preview','queued','System','QA ukończone. Zlecono wdrożenie i sprawdzenie podglądu.');

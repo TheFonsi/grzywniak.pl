@@ -64,12 +64,12 @@ function verifyGithubCi(array $repository,string $sha): void {
     throw new RuntimeException('Wskazany commit nie ma pozytywnych kontroli validate i publish.');
 }
 
-function verifyPublicDeployment(string $hostname,string $projectId,string $digest,string $healthPath): void {
+function verifyPublicDeployment(string $hostname,string $projectId,string $digest,string $commitSha,string $healthPath): void {
     $curl=curl_init('https://'.$hostname.'/.well-known/grzywniak/deployment');
     curl_setopt_array($curl,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_TIMEOUT=>20,CURLOPT_CONNECTTIMEOUT=>5,CURLOPT_FOLLOWLOCATION=>false,CURLOPT_SSL_VERIFYPEER=>true,CURLOPT_SSL_VERIFYHOST=>2]);
     $raw=curl_exec($curl); $status=(int)curl_getinfo($curl,CURLINFO_HTTP_CODE); curl_close($curl);
     $body=is_string($raw)?json_decode($raw,true):null;
-    if($status!==200 || !is_array($body) || ($body['projectId']??'')!==$projectId || ($body['imageDigest']??'')!==$digest) throw new RuntimeException('Publiczny adres HTTPS nie potwierdza uruchomienia dokładnie zatwierdzonego obrazu.');
+    if($status!==200 || !is_array($body) || ($body['projectId']??'')!==$projectId || ($body['imageDigest']??'')!==$digest || ($body['commitSha']??'')!==$commitSha) throw new RuntimeException('Publiczny adres HTTPS nie potwierdza uruchomienia dokładnie zatwierdzonego obrazu i commita.');
     $curl=curl_init('https://'.$hostname.$healthPath);
     curl_setopt_array($curl,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_TIMEOUT=>20,CURLOPT_CONNECTTIMEOUT=>5,CURLOPT_FOLLOWLOCATION=>false,CURLOPT_SSL_VERIFYPEER=>true,CURLOPT_SSL_VERIFYHOST=>2]);
     $healthy=curl_exec($curl); $healthStatus=(int)curl_getinfo($curl,CURLINFO_HTTP_CODE); curl_close($curl);
@@ -86,7 +86,7 @@ function deployProjectVersion(array $session,array $case,array $repository,array
     $response=workerRequest('POST',$control.'/v1/deployments',['projectId'=>$id,'kind'=>$kind,'hostname'=>$hostname,'repository'=>$repository['url'],'commitSha'=>$evidence['commitSha'],'imageDigest'=>$evidence['imageDigest'],'appPort'=>$evidence['appPort'],'healthPath'=>$evidence['healthPath']],['Authorization: Bearer '.$token,'Idempotency-Key: '.$id.':'.$kind.':'.$evidence['imageDigest'],'Content-Type: application/json','Accept: application/json'],180);
     $deploymentId=(string)($response['body']['deploymentId']??'');
     if(!in_array($response['status'],[200,201],true) || ($response['body']['ready']??false)!==true || ($response['body']['imageDigest']??'')!==$evidence['imageDigest'] || ($response['body']['hostname']??'')!==$hostname || !preg_match('/^[A-Za-z0-9_-]{4,100}$/',$deploymentId)) throw new RuntimeException('VPS nie potwierdził gotowego wdrożenia wskazanego obrazu.');
-    try { verifyPublicDeployment($hostname,$id,$evidence['imageDigest'],$evidence['healthPath']); }
+    try { verifyPublicDeployment($hostname,$id,$evidence['imageDigest'],$evidence['commitSha'],$evidence['healthPath']); }
     catch(Throwable $error) {
         $rollback=workerRequest('POST',$control.'/v1/deployments/'.rawurlencode($deploymentId).'/rollback',[],['Authorization: Bearer '.$token,'Content-Type: application/json','Accept: application/json']);
         if($rollback['status']!==200 || ($rollback['body']['rolledBack']??false)!==true) throw new RuntimeException('Kontrola publiczna nie powiodła się, a VPS nie potwierdził powrotu do poprzedniej wersji.');
