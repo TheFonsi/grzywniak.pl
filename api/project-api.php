@@ -26,6 +26,7 @@ importLegacySessions();
 $session=readSession($id);
 if(!$session || ($session['status']??'')!=='COMPLETED') projectReply(['message'=>'Sprawa powstaje po przekazaniu briefu.'],404);
 if($_SERVER['REQUEST_METHOD']==='GET') {
+    $case=projectCase($id);
     $snapshot=projectSnapshot($session);
     foreach(projectJobs($id) as $candidate) if($candidate['kind']==='provision_preview' && $candidate['state']==='done') {
         $environment=json_decode((string)$candidate['result'],true)?:[];
