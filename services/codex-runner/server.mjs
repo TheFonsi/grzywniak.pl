@@ -265,6 +265,23 @@ async function workflowJobSucceeded(credential, name, sha, jobName, event) {
   return false;
 }
 
+async function reconcileCompletedQaEvidence(task) {
+  const result = task.result || {};
+  const sha = result.commitSha;
+  const name = repositoryName(task.repository);
+  if (task.role !== 'qa' || task.state !== 'done' || result.qaPassed !== true || !name || !/^[a-f0-9]{40}$/.test(sha || '') || !Number.isInteger(result.appPort) || result.appPort < 1 || result.appPort > 65535 || !/^\/[A-Za-z0-9/_-]{1,100}$/.test(result.healthPath || '')) return false;
+  const credential = await ghToken();
+  const [validated, published] = await Promise.all([
+    workflowJobSucceeded(credential, name, sha, 'validate', 'push'),
+    workflowJobSucceeded(credential, name, sha, 'publish', 'push'),
+  ]);
+  if (!validated || !published) return false;
+  const digest = await registryDigest(name, sha);
+  if (result.imageCommitSha === sha && result.imageDigest === digest) return false;
+  await update(task, { result: { ...result, imageCommitSha: sha, imageDigest: digest } });
+  return true;
+}
+
 async function registryDigest(name, sha) {
   const path = `${githubOrg.toLowerCase()}/${name.toLowerCase()}`;
   const url = `https://ghcr.io/v2/${path}/manifests/${sha}`;
@@ -360,7 +377,10 @@ createServer(async (req, res) => {
     if (route) {
       const task = tasks[route[1]];
       if (!task) return reply(res, 404, { message: 'Nie znaleziono zadania.' });
-      if (req.method === 'GET' && !route[2]) return reply(res, 200, { id: task.id, state: task.state, costPln: task.state === 'done' || task.state === 'failed' ? task.costPln : undefined, knownCostPln: task.knownCostPln, result: task.result, error: task.error, phase: task.phase });
+      if (req.method === 'GET' && !route[2]) {
+        if (task.role === 'qa' && task.state === 'done') await reconcileCompletedQaEvidence(task).catch(() => false);
+        return reply(res, 200, { id: task.id, state: task.state, costPln: task.state === 'done' || task.state === 'failed' ? task.costPln : undefined, knownCostPln: task.knownCostPln, result: task.result, error: task.error, phase: task.phase });
+      }
       if (req.method === 'POST' && route[2]) {
         active.get(task.id)?.kill('SIGTERM');
         await update(task, { state: 'failed', phase: 'finished', costPln: task.state === 'queued' ? 0 : task.costPln, error: 'Zadanie anulowano.' });

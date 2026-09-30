@@ -151,7 +151,7 @@ function projectDispatchAgentTask(): bool {
 
 function projectPollAgentTask(): bool {
     $db=projectDb();
-    $find=$db->prepare("SELECT * FROM project_agent_tasks WHERE state='running' OR (state='failed' AND role='qa' AND runner_id IS NOT NULL AND reserved_pln=0 AND error=? AND updated_at<=?) OR (state='done' AND role='qa' AND runner_id IS NOT NULL AND runner_id NOT LIKE '%-code-unreported' AND updated_at<=?) ORDER BY CASE WHEN state='running' THEN 0 WHEN state='failed' THEN 1 ELSE 2 END,updated_at,id LIMIT 50");
+    $find=$db->prepare("SELECT * FROM project_agent_tasks WHERE state='running' OR (state='failed' AND role='qa' AND runner_id IS NOT NULL AND reserved_pln=0 AND error=? AND updated_at<=?) OR (state='done' AND role='qa' AND runner_id IS NOT NULL AND runner_id NOT LIKE '%-code-unreported' AND updated_at<=?) ORDER BY CASE WHEN state='running' THEN 0 WHEN state='failed' THEN 1 ELSE 2 END,updated_at DESC,id DESC LIMIT 50");
     $find->execute(['Niezależny przegląd odrzucił pull request.',time()-20,time()-60]);
     $task=null;
     foreach($find->fetchAll(PDO::FETCH_ASSOC) as $candidate) {
@@ -161,7 +161,7 @@ function projectPollAgentTask(): bool {
     if(!$task) return false;
     [$url,$token]=projectRunnerConfig();
     $key=(string)$task['runner_id'];
-    try { $response=workerRequest('GET',$url.'/v1/tasks/'.rawurlencode($key),null,['Authorization: Bearer '.$token,'Accept: application/json']); }
+    try { $response=workerRequest('GET',$url.'/v1/tasks/'.rawurlencode($key),null,['Authorization: Bearer '.$token,'Accept: application/json'],$task['state']==='done'?60:25); }
     catch(Throwable $error) {
         if($task['state']!=='running') { $db->prepare('UPDATE project_agent_tasks SET updated_at=? WHERE id=? AND state=?')->execute([time(),$task['id'],$task['state']]); return false; }
         if(time()-(int)$task['started_at']>max(1,(int)projectSetting('AGENT_TASK_TIMEOUT_MIN'))*60) {
