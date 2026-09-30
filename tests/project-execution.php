@@ -28,6 +28,12 @@ $accountingTask=['runner_id'=>'d036a6fbdef7324f0ebbf9fd8da6d1b9:runtime-hardenin
 if(projectTaskAffectsStageStatus($accountingTask)) throw new RuntimeException('Rozliczona próba księgowa nadal blokuje status etapu.');
 $accountingTask['reserved_pln']=9.96;
 if(!projectTaskAffectsStageStatus($accountingTask)) throw new RuntimeException('Nierozliczona rezerwacja księgowa nie blokuje etapu.');
+$blocker=projectIncompleteAgentTasksMessage([
+    ['task_key'=>'api','title'=>'Backend API','state'=>'done'],
+    ['task_key'=>'runtime-qa','title'=>'Niezależne QA runtime','state'=>'running','runner_phase'=>'waiting_image','error'=>''],
+]);
+if(!str_contains($blocker,'Niezależne QA runtime') || !str_contains($blocker,'running') || !str_contains($blocker,'czeka na obraz z CI')) throw new RuntimeException('Blokada podglądu nie wskazuje konkretnego zadania i przyczyny.');
+if(projectIncompleteAgentTasksMessage([])==='') throw new RuntimeException('Brak zadań agentów powinien wyjaśniać blokadę.');
 $evidence=deploymentEvidence([['role'=>'qa','state'=>'done','result'=>['summary'=>'OK','qaPassed'=>true,'commitSha'=>$sha,'imageCommitSha'=>$sha,'imageDigest'=>$digest,'appPort'=>8080,'healthPath'=>'/healthz']]]);
 if($evidence['commitSha']!==$sha || $evidence['imageDigest']!==$digest) throw new RuntimeException('Niepoprawna wersja wdrożenia.');
 try { deploymentEvidence([['role'=>'qa','state'=>'done','result'=>['summary'=>'OK','qaPassed'=>false,'commitSha'=>$sha,'imageDigest'=>$digest,'appPort'=>8080,'healthPath'=>'/healthz']]]); throw new RuntimeException('QA bez akceptacji przeszło bramkę.'); }

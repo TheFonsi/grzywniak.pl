@@ -239,7 +239,8 @@ function runOneJob(): bool {
                 $results=[]; foreach(projectJobs($id) as $related) if($related['state']==='done') $results[$related['kind']]=json_decode((string)$related['result'],true)?:[];
                 $repo=$results['create_repository']??[]; $environment=$results['provision_preview']??[];
                 $tasks=projectAgentTasks($id);
-                if(!$tasks || count(array_filter($tasks,static fn($task)=>$task['state']==='done'))!==count($tasks)) throw new RuntimeException('Zadania agentów nie są zakończone.');
+                $incomplete=projectIncompleteAgentTasksMessage($tasks);
+                if($incomplete!=='') throw new RuntimeException($incomplete);
                 $evidence=deploymentEvidence($tasks); $requested=json_decode((string)$job['input'],true)?:[];
                 if($requested && ($requested['imageDigest']??'')!==$evidence['imageDigest']) throw new RuntimeException('Wersja QA zmieniła się po zleceniu wdrożenia.');
                 return deployProjectVersion($session,$case,$repo,$environment,$evidence,'preview');

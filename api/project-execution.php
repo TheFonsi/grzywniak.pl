@@ -26,6 +26,25 @@ function projectTaskStage(string $role): string {
     return match($role) { 'ux','ui'=>'design','qa','security','performance','documentation'=>'qa',default=>'build' };
 }
 
+function projectIncompleteAgentTasksMessage(array $tasks): string {
+    if(!$tasks) return 'Nie utworzono jeszcze zadań agentów.';
+    $pending=array_values(array_filter($tasks,static fn($task)=>($task['state']??'')!=='done'));
+    if(!$pending) return '';
+    $phaseLabels=['waiting_merge'=>'PR czeka na przegląd i scalenie','reviewing'=>'trwa niezależny przegląd PR','waiting_merge_auto'=>'PR zaakceptowany, czeka na CI i scalenie','waiting_image'=>'czeka na obraz z CI'];
+    $items=[];
+    foreach(array_slice($pending,0,3) as $task) {
+        $name=trim((string)($task['title']??''))?:((string)($task['task_key']??'nieznane zadanie'));
+        $state=(string)($task['state']??'nieznany');
+        $phase=(string)($task['runner_phase']??'');
+        $detail=$name.' ['.$state.($phase!==''?'; '.($phaseLabels[$phase]??$phase):'').']';
+        $error=trim((string)($task['error']??''));
+        if($error!=='') $detail.=' — '.mb_substr($error,0,150);
+        $items[]=$detail;
+    }
+    $remaining=count($pending)-count($items);
+    return 'Zadania agentów nie są zakończone: '.implode('; ',$items).($remaining>0?'; oraz '.$remaining.' kolejnych':'').'.';
+}
+
 function projectTaskTotals(PDO $db,string $id): array {
     $stmt=$db->prepare('SELECT COALESCE(SUM(spent_pln+reserved_pln),0) FROM project_agent_tasks WHERE session_id=?');
     $stmt->execute([$id]);
