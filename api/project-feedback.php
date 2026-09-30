@@ -17,7 +17,8 @@ $id=(string)($_SERVER['REQUEST_METHOD']==='POST'?($_POST['project']??$payload['p
 $token=(string)($_SERVER['REQUEST_METHOD']==='POST'?($_POST['token']??$payload['token']??''):($_GET['token']??''));
 if(!preg_match('/^[a-f0-9]{32}$/',$id) || ($_SERVER['REQUEST_METHOD']!=='OPTIONS' && !preg_match('/^[a-f0-9]{48}$/',$token))) feedbackPage('Link jest niepoprawny.',404);
 $case=projectCase($id);
-if($_SERVER['REQUEST_METHOD']!=='OPTIONS' && (empty($case['feedbackTokenHash']) || !hash_equals((string)$case['feedbackTokenHash'],hash('sha256',$token)) || empty($case['previewSentDigest']))) feedbackPage('Link wygasł lub nie jest już aktualny.',403);
+$feedbackDigest=projectFeedbackDigest($case);
+if($_SERVER['REQUEST_METHOD']!=='OPTIONS' && (empty($case['feedbackTokenHash']) || !hash_equals((string)$case['feedbackTokenHash'],hash('sha256',$token)) || $feedbackDigest===null)) feedbackPage('Link wygasł lub nie jest już aktualny.',403);
 if($jsonRequest) {
     $origin=(string)($_SERVER['HTTP_ORIGIN']??'');
     $base=strtolower(trim(projectSetting('PREVIEW_BASE_DOMAIN')));
@@ -40,8 +41,8 @@ if($jsonRequest) {
     try {
         $count=$db->prepare('SELECT COUNT(*) FROM project_feedback WHERE session_id=? AND created_at>=?'); $count->execute([$id,time()-3600]);
         if((int)$count->fetchColumn()>=5) { $db->rollBack(); $fail('Osiągnięto limit pięciu uwag na godzinę.',429); }
-        $db->prepare('INSERT INTO project_feedback(session_id,image_digest,message,page_url,annotation_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?)')->execute([$id,$case['previewSentDigest'],$message,$page,json_encode($safeAnnotation,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),time(),time()]);
-        $feedbackId=(int)$db->lastInsertId(); projectEnqueue($id,'classify_feedback_'.$feedbackId); projectEvent($id,'feedback','received','Klient','Nowa uwaga do wersji '.$case['previewSentDigest'].'.'); $db->commit();
+        $db->prepare('INSERT INTO project_feedback(session_id,image_digest,message,page_url,annotation_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?)')->execute([$id,$feedbackDigest,$message,$page,json_encode($safeAnnotation,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),time(),time()]);
+        $feedbackId=(int)$db->lastInsertId(); projectEnqueue($id,'classify_feedback_'.$feedbackId); projectEvent($id,'feedback','received','Klient','Nowa uwaga do wersji '.$feedbackDigest.'.'); $db->commit();
     } catch(Throwable $error) { if($db->inTransaction())$db->rollBack(); error_log('Feedback: '.$error->getMessage()); $fail('Nie udało się zapisać uwagi.',500); }
     http_response_code(201); echo json_encode(['message'=>'Uwaga została zapisana przy właściwej wersji podglądu.'],JSON_UNESCAPED_UNICODE); exit;
 }
@@ -50,7 +51,7 @@ if($_SERVER['REQUEST_METHOD']==='POST') {
     if(mb_strlen($message)<10 || mb_strlen($message)>4000 || mb_strlen($page)>1000) feedbackPage('Wpisz uwagę od 10 do 4000 znaków i spróbuj ponownie.',400);
     if($page!=='' && (!filter_var($page,FILTER_VALIDATE_URL) || !str_starts_with($page,'https://'))) feedbackPage('Adres strony musi być adresem HTTPS.',400);
     $db=projectDb(); $db->exec('BEGIN IMMEDIATE');
-    try { $count=$db->prepare('SELECT COUNT(*) FROM project_feedback WHERE session_id=? AND created_at>=?'); $count->execute([$id,time()-3600]); if((int)$count->fetchColumn()>=5) { $db->rollBack(); feedbackPage('Osiągnięto limit pięciu uwag na godzinę. Spróbuj później.',429); } $db->prepare('INSERT INTO project_feedback(session_id,image_digest,message,page_url,created_at,updated_at) VALUES(?,?,?,?,?,?)')->execute([$id,$case['previewSentDigest'],$message,$page,time(),time()]); $feedbackId=(int)$db->lastInsertId(); projectEnqueue($id,'classify_feedback_'.$feedbackId); projectEvent($id,'feedback','received','Klient','Nowa uwaga do wersji '.$case['previewSentDigest'].'.'); $db->commit(); }
+    try { $count=$db->prepare('SELECT COUNT(*) FROM project_feedback WHERE session_id=? AND created_at>=?'); $count->execute([$id,time()-3600]); if((int)$count->fetchColumn()>=5) { $db->rollBack(); feedbackPage('Osiągnięto limit pięciu uwag na godzinę. Spróbuj później.',429); } $db->prepare('INSERT INTO project_feedback(session_id,image_digest,message,page_url,created_at,updated_at) VALUES(?,?,?,?,?,?)')->execute([$id,$feedbackDigest,$message,$page,time(),time()]); $feedbackId=(int)$db->lastInsertId(); projectEnqueue($id,'classify_feedback_'.$feedbackId); projectEvent($id,'feedback','received','Klient','Nowa uwaga do wersji '.$feedbackDigest.'.'); $db->commit(); }
     catch(Throwable $error) { if($db->inTransaction())$db->rollBack(); error_log('Feedback: '.$error->getMessage()); feedbackPage('Nie udało się zapisać uwagi.',500); }
     feedbackPage('Dziękujemy. Uwaga została zapisana przy właściwej wersji podglądu.');
 }

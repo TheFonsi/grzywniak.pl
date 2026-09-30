@@ -123,6 +123,14 @@ function projectFeedback(string $id): array {
     return $rows;
 }
 
+function projectFeedbackDigest(array $case): ?string {
+    foreach (['feedbackEnabledDigest','previewSentDigest'] as $field) {
+        $digest=(string)($case[$field]??'');
+        if(preg_match('/^sha256:[a-f0-9]{64}$/',$digest)) return $digest;
+    }
+    return null;
+}
+
 function projectSeedAgentTasks(string $id,array $tasks): void {
     $stmt=projectDb()->prepare('INSERT OR IGNORE INTO project_agent_tasks(session_id,task_key,title,role,dependencies,acceptance,updated_at) VALUES(?,?,?,?,?,?,?)');
     foreach($tasks as $task) $stmt->execute([$id,(string)$task['id'],(string)$task['title'],(string)$task['role'],json_encode($task['dependencies'],JSON_THROW_ON_ERROR),json_encode($task['acceptance'],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),time()]);
@@ -196,10 +204,13 @@ function projectSnapshot(array $session): array {
     $latestPreview=null;
     foreach($jobs as $candidate) if(preg_match('/^publish_preview(?:_[a-f0-9]{12})?$/',(string)$candidate['kind'])) { $latestPreview=$candidate; break; }
     $status['preview']=projectJobStatus($latestPreview,$status['qa']==='done' && $status['environment']==='done');
-    if($status['preview']==='done') $status['feedback']=!empty($case['previewSentAt'])?'waiting_client':'needs_you';
+    $latestPreviewResult=$latestPreview && $latestPreview['state']==='done'?json_decode((string)($latestPreview['result']??''),true):null;
+    $previewSent= is_array($latestPreviewResult) && ($case['previewSentDigest']??'')===($latestPreviewResult['imageDigest']??null);
+    if($status['preview']==='done') $status['feedback']=$previewSent?'waiting_client':'needs_you';
     $feedback=projectFeedback($id);
-    if($feedback) $status['feedback']=count(array_filter($feedback,static fn($entry)=>$entry['state']!=='resolved'))?'review':'done';
-    $status['release']=projectJobStatus($jobByKind['publish_production']??null,!empty($case['previewSentAt']));
+    $currentFeedback=array_values(array_filter($feedback,static fn($entry)=>is_array($latestPreviewResult) && $entry['image_digest']===($latestPreviewResult['imageDigest']??null)));
+    if($currentFeedback) $status['feedback']=count(array_filter($currentFeedback,static fn($entry)=>$entry['state']!=='resolved'))?'review':'done';
+    $status['release']=projectJobStatus($jobByKind['publish_production']??null,$previewSent);
     if($status['release']==='ready') $status['release']='needs_you';
     $status['handover']=!empty($case['handoverAt'])?'done':($status['release']==='done'?'needs_you':'locked');
     $name=trim((string)($session['projectState']['businessProblem']??''));

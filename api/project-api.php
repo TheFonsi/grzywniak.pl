@@ -147,12 +147,14 @@ try {
         $feedbackUrl=rtrim(projectSetting('PUBLIC_API_URL'),'/').'/project-feedback.php?project='.rawurlencode($id).'&token='.rawurlencode($token);
         $tokenSet=projectVpsRequest('POST',$control.'/v1/projects/feedback-token',['projectId'=>$id,'feedbackToken'=>$token,'feedbackUrl'=>$feedbackUrl],['Authorization: Bearer '.$controlToken,'Content-Type: application/json','Accept: application/json']);
         if($tokenSet['status']!==200 || ($tokenSet['body']['ready']??false)!==true) throw new DomainException('VPS nie zapisał bezpiecznej konfiguracji formularza uwag.');
+        $case['feedbackTokenHash']=hash('sha256',$token); $case['feedbackEnabledDigest']=$result['imageDigest']; $case['feedbackEnabledAt']=time(); projectSave($id,$case);
         $message="Dzień dobry,\n\nPodgląd projektu: ".$result['url']."\nLogin do podglądu: ".$previewUsername."\nHasło do podglądu: ".$previewPassword."\n\nNa stronie można kliknąć „Zgłoś uwagę”, zaznaczyć obszar i opisać zmianę. Formularz zapasowy: ".$feedbackUrl."\n\nPozdrawiamy,\nGrzywniak.pl";
-        $sender=getenv('MAIL_FROM')?:'kontakt@grzywniak.pl';
-        if(getenv('DISCOVERY_MAIL_MOCK')!=='true' && !@mail($email,'Podgląd projektu — Grzywniak.pl',$message,"From: Grzywniak.pl <{$sender}>\r\nContent-Type: text/plain; charset=UTF-8")) throw new DomainException('Serwer pocztowy nie przyjął wiadomości.');
-        $case['feedbackTokenHash']=hash('sha256',$token); $case['previewSentDigest']=$result['imageDigest']; $case['previewSentAt']=time();
+        $sender=getenv('MAIL_FROM')?:getenv('CONTACT_FROM')?:'dawid@grzywniak.pl';
+        $mailSent=getenv('DISCOVERY_MAIL_MOCK')==='true' || (filter_var($sender,FILTER_VALIDATE_EMAIL)!==false && @mail($email,'=?UTF-8?B?'.base64_encode('Podgląd projektu — Grzywniak.pl').'?=',$message,"From: Grzywniak.pl <{$sender}>\r\nReply-To: {$sender}\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8",'-f'.$sender));
+        if($mailSent) { $case['previewSentDigest']=$result['imageDigest']; $case['previewSentAt']=time(); $case['previewEmailStatus']='sent'; unset($case['previewEmailFailedAt']); }
+        else { $case['previewEmailStatus']='failed'; $case['previewEmailFailedAt']=time(); error_log('Project preview email was rejected for session '.$id.'; feedback form remains active.'); }
         projectSave($id,$case);
-        projectEvent($id,'preview','sent',$adminUser,'Wysłano klientowi podgląd obrazu '.$result['imageDigest'].'.');
+        projectEvent($id,$mailSent?'preview':'feedback',$mailSent?'sent':'enabled_email_failed',$adminUser,$mailSent?'Wysłano klientowi podgląd obrazu '.$result['imageDigest'].'.':'Formularz uwag aktywny dla obrazu '.$result['imageDigest'].', ale serwer nie przyjął e-maila.');
     } elseif($action==='resolve_feedback') {
         $feedbackId=filter_var($body['feedbackId']??null,FILTER_VALIDATE_INT);
         $resolution=trim((string)($body['resolution']??''));
