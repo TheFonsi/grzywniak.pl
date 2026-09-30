@@ -145,21 +145,30 @@ async function executeTask(task) {
     if (task.state !== 'running') return;
     const taskResult = { summary: result.summary.trim() };
     if (task.role === 'qa') {
+      const trustedImage = qaEvidence
+        && /^[a-f0-9]{40}$/.test(qaEvidence.commitSha || '')
+        && qaEvidence.validatePassed === true
+        && qaEvidence.publishPassed === true
+        && /^sha256:[a-f0-9]{64}$/.test(qaEvidence.imageDigest || '');
+      const qaPassed = result.qaPassed === true || (trustedImage
+        && Number.isInteger(result.appPort) && result.appPort > 0 && result.appPort <= 65535
+        && /^\/[A-Za-z0-9/_-]{1,100}$/.test(result.healthPath || ''));
       const qaIssues = [];
-      if (result.qaPassed !== true) qaIssues.push('agent nie potwierdził qaPassed=true');
+      if (!qaPassed) qaIssues.push('agent nie potwierdził qaPassed=true, a runner nie ma pełnego potwierdzenia CI i obrazu');
       if (!Number.isInteger(result.appPort) || result.appPort < 1 || result.appPort > 65535) qaIssues.push(`niepoprawny appPort: ${String(result.appPort)}`);
       if (!/^\/[A-Za-z0-9/_-]{1,100}$/.test(result.healthPath || '')) qaIssues.push(`niepoprawny healthPath: ${String(result.healthPath)}`);
       if (qaIssues.length) {
         const diagnostics = {
           summary: result.summary.trim(),
-          qaPassed: result.qaPassed === true,
+          qaPassed,
           appPort: Number.isInteger(result.appPort) ? result.appPort : null,
           healthPath: typeof result.healthPath === 'string' ? result.healthPath.slice(0, 120) : '',
+          runnerEvidence: qaEvidence,
         };
         await update(task, { state: 'failed', phase: 'finished', result: diagnostics, error: `QA nie spełniło bramki: ${qaIssues.join('; ')}.` });
         return;
       }
-      Object.assign(taskResult, { qaPassed: true, appPort: result.appPort, healthPath: result.healthPath });
+      Object.assign(taskResult, { qaPassed: true, appPort: result.appPort, healthPath: result.healthPath, ...(trustedImage ? { commitSha: qaEvidence.commitSha, imageDigest: qaEvidence.imageDigest } : {}) });
     }
     await update(task, { costPln, result: taskResult, phase: 'git' });
     if (costPln > task.maxCostPln) throw new Error('Przekroczono limit kosztu zadania; zmiany nie zostały wysłane.');
