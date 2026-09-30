@@ -3,6 +3,14 @@ import { mkdtemp, rm, realpath, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { strict as assert } from 'node:assert';
+import { settleUsage } from '../services/codex-runner/billing.mjs';
+
+const billingTask = { costPln: 0 };
+const billingRates = { input: 1, cached: 0.1, output: 2 };
+const usageEvent = JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 1_000_000, cached_input_tokens: 200_000, output_tokens: 150_000 } });
+await settleUsage(billingTask, async (task, changes) => Object.assign(task, changes), usageEvent, billingRates);
+try { throw new Error('Simulated QA validation failure after usage was recorded.'); } catch {}
+assert.equal(billingTask.costPln, 1.12, 'Zużycie pozostaje zapisane, gdy późniejsza walidacja zadania się nie powiedzie.');
 
 const root = await mkdtemp(join(tmpdir(), 'grzywniak-runner-test-'));
 const port = 32000 + Math.floor(Math.random() * 1000);

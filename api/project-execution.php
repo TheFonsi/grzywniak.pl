@@ -133,8 +133,11 @@ function projectPollAgentTask(): bool {
     if(!in_array($state,['done','failed'],true)) throw new RuntimeException('Runner zwrócił nieznany stan zadania.');
     $spent=$body['costPln']??null;
     if(!is_numeric($spent) || (float)$spent<0 || !is_finite((float)$spent) || (float)$spent>1000000) {
-        $db->prepare("UPDATE project_agent_tasks SET state='failed',error='Runner nie podał rozliczenia. Sprawdź koszt i zwolnij rezerwację ręcznie.',updated_at=? WHERE id=? AND state='running'")->execute([time(),$task['id']]);
-        projectEvent((string)$task['session_id'],projectTaskStage((string)$task['role']),'reconcile_needed','System','Brak poprawnego kosztu zadania '.$task['task_key'].'; rezerwacja pozostaje zablokowana.');
+        $knownCost=is_numeric($body['knownCostPln']??null)?max(0.0,(float)$body['knownCostPln']):null;
+        $message='Runner nie podał pełnego rozliczenia. Sprawdź rzeczywisty koszt przed zwolnieniem rezerwacji.';
+        if($knownCost!==null) $message.=' Znany koszt zakończonej części zadania: '.number_format($knownCost,2,'.','').' PLN; możliwy dodatkowy koszt review pozostał nieustalony.';
+        $db->prepare("UPDATE project_agent_tasks SET state='failed',error=?,updated_at=? WHERE id=? AND state='running'")->execute([$message,time(),$task['id']]);
+        projectEvent((string)$task['session_id'],projectTaskStage((string)$task['role']),'reconcile_needed','System','Brak pełnego rozliczenia zadania '.$task['task_key'].'; znana część='.($knownCost===null?'brak danych':number_format($knownCost,2,'.','').' PLN').'; rezerwacja pozostaje zablokowana.');
         return true;
     }
     $overspent=(float)$spent>(float)$task['reserved_pln']+0.0001;

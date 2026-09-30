@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process';
 import { chmod, mkdir, readFile, writeFile, rename, unlink, realpath, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { timingSafeEqual } from 'node:crypto';
+import { settleUsage } from './billing.mjs';
 
 const workRoot = resolve(process.env.RUNNER_WORK_DIR || '/var/lib/grzywniak-runner');
 const stateFile = join(workRoot, 'tasks.json');
@@ -57,10 +58,6 @@ const githubRequestAs = async (credential, method, path, body) => {
 };
 const githubRequest = async (method, path, body) => githubRequestAs(await ghToken(), method, path, body);
 const reviewToken = async () => (await readFile(reviewTokenFile, 'utf8')).trim();
-const costFromUsage = (usage) => {
-  const input = Number(usage?.input_tokens || 0), cached = Number(usage?.cached_input_tokens || 0), output = Number(usage?.output_tokens || 0);
-  return Math.round(((Math.max(0, input - cached) * rates.input + cached * rates.cached + output * rates.output) / 1_000_000) * 100) / 100;
-};
 const codexEnvironment = async () => {
   const result = { PATH: process.env.PATH || '/usr/local/bin:/usr/bin:/bin', HOME: process.env.RUNNER_CODEX_HOME || '/home/codex', CODEX_HOME: process.env.RUNNER_CODEX_HOME || '/home/codex', LANG: 'C.UTF-8', TMPDIR: '/tmp' };
   if (openaiApiKeyFile) {
@@ -73,8 +70,6 @@ const codexEnvironment = async () => {
 const schema = { type: 'object', additionalProperties: false, required: ['summary', 'qaPassed', 'appPort', 'healthPath'], properties: { summary: { type: 'string' }, qaPassed: { type: 'boolean' }, appPort: { type: 'integer' }, healthPath: { type: 'string' } } };
 const reviewSchema = { type: 'object', additionalProperties: false, required: ['approved', 'summary'], properties: { approved: { type: 'boolean' }, summary: { type: 'string' } } };
 const update = async (task, changes) => { Object.assign(task, changes, { updatedAt: Date.now() }); await persist(); };
-const usageFromJsonl = (text) => { let usage = null; for (const line of text.split(/\r?\n/)) { try { const event = JSON.parse(line); if (event.type === 'turn.completed' && event.usage) usage = event.usage; } catch {} } if (!usage) throw new Error('Codex nie zwrócił danych zużycia; koszt wymaga ręcznego rozliczenia.'); return usage; };
-
 async function reviewPullRequest(task, directory, pr, branch) {
   if (!reviewTokenFile) return false;
   const reviewer = await reviewToken();
@@ -96,9 +91,9 @@ async function reviewPullRequest(task, directory, pr, branch) {
   finally { active.delete(task.id); await unlink(resultPath).catch(() => {}); await run('chown', ['-R', '0:0', directory], { env: safeGitEnv() }); }
   const statusAfter = await run('git', ['status', '--porcelain=v1', '--untracked-files=all'], { cwd: directory, env: safeGitEnv() });
   if (statusAfter.stdout !== statusBefore.stdout) throw new Error('Przegląd zmienił katalog roboczy; zmiany nie zostaną zaakceptowane.');
-  const cost = costFromUsage(usageFromJsonl(reviewRun.stdout));
+  await settleUsage(task, update, reviewRun.stdout, rates);
+  await update(task, { reviewCostSettled: true });
   const verdict = JSON.parse(reviewText);
-  await update(task, { costPln: (task.costPln || 0) + cost });
   if (task.costPln > task.maxCostPln) throw new Error('Przegląd przekroczył limit kosztu zadania.');
   if (typeof verdict.approved !== 'boolean' || typeof verdict.summary !== 'string' || verdict.summary.trim().length < 10) throw new Error('Agent przeglądu nie podał poprawnego werdyktu.');
   const path = `/repos/${encodeURIComponent(githubOrg)}/${encodeURIComponent(repositoryName(task.repository))}/pulls/${pr.number}/reviews`;
@@ -126,7 +121,7 @@ async function executeTask(task) {
     const cli = await run(codexBin, ['exec', '--json', '--ephemeral', '--approve-for-me', '--output-schema', schemaPath, '-o', resultPath, '-C', directory, prompt], { cwd: directory, env: await codexEnvironment(), uid: codexUid, gid: codexGid, timeoutMs: task.timeoutMinutes * 60000, onChild: (child) => active.set(task.id, child) });
     active.delete(task.id);
     await run('chown', ['-R', '0:0', directory], { env: safeGitEnv() });
-    const costPln = costFromUsage(usageFromJsonl(cli.stdout));
+    const costPln = await settleUsage(task, update, cli.stdout, rates);
     const result = JSON.parse(await readFile(resultPath, 'utf8'));
     await unlink(resultPath);
     if (typeof result.summary !== 'string' || result.summary.trim().length < 5) throw new Error('Codex nie podał poprawnego podsumowania.');
@@ -162,7 +157,15 @@ async function executeTask(task) {
     await update(task, { state: 'done', phase: 'finished', result: taskResult });
   } catch (error) {
     active.delete(task.id);
-    if (task.state === 'running') await update(task, { state: 'failed', phase: 'finished', costPln: task.phase === 'reviewing' ? null : task.costPln, error: error instanceof Error ? error.message.slice(0, 500) : 'Nieznany błąd runnera.' });
+    if (task.state === 'running') {
+      const reviewCostIncomplete = task.phase === 'reviewing' && task.reviewCostSettled !== true;
+      await update(task, {
+        state: 'failed',
+        phase: 'finished',
+        ...(reviewCostIncomplete ? { costPln: null, knownCostPln: Number(task.costPln) || 0 } : {}),
+        error: error instanceof Error ? error.message.slice(0, 500) : 'Nieznany błąd runnera.',
+      });
+    }
   }
 }
 
@@ -259,7 +262,14 @@ if (reviewTokenFile) {
 await writeFile(join(workRoot, 'askpass.sh'), '#!/bin/sh\ncase "$1" in *Username*) printf "%s\\n" "$GH_PUSH_USER" ;; *Password*) printf "%s\\n" "$GH_PUSH_TOKEN" ;; esac\n', { mode: 0o700 });
 await writeFile(join(workRoot, 'result-schema.json'), JSON.stringify(schema), { mode: 0o644 });
 await writeFile(join(workRoot, 'review-schema.json'), JSON.stringify(reviewSchema), { mode: 0o644 });
-for (const task of Object.values(tasks)) if (task.state === 'running' && !['waiting_merge', 'waiting_image'].includes(task.phase)) { task.state = 'failed'; task.error = 'Runner uruchomiono ponownie podczas pracy; sprawdź wynik przed ponowieniem.'; }
+for (const task of Object.values(tasks)) if (task.state === 'running' && !['waiting_merge', 'waiting_image'].includes(task.phase)) {
+  if (task.phase === 'reviewing' && task.reviewCostSettled !== true) {
+    task.knownCostPln = Number(task.costPln) || 0;
+    task.costPln = null;
+  }
+  task.state = 'failed';
+  task.error = 'Runner uruchomiono ponownie podczas pracy; sprawdź wynik i rozliczenie przed ponowieniem.';
+}
 await persist();
 
 createServer(async (req, res) => {
@@ -281,7 +291,7 @@ createServer(async (req, res) => {
     if (route) {
       const task = tasks[route[1]];
       if (!task) return reply(res, 404, { message: 'Nie znaleziono zadania.' });
-      if (req.method === 'GET' && !route[2]) return reply(res, 200, { id: task.id, state: task.state, costPln: task.state === 'done' || task.state === 'failed' ? task.costPln : undefined, result: task.result, error: task.error, phase: task.phase });
+      if (req.method === 'GET' && !route[2]) return reply(res, 200, { id: task.id, state: task.state, costPln: task.state === 'done' || task.state === 'failed' ? task.costPln : undefined, knownCostPln: task.knownCostPln, result: task.result, error: task.error, phase: task.phase });
       if (req.method === 'POST' && route[2]) {
         active.get(task.id)?.kill('SIGTERM');
         await update(task, { state: 'failed', phase: 'finished', costPln: task.state === 'queued' ? 0 : task.costPln, error: 'Zadanie anulowano.' });

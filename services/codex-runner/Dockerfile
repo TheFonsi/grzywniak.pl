@@ -8,7 +8,7 @@ RUN apt-get update \
     && npm install --global @openai/codex
 
 WORKDIR /srv/codex-runner
-COPY server.mjs ./server.mjs
+COPY server.mjs billing.mjs ./
 
 EXPOSE 3020
 CMD ["node", "server.mjs"]
