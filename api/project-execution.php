@@ -17,6 +17,7 @@ function projectRunnerQaResultIsValid(mixed $result): bool {
         && (int)($result['appPort']??0)>0 && (int)($result['appPort']??0)<=65535
         && preg_match('~^/[A-Za-z0-9/_-]{1,100}$~',(string)($result['healthPath']??''))===1
         && preg_match('/^[a-f0-9]{40}$/',(string)($result['commitSha']??''))===1
+        && ($result['imageCommitSha']??null)===($result['commitSha']??null)
         && preg_match('/^sha256:[a-f0-9]{64}$/',(string)($result['imageDigest']??''))===1
         && trim((string)($result['summary']??''))!=='';
 }

@@ -201,7 +201,7 @@ async function executeTask(task) {
     if (['architect', 'ux', 'ui', 'frontend', 'backend', 'integration', 'documentation'].includes(task.role)) throw new Error('Zadanie nie wytworzyło plików ani pull requestu.');
     if (task.role === 'qa') {
       const sha = (await run('git', ['rev-parse', 'HEAD'], { cwd: directory, env: safeGitEnv() })).stdout.trim();
-      await update(task, { phase: 'waiting_image', result: { ...taskResult, commitSha: sha } });
+      await update(task, { phase: 'waiting_image', result: { ...taskResult, commitSha: sha, imageCommitSha: sha } });
       return;
     }
     await update(task, { state: 'done', phase: 'finished', result: taskResult });
@@ -224,7 +224,7 @@ async function pollExternal(task) {
   if (task.phase === 'waiting_merge' || task.phase === 'waiting_merge_auto') {
     const pr = await githubRequest('GET', `/repos/${encodeURIComponent(githubOrg)}/${encodeURIComponent(name)}/pulls/${task.pullRequestNumber}`);
     if (pr.merged === true) {
-      const result = { ...task.result, commitSha: pr.merge_commit_sha };
+      const result = { ...task.result, commitSha: pr.merge_commit_sha, imageCommitSha: null, imageDigest: null };
       if (task.role === 'qa') await update(task, { phase: 'waiting_image', result });
       else await update(task, { state: 'done', phase: 'finished', result });
     } else if (pr.state === 'closed') await update(task, { state: 'failed', phase: 'finished', error: 'Pull request zamknięto bez połączenia.' });
@@ -238,7 +238,10 @@ async function pollExternal(task) {
     else if (task.phase === 'waiting_merge_auto' && task.result?.reviewApproved === true) {
       if (await workflowJobSucceeded(await reviewToken(), name, pr.head.sha, 'validate', 'pull_request')) {
         const merged = await githubRequestAs(await reviewToken(), 'PUT', `/repos/${encodeURIComponent(githubOrg)}/${encodeURIComponent(name)}/pulls/${task.pullRequestNumber}/merge`, { sha: pr.head.sha, merge_method: 'squash' });
-        if (merged.merged === true && /^[a-f0-9]{40}$/.test(merged.sha || '')) await update(task, { state: 'done', phase: 'finished', result: { ...task.result, commitSha: merged.sha } });
+        if (merged.merged === true && /^[a-f0-9]{40}$/.test(merged.sha || '')) {
+          if (task.role === 'qa') await update(task, { phase: 'waiting_image', result: { ...task.result, commitSha: merged.sha, imageCommitSha: null, imageDigest: null } });
+          else await update(task, { state: 'done', phase: 'finished', result: { ...task.result, commitSha: merged.sha } });
+        }
       }
     }
   }
@@ -247,7 +250,7 @@ async function pollExternal(task) {
     if (!/^[a-f0-9]{40}$/.test(sha || '')) throw new Error('Brak commita QA.');
     if (!(await workflowJobSucceeded(await reviewToken(), name, sha, 'publish', 'push'))) return;
     const digest = await registryDigest(name, sha);
-    await update(task, { state: 'done', phase: 'finished', result: { ...task.result, imageDigest: digest } });
+    await update(task, { state: 'done', phase: 'finished', result: { ...task.result, imageCommitSha: sha, imageDigest: digest } });
   }
 }
 

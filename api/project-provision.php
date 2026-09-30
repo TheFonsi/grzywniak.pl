@@ -45,9 +45,10 @@ function deploymentEvidence(array $tasks): array {
     $result=$qa[count($qa)-1]['result']??[];
     $sha=(string)($result['commitSha']??'');
     $digest=(string)($result['imageDigest']??'');
+    $imageSha=(string)($result['imageCommitSha']??'');
     $port=filter_var($result['appPort']??null,FILTER_VALIDATE_INT);
     $healthPath=(string)($result['healthPath']??'');
-    if(!preg_match('/^[a-f0-9]{40}$/',$sha) || !preg_match('/^sha256:[a-f0-9]{64}$/',$digest) || ($result['qaPassed']??false)!==true || !$port || $port>65535 || !preg_match('~^/[a-zA-Z0-9/_-]{1,100}$~',$healthPath)) throw new RuntimeException('QA musi potwierdzić commit, obraz, port, ścieżkę zdrowia i wynik kontroli.');
+    if(!preg_match('/^[a-f0-9]{40}$/',$sha) || $imageSha!==$sha || !preg_match('/^sha256:[a-f0-9]{64}$/',$digest) || ($result['qaPassed']??false)!==true || !$port || $port>65535 || !preg_match('~^/[a-zA-Z0-9/_-]{1,100}$~',$healthPath)) throw new RuntimeException('QA musi potwierdzić obraz zbudowany dla tego samego commita, port, ścieżkę zdrowia i wynik kontroli.');
     return ['commitSha'=>$sha,'imageDigest'=>$digest,'appPort'=>$port,'healthPath'=>$healthPath];
 }
 

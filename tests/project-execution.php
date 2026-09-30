@@ -21,15 +21,17 @@ $db->exec("INSERT INTO project_ai_calls VALUES('job:1:1','a','generate_plan','se
 [$project,$monthly]=projectTaskTotals($db,'a');
 if($project!==17.0 || $monthly!==28.0) throw new RuntimeException('Niepoprawne rozliczenie projektu lub miesiąca.');
 $sha=str_repeat('a',40); $digest='sha256:'.str_repeat('b',64);
-$verifiedQa=['summary'=>'QA PASS','qaPassed'=>true,'appPort'=>8080,'healthPath'=>'/health','commitSha'=>$sha,'imageDigest'=>$digest];
+$verifiedQa=['summary'=>'QA PASS','qaPassed'=>true,'appPort'=>8080,'healthPath'=>'/health','commitSha'=>$sha,'imageCommitSha'=>$sha,'imageDigest'=>$digest];
 if(!projectRunnerQaResultIsValid($verifiedQa)) throw new RuntimeException('Poprawny wynik QA runnera nie przeszedł synchronizacji.');
 if(projectRunnerQaResultIsValid(array_merge($verifiedQa,['imageDigest'=>null]))) throw new RuntimeException('Wynik QA bez digestu obrazu nie powinien zostać zsynchronizowany.');
 $accountingTask=['runner_id'=>'d036a6fbdef7324f0ebbf9fd8da6d1b9:runtime-hardening:4-code-unreported','reserved_pln'=>0];
 if(projectTaskAffectsStageStatus($accountingTask)) throw new RuntimeException('Rozliczona próba księgowa nadal blokuje status etapu.');
 $accountingTask['reserved_pln']=9.96;
 if(!projectTaskAffectsStageStatus($accountingTask)) throw new RuntimeException('Nierozliczona rezerwacja księgowa nie blokuje etapu.');
-$evidence=deploymentEvidence([['role'=>'qa','state'=>'done','result'=>['summary'=>'OK','qaPassed'=>true,'commitSha'=>$sha,'imageDigest'=>$digest,'appPort'=>8080,'healthPath'=>'/healthz']]]);
+$evidence=deploymentEvidence([['role'=>'qa','state'=>'done','result'=>['summary'=>'OK','qaPassed'=>true,'commitSha'=>$sha,'imageCommitSha'=>$sha,'imageDigest'=>$digest,'appPort'=>8080,'healthPath'=>'/healthz']]]);
 if($evidence['commitSha']!==$sha || $evidence['imageDigest']!==$digest) throw new RuntimeException('Niepoprawna wersja wdrożenia.');
 try { deploymentEvidence([['role'=>'qa','state'=>'done','result'=>['summary'=>'OK','qaPassed'=>false,'commitSha'=>$sha,'imageDigest'=>$digest,'appPort'=>8080,'healthPath'=>'/healthz']]]); throw new RuntimeException('QA bez akceptacji przeszło bramkę.'); }
 catch(RuntimeException $error) { if($error->getMessage()==='QA bez akceptacji przeszło bramkę.') throw $error; }
+try { deploymentEvidence([['role'=>'qa','state'=>'done','result'=>['summary'=>'OK','qaPassed'=>true,'commitSha'=>$sha,'imageCommitSha'=>str_repeat('c',40),'imageDigest'=>$digest,'appPort'=>8080,'healthPath'=>'/healthz']]]); throw new RuntimeException('Image from a different commit passed the gate.'); }
+catch(RuntimeException $error) { if($error->getMessage()==='Image from a different commit passed the gate.') throw $error; }
 echo "Project execution gates OK\n";
