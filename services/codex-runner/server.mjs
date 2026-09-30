@@ -110,7 +110,7 @@ async function executeTask(task) {
   const branch = `agent/${match[2]}-${match[3]}`;
   try {
     await update(task, { state: 'running', phase: 'clone' });
-    await run('git', ['clone', '--depth', '1', `${task.repository}.git`, directory], { env: await gitEnv() });
+    await run('git', ['clone', '--depth', '50', `${task.repository}.git`, directory], { env: await gitEnv() });
     await run('git', ['switch', '-c', branch], { cwd: directory, env: safeGitEnv() });
     const initialGitConfig = await readFile(join(directory, '.git', 'config'), 'utf8');
     await run('chown', ['-R', `${codexUid}:${codexGid}`, directory], { env: safeGitEnv() });
@@ -277,7 +277,7 @@ async function registryDigest(name, sha) {
 async function trustedQaEvidence(name, directory) {
   const evidence = { commitSha: '', validatePassed: false, publishPassed: false, imageDigest: null };
   try {
-    const sha = (await run('git', ['rev-parse', 'HEAD'], { cwd: directory, env: safeGitEnv() })).stdout.trim();
+    const sha = (await run('git', ['-c', `safe.directory=${directory}`, 'rev-parse', 'HEAD'], { cwd: directory, env: safeGitEnv() })).stdout.trim();
     if (!/^[a-f0-9]{40}$/.test(sha)) return evidence;
     evidence.commitSha = sha;
     const reviewer = await reviewToken();
