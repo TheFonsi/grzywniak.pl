@@ -28,13 +28,13 @@ if(!$session || ($session['status']??'')!=='COMPLETED') projectReply(['message'=
 if($_SERVER['REQUEST_METHOD']==='GET') {
     $case=projectCase($id);
     $snapshot=projectSnapshot($session);
-    foreach(projectJobs($id) as $candidate) if($candidate['kind']==='provision_preview' && $candidate['state']==='done') {
+    if(!empty($case['previewPasswordEncrypted'])) $snapshot['previewAccess']=['password'=>projectDecryptSecret((string)$case['previewPasswordEncrypted']),'username'=>(string)($case['previewUsername']??projectPreviewUsernameOrLegacy($session))];
+    foreach(projectJobs($id) as $candidate) if(empty($snapshot['previewAccess']['password']) && $candidate['kind']==='provision_preview' && $candidate['state']==='done') {
         $environment=json_decode((string)$candidate['result'],true)?:[];
         $stored=(string)($environment['previewPasswordEncrypted']??$environment['previewPassword']??'');
-        if($stored!=='') $snapshot['previewAccess']=['password'=>str_starts_with($stored,'enc:')?projectDecryptSecret($stored):$stored,'username'=>'client'];
+        if($stored!=='') $snapshot['previewAccess']=['password'=>str_starts_with($stored,'enc:')?projectDecryptSecret($stored):$stored,'username'=>(string)($environment['previewUsername']??$case['previewUsername']??projectPreviewUsernameOrLegacy($session))];
         break;
     }
-    if(empty($snapshot['previewAccess']['password']) && !empty($case['previewPasswordEncrypted'])) $snapshot['previewAccess']=['password'=>projectDecryptSecret((string)$case['previewPasswordEncrypted']),'username'=>'client'];
     projectReply(['project'=>$snapshot,'csrf'=>$projectCsrf,'defaults'=>['costLimitPln'=>projectSetting('PROJECT_DEFAULT_COST_LIMIT_PLN')]]);
 }
 if($_SERVER['REQUEST_METHOD']!=='POST') projectReply(['message'=>'Niedozwolona metoda.'],405);
@@ -110,10 +110,12 @@ try {
         $hostname=(string)($result['hostname']??''); if($hostname==='' && !empty($result['url'])) $hostname=(string)(parse_url((string)$result['url'],PHP_URL_HOST)?:'');
         $base=strtolower(trim(projectSetting('PREVIEW_BASE_DOMAIN')));
         if($hostname!=='p-'.substr($id,0,12).'.'.$base || empty($repository['url'])) throw new DomainException('Nie można zweryfikować hosta i repozytorium podglądu.');
-        $control=rtrim(trim(projectSetting('VPS_CONTROL_URL')),'/'); $controlToken=trim(projectSetting('VPS_CONTROL_TOKEN')); $password=bin2hex(random_bytes(16));
-        $provision=projectVpsRequest('POST',$control.'/v1/projects',['projectId'=>$id,'hostname'=>$hostname,'repository'=>(string)$repository['url'],'kind'=>'preview','previewPassword'=>$password,'limitPln'=>(float)($case['budgetPln']??0)],['Authorization: Bearer '.$controlToken,'Idempotency-Key: '.$id.':preview','Content-Type: application/json','Accept: application/json']);
+        $control=rtrim(trim(projectSetting('VPS_CONTROL_URL')),'/'); $controlToken=trim(projectSetting('VPS_CONTROL_TOKEN')); $password=bin2hex(random_bytes(16)); $username=projectPreviewUsername($session);
+        $provision=projectVpsRequest('POST',$control.'/v1/projects',['projectId'=>$id,'hostname'=>$hostname,'repository'=>(string)$repository['url'],'kind'=>'preview','previewUsername'=>$username,'previewPassword'=>$password,'limitPln'=>(float)($case['budgetPln']??0)],['Authorization: Bearer '.$controlToken,'Idempotency-Key: '.$id.':preview','Content-Type: application/json','Accept: application/json']);
         if(!in_array($provision['status'],[200,201],true) || ($provision['body']['ready']??false)!==true || ($provision['body']['hostname']??'')!==$hostname) throw new DomainException('VPS nie potwierdził zabezpieczenia podglądu hasłem.');
-        $case['previewPasswordEncrypted']=projectEncryptSecret($password); projectSave($id,$case);
+        $case['previewPasswordEncrypted']=projectEncryptSecret($password); $case['previewUsername']=$username; projectSave($id,$case);
+        $environmentJob=$db->prepare("SELECT id,result FROM project_jobs WHERE session_id=? AND kind='provision_preview' AND state='done'"); $environmentJob->execute([$id]);
+        if($storedEnvironment=$environmentJob->fetch(PDO::FETCH_ASSOC)) { $storedResult=json_decode((string)$storedEnvironment['result'],true)?:[]; $storedResult['previewPasswordEncrypted']=$case['previewPasswordEncrypted']; $storedResult['previewUsername']=$username; $db->prepare('UPDATE project_jobs SET result=?,updated_at=? WHERE id=?')->execute([json_encode($storedResult,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),time(),$storedEnvironment['id']]); }
         projectEvent($id,'preview','password_set',$adminUser,'Ustawiono unikalne hasło dostępu do podglądu.');
     } elseif($action==='send_preview') {
         $preview=projectLatestPreviewJob($id);
@@ -133,17 +135,19 @@ try {
         if(!preg_match('/^[a-f0-9]{32}$/',$id) || $hostname!=='p-'.substr($id,0,12).'.'.$base || empty($repository['url'])) throw new DomainException('Nie można zweryfikować środowiska podglądu i repozytorium.');
         $control=rtrim(trim(projectSetting('VPS_CONTROL_URL')),'/'); $controlToken=trim(projectSetting('VPS_CONTROL_TOKEN'));
         if(!str_starts_with($control,'https://') || strlen($controlToken)<32) throw new DomainException('Brak bezpiecznej konfiguracji API VPS.');
-        $previewPassword=(string)($environment['previewPasswordEncrypted']??$environment['previewPassword']??$case['previewPasswordEncrypted']??'');
+        $previewPassword=(string)($case['previewPasswordEncrypted']??$environment['previewPasswordEncrypted']??$environment['previewPassword']??'');
         if(str_starts_with($previewPassword,'enc:')) $previewPassword=projectDecryptSecret($previewPassword);
         if(strlen($previewPassword)<16) $previewPassword=bin2hex(random_bytes(16));
+        $previewUsername=projectPreviewUsername($session);
         $case['previewPasswordEncrypted']=projectEncryptSecret($previewPassword);
-        $provision=projectVpsRequest('POST',$control.'/v1/projects',['projectId'=>$id,'hostname'=>$hostname,'repository'=>(string)$repository['url'],'kind'=>'preview','previewPassword'=>$previewPassword,'limitPln'=>(float)($case['budgetPln']??0)],['Authorization: Bearer '.$controlToken,'Idempotency-Key: '.$id.':preview','Content-Type: application/json','Accept: application/json']);
+        $case['previewUsername']=$previewUsername;
+        $provision=projectVpsRequest('POST',$control.'/v1/projects',['projectId'=>$id,'hostname'=>$hostname,'repository'=>(string)$repository['url'],'kind'=>'preview','previewUsername'=>$previewUsername,'previewPassword'=>$previewPassword,'limitPln'=>(float)($case['budgetPln']??0)],['Authorization: Bearer '.$controlToken,'Idempotency-Key: '.$id.':preview','Content-Type: application/json','Accept: application/json']);
         if(!in_array($provision['status'],[200,201],true) || ($provision['body']['ready']??false)!==true || ($provision['body']['hostname']??'')!==$hostname) throw new DomainException('VPS nie potwierdził zabezpieczenia podglądu hasłem.');
         $token=bin2hex(random_bytes(24));
         $feedbackUrl=rtrim(projectSetting('PUBLIC_API_URL'),'/').'/project-feedback.php?project='.rawurlencode($id).'&token='.rawurlencode($token);
         $tokenSet=projectVpsRequest('POST',$control.'/v1/projects/feedback-token',['projectId'=>$id,'feedbackToken'=>$token,'feedbackUrl'=>$feedbackUrl],['Authorization: Bearer '.$controlToken,'Content-Type: application/json','Accept: application/json']);
         if($tokenSet['status']!==200 || ($tokenSet['body']['ready']??false)!==true) throw new DomainException('VPS nie zapisał bezpiecznej konfiguracji formularza uwag.');
-        $message="Dzień dobry,\n\nPodgląd projektu: ".$result['url']."\nLogin do podglądu: client\nHasło do podglądu: ".$previewPassword."\n\nNa stronie można kliknąć „Zgłoś uwagę”, zaznaczyć obszar i opisać zmianę. Formularz zapasowy: ".$feedbackUrl."\n\nPozdrawiamy,\nGrzywniak.pl";
+        $message="Dzień dobry,\n\nPodgląd projektu: ".$result['url']."\nLogin do podglądu: ".$previewUsername."\nHasło do podglądu: ".$previewPassword."\n\nNa stronie można kliknąć „Zgłoś uwagę”, zaznaczyć obszar i opisać zmianę. Formularz zapasowy: ".$feedbackUrl."\n\nPozdrawiamy,\nGrzywniak.pl";
         $sender=getenv('MAIL_FROM')?:'kontakt@grzywniak.pl';
         if(getenv('DISCOVERY_MAIL_MOCK')!=='true' && !@mail($email,'Podgląd projektu — Grzywniak.pl',$message,"From: Grzywniak.pl <{$sender}>\r\nContent-Type: text/plain; charset=UTF-8")) throw new DomainException('Serwer pocztowy nie przyjął wiadomości.');
         $case['feedbackTokenHash']=hash('sha256',$token); $case['previewSentDigest']=$result['imageDigest']; $case['previewSentAt']=time();

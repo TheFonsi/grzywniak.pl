@@ -50,6 +50,27 @@ function projectCase(string $id): array {
     return is_array($data) ? $data : [];
 }
 
+function projectContactLogin(array $state): ?string {
+    $email=trim((string)($state['contactEmail']??''));
+    if($email!=='' && filter_var($email,FILTER_VALIDATE_EMAIL)) return $email;
+    $phone=trim((string)($state['contactPhone']??''));
+    $digits=preg_replace('/\D+/','',$phone)??'';
+    if(strlen($digits)>=7 && strlen($digits)<=15 && preg_match('/^[+0-9(). -]+$/',$phone)) return $phone;
+    return null;
+}
+
+function projectPreviewUsername(array $session): string {
+    $state=is_array($session['projectState']??null)?$session['projectState']:[];
+    $login=projectContactLogin($state);
+    if($login!==null) return $login;
+    throw new DomainException('W briefie zapisz poprawny e-mail lub numer telefonu klienta przed zabezpieczeniem podglądu.');
+}
+
+function projectPreviewUsernameOrLegacy(array $session): string {
+    try { return projectPreviewUsername($session); }
+    catch (DomainException) { return 'client'; }
+}
+
 function projectSave(string $id, array $data): void {
     $stmt = projectDb()->prepare('INSERT INTO project_cases(session_id,data,updated_at) VALUES(?,?,?) ON CONFLICT(session_id) DO UPDATE SET data=excluded.data,updated_at=excluded.updated_at');
     $stmt->execute([$id,json_encode($data,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),time()]);

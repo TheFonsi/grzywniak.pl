@@ -144,7 +144,7 @@ createServer(async (request, response) => {
     const url = new URL(request.url || '/', 'http://localhost');
     if (request.method === 'GET' && url.pathname === '/internal/preview-auth') {
       if (url.searchParams.get('key') !== token) return json(response, 404, { message: 'Nie znaleziono zasobu.' });
-      const hostname = String(request.headers['x-forwarded-host'] || '').split(',')[0].trim().toLowerCase();
+      const hostname = String(request.headers['x-forwarded-host'] || '').split(',')[0].trim().replace(/:\d+$/, '').toLowerCase();
       const project = Object.values(state.projects).find((item) => item.kind === 'preview' && item.hostname === hostname);
       if (!project) return json(response, 404, { message: 'Nie znaleziono podglądu.' });
       if (previewPasswordMatches(project, request.headers.authorization || '')) { response.writeHead(200, { 'cache-control': 'no-store' }); return response.end(); }
@@ -168,13 +168,13 @@ createServer(async (request, response) => {
     if (request.method === 'POST' && url.pathname === '/v1/projects') {
       const body = await readBody(request);
       if (!idPattern.test(body.projectId) || !validKind(body.kind) || body.hostname !== expectedHostname(body.projectId, body.kind) || !repositoryName(body.repository) || request.headers['idempotency-key'] !== `${body.projectId}:${body.kind}`) return json(response, 400, { message: 'Niepoprawna konfiguracja projektu.' });
-      if (body.kind === 'preview' && (typeof body.previewPassword !== 'string' || body.previewPassword.length < 16 || body.previewPassword.length > 128)) return json(response, 400, { message: 'Podgląd wymaga unikalnego hasła o długości 16–128 znaków.' });
+      if (body.kind === 'preview' && (typeof body.previewPassword !== 'string' || body.previewPassword.length < 16 || body.previewPassword.length > 128 || typeof body.previewUsername !== 'string' || body.previewUsername.length < 3 || body.previewUsername.length > 254 || /[:\u0000-\u001f\u007f]/.test(body.previewUsername))) return json(response, 400, { message: 'Podgląd wymaga loginu klienta i unikalnego hasła.' });
       const project = await serialized(async () => {
         const key = `${body.projectId}:${body.kind}`;
         const existing = state.projects[key];
         if (existing && (existing.hostname !== body.hostname || existing.repository !== body.repository)) throw new Error('Zasób jest przypisany do innego projektu.');
         const value = existing || { projectId: body.projectId, kind: body.kind, hostname: body.hostname, repository: body.repository, current: null, previous: null };
-        if (body.kind === 'preview') { value.previewAuthUser = 'client'; Object.assign(value, previewPasswordHash(body.previewPassword)); }
+        if (body.kind === 'preview') { value.previewAuthUser = body.previewUsername; Object.assign(value, previewPasswordHash(body.previewPassword)); }
         state.projects[key] = value;
         await writeRoute(value); await save();
         return value;

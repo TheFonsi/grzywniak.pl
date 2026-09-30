@@ -4,6 +4,10 @@ if(PHP_SAPI!=='cli') { http_response_code(404); exit; }
 require_once __DIR__.'/../api/project-execution.php';
 require_once __DIR__.'/../api/project-provision.php';
 
+if(projectPreviewUsername(['projectState'=>['contactName'=>'Test','contactEmail'=>'dawid@example.com']])!=='dawid@example.com') throw new RuntimeException('Login do podglądu powinien użyć e-maila klienta.');
+if(projectPreviewUsername(['projectState'=>['contactName'=>'Test','contactPhone'=>'+48 600 700 800']])!=='+48 600 700 800') throw new RuntimeException('Login do podglądu powinien przyjąć numer telefonu, gdy brak e-maila.');
+if(projectContactLogin(['contactEmail'=>'invalid','contactPhone'=>'123'])!==null) throw new RuntimeException('Niepoprawny e-mail i zbyt krótki telefon nie mogą zamknąć briefu.');
+
 $executionSource=(string)file_get_contents(__DIR__.'/../api/project-execution.php');
 if(str_contains($executionSource,'->commit()') || str_contains($executionSource,'->rollBack()')) throw new RuntimeException('BEGIN IMMEDIATE musi być kończony przez SQL COMMIT lub ROLLBACK.');
 
