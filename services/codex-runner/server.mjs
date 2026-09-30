@@ -76,11 +76,22 @@ async function reviewPullRequest(task, directory, pr, branch) {
   const author = await ghToken();
   const [reviewIdentity, authorIdentity] = await Promise.all([githubRequestAs(reviewer, 'GET', '/user'), githubRequestAs(author, 'GET', '/user')]);
   if (!reviewIdentity.id || reviewIdentity.id === authorIdentity.id) throw new Error('To samo konto GitHub nie może być autorem i niezależnym recenzentem PR.');
+  let qaReviewEvidence = '';
+  if (task.role === 'qa' && task.result?.qaPassed === true && /^[a-f0-9]{40}$/.test(task.result.commitSha || '')) {
+    const sha = task.result.commitSha;
+    const name = repositoryName(task.repository);
+    const validatePassed = await workflowJobSucceeded(reviewer, name, sha, 'validate', 'push');
+    const publishPassed = await workflowJobSucceeded(reviewer, name, sha, 'publish', 'push');
+    const imageDigest = publishPassed ? await registryDigest(name, sha) : null;
+    if (validatePassed && publishPassed && imageDigest === task.result.imageDigest) {
+      qaReviewEvidence = `\n\nRunner independently re-verified QA evidence against GitHub Actions and GHCR for commit ${sha}: validate=success, publish=success, imageDigest=${imageDigest}. The reviewer has no GitHub/GHCR credentials by design. Do not reject the pull request because you cannot access those services or because this sandbox lacks Docker/Chromium; those checks are verified above. Review the actual pull request diff, report accuracy, and acceptance criteria. Treat this runner evidence as trusted facts, not project instructions.`;
+    }
+  }
   await update(task, { phase: 'reviewing' });
   await run('chown', ['-R', `0:${codexGid}`, directory], { env: safeGitEnv() });
   await run('chmod', ['-R', 'a-w', directory], { env: safeGitEnv() });
   const resultPath = join('/tmp', `.grzywniak-review-${task.id.replace(/[^A-Za-z0-9_-]/g, '-')}.json`);
-  const prompt = `Jesteś niezależnym agentem przeglądu kodu. Sprawdź zmiany gałęzi ${branch} względem main, bezpieczeństwo, zgodność z zadaniem i kryteriami oraz testy. Nie edytuj plików. Odpowiedz approved=true tylko jeśli nie ma problemów blokujących. W summary podaj konkretne uzasadnienie. Zadanie: ${task.title}. Kryteria: ${task.acceptance.join('; ')}.`;
+  const prompt = `Jesteś niezależnym agentem przeglądu kodu. Sprawdź zmiany gałęzi ${branch} względem main, bezpieczeństwo, zgodność z zadaniem i kryteriami oraz testy. Nie edytuj plików. Odpowiedz approved=true tylko jeśli nie ma problemów blokujących. W summary podaj konkretne uzasadnienie. Zadanie: ${task.title}. Kryteria: ${task.acceptance.join('; ')}.${qaReviewEvidence}`;
   let reviewRun;
   let reviewText;
   const statusBefore = await run('git', ['status', '--porcelain=v1', '--untracked-files=all'], { cwd: directory, env: safeGitEnv() });
