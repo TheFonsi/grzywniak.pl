@@ -3,8 +3,9 @@ import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
 import { join } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { connect as tlsConnect } from 'node:tls';
+import { previewPasswordHash, previewPasswordMatches } from './auth.mjs';
 
 const exec = promisify(execFile);
 const directory = process.env.VPS_DATA_DIR || '/data';
@@ -73,17 +74,6 @@ const routeConfig = (project) => {
   const previewMiddlewares = authMiddleware ? `    ${name}-preview-auth:\n      forwardAuth:\n        address: http://vps-control:3010/internal/preview-auth?key=${encodeURIComponent(token)}\n        trustForwardHeader: true\n        authRequestHeaders:\n          - Authorization\n          - X-Forwarded-Host\n    ${name}-feedback-config-path:\n      replacePath:\n        path: /internal/feedback-config\n` : '';
   const appMiddlewares = authMiddleware ? `      middlewares: [${authMiddleware}]\n` : '';
   return `http:\n  routers:\n    ${name}-metadata:\n      rule: "Host(\`${project.hostname}\`) && Path(\`/.well-known/grzywniak/deployment\`)"\n      entryPoints: [websecure]\n      middlewares: [${name}-metadata-path]\n      service: ${name}-metadata\n      priority: 100\n      tls:\n        certResolver: cf\n${previewRoutes}    ${name}-app:\n      rule: "Host(\`${project.hostname}\`)"\n      entryPoints: [websecure]\n${appMiddlewares}      service: ${name}-app\n      priority: 1\n      tls:\n        certResolver: cf\n  middlewares:\n    ${name}-metadata-path:\n      replacePath:\n        path: /metadata/${project.projectId}/${project.kind}\n${previewMiddlewares}  services:\n    ${name}-metadata:\n      loadBalancer:\n        servers:\n          - url: http://vps-control:3010\n    ${name}-app:\n      loadBalancer:\n        servers:\n          - url: ${upstream}\n`;
-};
-const previewPasswordHash = (password, salt = randomBytes(16).toString('hex')) => ({ salt, hash: scryptSync(password, salt, 32).toString('hex') });
-const previewPasswordMatches = (project, authorization) => {
-  if (!project.previewAuthSalt || !project.previewAuthHash || typeof authorization !== 'string' || !authorization.startsWith('Basic ')) return false;
-  let decoded;
-  try { decoded = Buffer.from(authorization.slice(6), 'base64').toString('utf8'); } catch { return false; }
-  const split = decoded.indexOf(':');
-  if (split < 1 || decoded.slice(0, split) !== project.previewAuthUser) return false;
-  const supplied = scryptSync(decoded.slice(split + 1), project.previewAuthSalt, 32);
-  const expected = Buffer.from(project.previewAuthHash, 'hex');
-  return supplied.length === expected.length && timingSafeEqual(supplied, expected);
 };
 const writeRoute = async (project) => {
   await mkdir(dynamic, { recursive: true });

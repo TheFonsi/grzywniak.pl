@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, realpath, mkdir, writeFile } from 'node:fs/promi
 import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { strict as assert } from 'node:assert';
-import { scryptSync } from 'node:crypto';
+import { previewPasswordHash, previewPasswordMatches } from '../services/vps-control/auth.mjs';
 
 const root = await mkdtemp(join(tmpdir(), 'grzywniak-vps-test-'));
 const port = 31000 + Math.floor(Math.random() * 1000);
@@ -11,8 +11,11 @@ const token = 'test-token-' + 'x'.repeat(40);
 const projectId = 'a'.repeat(32);
 const password = 'preview-test-password-123456';
 const salt = '00112233445566778899aabbccddeeff';
+const generatedAuth = { previewAuthUser: 'client', ...previewPasswordHash(password, salt) };
+assert.equal(previewPasswordMatches(generatedAuth, `Basic ${Buffer.from(`client:${password}`).toString('base64')}`), true, 'Wygenerowane dane muszą być zapisane w polach odczytywanych przez bramkę logowania.');
+assert.equal(previewPasswordMatches(generatedAuth, `Basic ${Buffer.from(`wrong:${password}`).toString('base64')}`), false);
 await mkdir(join(root, 'state'), { recursive: true });
-await writeFile(join(root, 'state', 'state.json'), JSON.stringify({ projects: { [`${projectId}:preview`]: { projectId, kind: 'preview', hostname: 'p-aaaaaaaaaaaa.grzywniak.pl', repository: 'https://github.com/Grzywniak/test', current: null, previous: null, previewAuthUser: 'client', previewAuthSalt: salt, previewAuthHash: scryptSync(password, salt, 32).toString('hex'), feedbackToken: 'b'.repeat(48), feedbackUrl: 'https://api.grzywniak.pl/api/project-feedback.php?project=x' } }, deployments: {} }));
+await writeFile(join(root, 'state', 'state.json'), JSON.stringify({ projects: { [`${projectId}:preview`]: { projectId, kind: 'preview', hostname: 'p-aaaaaaaaaaaa.grzywniak.pl', repository: 'https://github.com/Grzywniak/test', current: null, previous: null, ...generatedAuth, feedbackToken: 'b'.repeat(48), feedbackUrl: 'https://api.grzywniak.pl/api/project-feedback.php?project=x' } }, deployments: {} }));
 const server = spawn(process.execPath, [resolve('services/vps-control/server.mjs')], { cwd: resolve('.'), env: { ...process.env, VPS_DATA_DIR: join(root, 'state'), TRAEFIK_DYNAMIC_DIR: join(root, 'dynamic'), VPS_LISTEN_PORT: String(port), VPS_CONTROL_TOKEN: token, VPS_CONTROL_HOST: 'control.grzywniak.pl' }, stdio: 'ignore' });
 try {
   let ready = false;
