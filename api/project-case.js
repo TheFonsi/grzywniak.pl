@@ -36,9 +36,44 @@
   miniStyle.textContent = '.map-wrap{position:relative}.node.review{border-color:#c7a477;background:#3d322b}.minimap{position:absolute;right:13px;bottom:13px;width:235px;height:72px;padding:5px;border:1px solid #52709d;border-radius:10px;background:#0b1524ed;box-shadow:0 8px 26px #0009;cursor:crosshair}.minimap svg{width:100%;height:100%}.minimap:hover,.minimap:focus-visible{border-color:#afc7ff;outline:0}@media(max-width:600px){.minimap{width:160px;height:53px}}';
   document.head.append(miniStyle);
 
+  function modalFormKey(form) {
+    const identity = [...form.querySelectorAll('input[type="hidden"][name]')]
+      .map((input) => `${input.name}=${input.value}`)
+      .join("&");
+    return `${form.dataset.action || ""}|${identity}`;
+  }
+
+  function captureModalForms() {
+    return [...document.querySelectorAll("#dialog-content form[data-action]")].map((form) => ({
+      key: modalFormKey(form),
+      controls: [...form.querySelectorAll("input[name], textarea[name], select[name]")].map((control) => ({
+        name: control.name,
+        type: control.type,
+        value: control.value,
+        checked: "checked" in control ? control.checked : undefined,
+      })),
+    }));
+  }
+
+  function restoreModalForms(states) {
+    for (const state of states || []) {
+      const form = [...document.querySelectorAll("#dialog-content form[data-action]")]
+        .find((candidate) => modalFormKey(candidate) === state.key);
+      if (!form) continue;
+      for (const saved of state.controls) {
+        const control = [...form.querySelectorAll("[name]")]
+          .find((candidate) => candidate.name === saved.name && candidate.type === saved.type);
+        if (!control) continue;
+        if (saved.type === "checkbox" || saved.type === "radio") control.checked = Boolean(saved.checked);
+        else control.value = saved.value;
+      }
+    }
+  }
+
   async function load(keepModal = false) {
     if (refreshing) return;
     refreshing = true;
+    const formStates = keepModal ? captureModalForms() : [];
     $("#live-state").classList.add("syncing");
     try {
       const response = await fetch(endpoint, { credentials: "same-origin", cache: "no-store" });
@@ -49,7 +84,10 @@
       csrf = data.csrf || csrf;
       render();
       $("#last-updated").textContent = `Aktualizacja ${new Date().toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit", second: "2-digit" })} · odświeżanie co 5 s`;
-      if (keepModal && currentStage) openStage(currentStage, false);
+      if (keepModal && currentStage) {
+        openStage(currentStage, false);
+        restoreModalForms(formStates);
+      }
     } finally {
       refreshing = false;
       $("#live-state").classList.remove("syncing");
