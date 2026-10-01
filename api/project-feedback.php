@@ -48,9 +48,16 @@ if($jsonRequest) {
         $feedbackId=(int)$db->lastInsertId(); projectEnqueue($id,'classify_feedback_'.$feedbackId); projectEvent($id,'feedback','received','Klient','Nowa uwaga do wersji '.$feedbackDigest.'.'); $db->commit(); $transactionOpen=false;
     } catch(Throwable $error) {
         if($transactionOpen && $db instanceof PDO) { try { $db->rollBack(); } catch(Throwable) {} }
-        error_log('Feedback ['.$requestId.']: '.$error->getMessage());
+        $diagnostic=['time'=>gmdate('c'),'reference'=>$requestId,'type'=>get_class($error),'code'=>(string)$error->getCode(),'message'=>substr(str_replace(["\r","\n"],' ',$error->getMessage()),0,1200)];
+        try {
+            $logPath=storage().'/feedback-errors.log';
+            if(@file_put_contents($logPath,json_encode($diagnostic,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES|JSON_THROW_ON_ERROR).PHP_EOL,FILE_APPEND|LOCK_EX)===false) throw new RuntimeException('Could not append protected feedback diagnostic log.');
+        } catch(Throwable $logError) { error_log('Feedback diagnostic write failed ['.$requestId.']: '.get_class($logError)); }
+        error_log('Feedback ['.$requestId.'] '.$diagnostic['type'].' '.$diagnostic['code'].': '.$diagnostic['message']);
         if($error instanceof PDOException && str_contains(strtolower($error->getMessage()),'locked')) $fail('Serwer jest chwilowo zajęty. Twoja uwaga nie została wysłana; spróbuj ponownie.',503);
-        $fail('Nie udało się zapisać uwagi. Spróbuj ponownie za chwilę.',500);
+        http_response_code(500);
+        echo json_encode(['message'=>'Nie udało się zapisać uwagi. Spróbuj ponownie za chwilę.','reference'=>$requestId,'diagnostic'=>['type'=>$diagnostic['type'],'code'=>$diagnostic['code']]],JSON_UNESCAPED_UNICODE);
+        exit;
     }
     http_response_code(201); echo json_encode(['message'=>'Uwaga została zapisana przy właściwej wersji podglądu.'],JSON_UNESCAPED_UNICODE); exit;
 }
