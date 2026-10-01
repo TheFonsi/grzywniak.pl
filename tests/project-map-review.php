@@ -11,6 +11,14 @@ try {
     $session=['id'=>$id,'status'=>'COMPLETED','contract'=>['version'=>1],'projectState'=>['businessProblem'=>'Przykład','contactName'=>'Klient']];
     $snapshot=projectSnapshot($session);
     if($snapshot['status']['build']!=='needs_you' || $snapshot['agentTasks'][0]['runner_phase']!=='waiting_merge') throw new RuntimeException('PR oczekujący na przegląd nie jest widoczny na mapie.');
+    $offerSession=array_replace($session,['internalAnalysis'=>['status'=>'COMPLETED']]);
+    foreach(['DRAFT'=>'ready','REVIEWED'=>'needs_you','SENT'=>'needs_you','ACCEPTED'=>'done'] as $offerStatus=>$expected) {
+        $offerSession['offer']=['status'=>$offerStatus];
+        $snapshot=projectSnapshot($offerSession);
+        if($snapshot['status']['offer']!==$expected) throw new RuntimeException('Niepoprawny stan etapu oferty dla '.$offerStatus.': '.$snapshot['status']['offer']);
+        $expectedContract=$offerStatus==='ACCEPTED'?'needs_you':'locked';
+        if($snapshot['status']['contract']!==$expectedContract) throw new RuntimeException('Umowa odblokowała się przed akceptacją oferty: '.$offerStatus);
+    }
     $db->prepare("UPDATE project_jobs SET result=? WHERE session_id=? AND kind='create_repository'")->execute([json_encode(['ci'=>'awaiting_project_scaffold']),$id]);
     $db->prepare("INSERT INTO project_jobs(session_id,kind,state,input,error,created_at,updated_at) VALUES(?,'configure_scaffold','failed','{}','Brak workflow',?,?)")->execute([$id,time(),time()]);
     $snapshot=projectSnapshot($session);

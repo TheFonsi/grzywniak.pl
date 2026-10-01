@@ -254,7 +254,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($body['action'] ?? '') === 'accept
     if (!is_array($session['offer'] ?? null)) { http_response_code(404); echo json_encode(['message' => 'Najpierw przygotuj ofertę.'], JSON_UNESCAPED_UNICODE); exit; }
     $offer = $session['offer'];
     if (!in_array(($offer['status'] ?? ''), ['REVIEWED', 'SENT'], true)) { http_response_code(409); echo json_encode(['message' => 'Najpierw zweryfikuj ofertę.'], JSON_UNESCAPED_UNICODE); exit; }
-    $offer['status'] = 'ACCEPTED'; $offer['acceptedAt'] = time(); $offer['acceptedBy'] = 'Zespół';
+    $offer['status'] = 'ACCEPTED'; $offer['acceptedAt'] = time(); $offer['acceptedBy'] = (string) ($_SERVER['PHP_AUTH_USER'] ?? 'admin');
     $note = trim((string) ($body['clientMessage'] ?? '')); if ($note !== '') { $offer['clientMessage'] = $note; $offer['clientMessageAt'] = time(); }
     $session['offer'] = $offer; file_put_contents($file, json_encode($session, JSON_UNESCAPED_UNICODE), LOCK_EX); echo json_encode(['offer' => $offer], JSON_UNESCAPED_UNICODE); exit;
 }

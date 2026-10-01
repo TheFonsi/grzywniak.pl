@@ -219,7 +219,9 @@ function projectSnapshot(array $session): array {
     $status=[];
     $status['brief']=$briefDone?'done':'waiting_client';
     $status['analysis']=$analysisDone?'done':($briefDone?'ready':'locked');
-    $status['offer']=in_array($offer['status']??'',['REVIEWED','SENT','ACCEPTED'],true)?'done':($analysisDone?'needs_you':'locked');
+    $offerStatus=(string)($offer['status']??'');
+    // Review or delivery is not acceptance: keep the stage open until an admin accepts it.
+    $status['offer']=$offerStatus==='ACCEPTED'?'done':(in_array($offerStatus,['REVIEWED','SENT'],true)?'needs_you':($analysisDone?'ready':'locked'));
     $status['contract']=$signed?'done':(($contract['status']??'')==='SENT'?'needs_you':(($offer['status']??'')==='ACCEPTED'?'needs_you':'locked'));
     $status['kickoff']=$started?($sourceCurrent?'done':'review'):($signed?'needs_you':'locked');
     $status['plan']=projectJobStatus($jobByKind['generate_plan']??null,$started && $sourceCurrent);
