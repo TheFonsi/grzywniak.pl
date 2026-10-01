@@ -66,7 +66,9 @@ try {
   assert.match(scriptText, /\{ areas: annotations\.map/);
   assert.match(scriptText, /Notatka do tego obszaru/);
   assert.match(scriptText, /annotation\.note = note\.value/);
-  assert.match(scriptText, /rect\.x \* annotation\.viewport\.width \* scale/);
+  assert.match(scriptText, /context\.x \* annotation\.viewport\.width \* scale/);
+  assert.match(scriptText, /context: \{ x: 0, y: 0, width: 1, height: 1 \}/, 'Podgląd obszaru powinien zachować cały widok strony jako kontekst.');
+  assert.match(scriptText, /location\.origin\}\$\{location\.pathname\}\$\{location\.hash\}/, 'Ukryta informacja o podstronie powinna zachować ścieżkę i trasę SPA, bez query stringa.');
   assert.match(scriptText, /gw-thumb-selection/);
   assert.match(scriptText, /gw-feedback-viewer/);
   assert.match(scriptText, /Powiększ zaznaczony obszar/);
@@ -75,6 +77,7 @@ try {
   assert.doesNotMatch(scriptText, /sandbox/, 'Miniatury muszą dziedziczyć pochodzenie podglądu, aby style nie były blokowane przez CORS.');
   assert.match(scriptText, /\^on\/i\.test\(attribute\.name\)/, 'Kopia strony musi usuwać atrybuty obsługi zdarzeń przed renderowaniem.');
   assert.match(scriptText, /feedback-submit/);
+  assert.match(scriptText, /result\.reference/, 'Błąd zapisu powinien pokazać identyfikator do odnalezienia wpisu w logu PHP.');
   assert.doesNotMatch(scriptText, /endpoint\.origin/, 'Wysyłka zgłoszenia powinna być same-origin, bez przeglądarkowego CORS do API.');
   const asset = await fetch(`http://127.0.0.1:${port}/asset.js`, { headers: appHeaders });
   assert.equal(await asset.text(), 'window.assetLoaded=true', 'Pozostałe zasoby powinny być przekazywane do aplikacji bez zmian.');

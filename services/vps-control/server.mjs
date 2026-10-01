@@ -162,7 +162,7 @@ const submitPreviewFeedback = async (request, response, project) => {
     const text = await result.text();
     let body;
     try { body = JSON.parse(text); } catch { body = null; }
-    if (!result.ok) return json(response, result.status, { message: typeof body?.message === 'string' ? body.message : `Serwer formularza odrzucił zgłoszenie (HTTP ${result.status}). Spróbuj ponownie.` });
+    if (!result.ok) return json(response, result.status, { ...(body && typeof body === 'object' ? body : {}), message: typeof body?.message === 'string' ? body.message : `Serwer formularza odrzucił zgłoszenie (HTTP ${result.status}). Spróbuj ponownie.` });
     return json(response, 201, body && typeof body.message === 'string' ? body : { message: 'Uwaga została zapisana.' });
   } catch {
     return json(response, 502, { message: 'Nie udało się połączyć z API uwag. Twoje zgłoszenie pozostało w formularzu; spróbuj ponownie.' });

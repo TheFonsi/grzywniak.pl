@@ -145,7 +145,12 @@ function projectNormalizeFeedbackAnnotation(mixed $annotation): array {
         foreach($element as $key=>$value) $element[$key]=function_exists('mb_substr')?mb_substr(trim((string)$value),0,240,'UTF-8'):substr(trim((string)$value),0,240);
         $note=trim((string)($area['note']??''));
         $note=function_exists('mb_substr')?mb_substr($note,0,1000,'UTF-8'):substr($note,0,1000);
-        $safe[]=['rect'=>array_map(static fn($key)=>(float)$rect[$key],['x','y','width','height']),'viewport'=>['width'=>max(1,min(10000,(int)($area['viewport']['width']??1))),'height'=>max(1,min(10000,(int)($area['viewport']['height']??1)))],'scroll'=>['x'=>max(0,min(100000,(int)($area['scroll']['x']??0))),'y'=>max(0,min(100000,(int)($area['scroll']['y']??0)))],'element'=>$element,'note'=>$note];
+        $context=is_array($area['context']??null)?$area['context']:['x'=>0,'y'=>0,'width'=>1,'height'=>1];
+        foreach(['x','y','width','height'] as $key) if(!isset($context[$key])||!is_numeric($context[$key])||(float)$context[$key]<0||(float)$context[$key]>1) throw new InvalidArgumentException('Niepoprawny obszar kontekstu zaznaczenia.');
+        if((float)$context['width']<=0 || (float)$context['height']<=0 || (float)$context['x']+(float)$context['width']>1.000001 || (float)$context['y']+(float)$context['height']>1.000001) throw new InvalidArgumentException('Obszar kontekstu musi mieścić się w widoku strony.');
+        $rect=array_combine(['x','y','width','height'],array_map(static fn($key)=>(float)$rect[$key],['x','y','width','height']));
+        $context=array_combine(['x','y','width','height'],array_map(static fn($key)=>(float)$context[$key],['x','y','width','height']));
+        $safe[]=['rect'=>$rect,'context'=>$context,'viewport'=>['width'=>max(1,min(10000,(int)($area['viewport']['width']??1))),'height'=>max(1,min(10000,(int)($area['viewport']['height']??1)))],'scroll'=>['x'=>max(0,min(100000,(int)($area['scroll']['x']??0))),'y'=>max(0,min(100000,(int)($area['scroll']['y']??0)))],'element'=>$element,'note'=>$note];
     }
     return ['areas'=>$safe];
 }

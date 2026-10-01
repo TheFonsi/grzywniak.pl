@@ -61,8 +61,9 @@
   const showViewer = (annotation, index, returnTarget) => {
     viewerReturnTarget = returnTarget;
     const rect = annotation.rect;
-    const areaWidth = Math.max(1, rect.width * annotation.viewport.width);
-    const areaHeight = Math.max(1, rect.height * annotation.viewport.height);
+    const context = annotation.context || { x: 0, y: 0, width: 1, height: 1 };
+    const areaWidth = Math.max(1, context.width * annotation.viewport.width);
+    const areaHeight = Math.max(1, context.height * annotation.viewport.height);
     const scale = Math.min((innerWidth - 64) / areaWidth, (innerHeight - 130) / areaHeight);
     const cropWidth = areaWidth * scale;
     const cropHeight = areaHeight * scale;
@@ -70,13 +71,16 @@
     frame.title = `Powiększony obszar ${index + 1}`;
     frame.style.width = `${annotation.viewport.width}px`;
     frame.style.height = `${annotation.viewport.height}px`;
-    frame.style.left = `${-rect.x * annotation.viewport.width * scale}px`;
-    frame.style.top = `${-rect.y * annotation.viewport.height * scale}px`;
+    frame.style.left = `${-context.x * annotation.viewport.width * scale}px`;
+    frame.style.top = `${-context.y * annotation.viewport.height * scale}px`;
     frame.style.transform = `scale(${scale})`;
     frame.srcdoc = annotation.snapshot;
     const highlight = document.createElement("span");
     highlight.className = "gw-viewer-selection";
-    highlight.style.inset = "0";
+    highlight.style.left = `${(rect.x - context.x) * annotation.viewport.width * scale}px`;
+    highlight.style.top = `${(rect.y - context.y) * annotation.viewport.height * scale}px`;
+    highlight.style.width = `${rect.width * annotation.viewport.width * scale}px`;
+    highlight.style.height = `${rect.height * annotation.viewport.height * scale}px`;
     viewerTitle.textContent = `Powiększony podgląd · obszar ${index + 1}`;
     viewerCrop.style.width = `${cropWidth}px`;
     viewerCrop.style.height = `${cropHeight}px`;
@@ -117,8 +121,9 @@
   };
   const addAreaCard = (annotation, index, snapshot) => {
     const rect = annotation.rect;
-    const width = Math.max(1, rect.width * annotation.viewport.width);
-    const height = Math.max(1, rect.height * annotation.viewport.height);
+    const context = annotation.context || { x: 0, y: 0, width: 1, height: 1 };
+    const width = Math.max(1, context.width * annotation.viewport.width);
+    const height = Math.max(1, context.height * annotation.viewport.height);
     const frame = document.createElement("iframe");
     frame.title = `Podgląd zaznaczonego obszaru ${index + 1}`;
     frame.setAttribute("aria-hidden", "true");
@@ -167,13 +172,13 @@
     const visibleHeight = height * scale;
     const offsetX = (thumb.clientWidth - visibleWidth) / 2;
     const offsetY = (thumb.clientHeight - visibleHeight) / 2;
-    frame.style.left = `${offsetX - rect.x * annotation.viewport.width * scale}px`;
-    frame.style.top = `${offsetY - rect.y * annotation.viewport.height * scale}px`;
+    frame.style.left = `${offsetX - context.x * annotation.viewport.width * scale}px`;
+    frame.style.top = `${offsetY - context.y * annotation.viewport.height * scale}px`;
     frame.style.transform = `scale(${scale})`;
-    highlight.style.left = `${offsetX}px`;
-    highlight.style.top = `${offsetY}px`;
-    highlight.style.width = `${visibleWidth}px`;
-    highlight.style.height = `${visibleHeight}px`;
+    highlight.style.left = `${offsetX + (rect.x - context.x) * annotation.viewport.width * scale}px`;
+    highlight.style.top = `${offsetY + (rect.y - context.y) * annotation.viewport.height * scale}px`;
+    highlight.style.width = `${rect.width * annotation.viewport.width * scale}px`;
+    highlight.style.height = `${rect.height * annotation.viewport.height * scale}px`;
   };
   const renderAreas = () => {
     areasEl.replaceChildren();
@@ -220,6 +225,7 @@
     const snapshot = captureSnapshot(scroll);
     annotations.push({
       rect: { x: x / innerWidth, y: y / innerHeight, width: width / innerWidth, height: height / innerHeight },
+      context: { x: 0, y: 0, width: 1, height: 1 },
       viewport: { width: innerWidth, height: innerHeight },
       scroll,
       element: { tag: element.tagName.toLowerCase(), id: element.id || "", classes: typeof element.className === "string" ? element.className.slice(0, 240) : "", text: (element.innerText || "").trim().slice(0, 240) },
@@ -253,10 +259,10 @@
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: form.querySelector("textarea").value.trim(), page_url: location.href, annotation: annotations.length === 1 ? (({ snapshot, ...annotation }) => annotation)(annotations[0]) : { areas: annotations.map(({ snapshot, ...annotation }) => annotation) } }),
+        body: JSON.stringify({ message: form.querySelector("textarea").value.trim(), page_url: `${location.origin}${location.pathname}${location.hash}`.slice(0, 1000), annotation: annotations.length === 1 ? (({ snapshot, ...annotation }) => annotation)(annotations[0]) : { areas: annotations.map(({ snapshot, ...annotation }) => annotation) } }),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.message || `Serwer odrzucił zgłoszenie (HTTP ${response.status}).`);
+      if (!response.ok) throw new Error(`${result.message || `Serwer odrzucił zgłoszenie (HTTP ${response.status}).`}${result.reference ? ` (ID: ${result.reference})` : ""}`);
       message.textContent = result.message || "Uwaga została zapisana.";
       form.reset();
       annotations = [];
