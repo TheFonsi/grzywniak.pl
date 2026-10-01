@@ -167,10 +167,21 @@ try {
         $feedbackId=filter_var($body['feedbackId']??null,FILTER_VALIDATE_INT);
         $message=trim((string)($body['message']??''));
         if(!$feedbackId || mb_strlen($message)<10 || mb_strlen($message)>4000) throw new DomainException('Poprawiona treść musi mieć od 10 do 4000 znaków.');
-        $stmt=$db->prepare("UPDATE project_feedback SET admin_message=?,updated_at=? WHERE id=? AND session_id=? AND state='triaged'");
+        $stmt=$db->prepare("UPDATE project_feedback SET admin_message=?,updated_at=? WHERE id=? AND session_id=? AND state IN ('new','triaged')");
         $stmt->execute([$message,time(),$feedbackId,$id]);
         if($stmt->rowCount()!==1) throw new DomainException('Tę uwagę można edytować tylko przed zatwierdzeniem poprawki.');
         projectEvent($id,'feedback','edited',$adminUser,'Zapisano redakcję uwagi #'.$feedbackId.'. Nie przekazano jej agentom.');
+    } elseif($action==='classify_feedback_manual') {
+        $feedbackId=filter_var($body['feedbackId']??null,FILTER_VALIDATE_INT);
+        $message=trim((string)($body['message']??''));
+        $category=(string)($body['category']??'');
+        if(!$feedbackId || mb_strlen($message)<10 || mb_strlen($message)>4000 || !in_array($category,['bug','scope_change','question','other'],true)) throw new DomainException('Wybierz kategorię i podaj treść uwagi (10–4000 znaków).');
+        $analysis=['category'=>$category,'rationale'=>'Klasyfikacja ustawiona ręcznie przez administratora.','suggestedAction'=>'Decyzja administratora','scopeImpact'=>'Ocenione ręcznie','timelineImpact'=>'Ocenione ręcznie','manualReview'=>true];
+        $stmt=$db->prepare("UPDATE project_feedback SET admin_message=?,category=?,analysis=?,state='triaged',updated_at=? WHERE id=? AND session_id=? AND state='new'");
+        $stmt->execute([$message,$category,json_encode($analysis,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),time(),$feedbackId,$id]);
+        if($stmt->rowCount()!==1) throw new DomainException('Klasyfikacja automatyczna już zakończyła się lub uwaga została rozstrzygnięta.');
+        $db->prepare("UPDATE project_jobs SET state='failed',error='Klasyfikację ręcznie zastąpił administrator.',updated_at=? WHERE session_id=? AND kind=? AND state='queued'")->execute([time(),$id,'classify_feedback_'.$feedbackId]);
+        projectEvent($id,'feedback','triaged',$adminUser,'Uwaga #'.$feedbackId.' została ręcznie sklasyfikowana jako '.$category.'.');
     } elseif($action==='accept_feedback') {
         $feedbackId=filter_var($body['feedbackId']??null,FILTER_VALIDATE_INT);
         $message=trim((string)($body['message']??''));
@@ -184,9 +195,10 @@ try {
         $feedbackId=filter_var($body['feedbackId']??null,FILTER_VALIDATE_INT);
         $resolution=trim((string)($body['resolution']??''));
         if(!$feedbackId || mb_strlen($resolution)<8 || mb_strlen($resolution)>1000) throw new DomainException('Zapisz powód odrzucenia uwagi (8–1000 znaków).');
-        $stmt=$db->prepare("UPDATE project_feedback SET state='resolved',admin_decision='rejected',decision_note=?,decision_by=?,decision_at=?,updated_at=? WHERE id=? AND session_id=? AND state='triaged'");
+        $stmt=$db->prepare("UPDATE project_feedback SET state='resolved',admin_decision='rejected',decision_note=?,decision_by=?,decision_at=?,updated_at=? WHERE id=? AND session_id=? AND state IN ('new','triaged')");
         $stmt->execute([$resolution,$adminUser,time(),time(),$feedbackId,$id]);
         if($stmt->rowCount()!==1) throw new DomainException('Tę uwagę można odrzucić tylko przed przekazaniem jej dalej.');
+        $db->prepare("UPDATE project_jobs SET state='failed',error='Uwaga odrzucona przez administratora.',updated_at=? WHERE session_id=? AND kind=? AND state='queued'")->execute([time(),$id,'classify_feedback_'.$feedbackId]);
         projectEvent($id,'feedback','rejected',$adminUser,'Odrzucono uwagę #'.$feedbackId.'. '.$resolution);
     } elseif($action==='request_fix') {
         $feedbackId=filter_var($body['feedbackId']??null,FILTER_VALIDATE_INT);
