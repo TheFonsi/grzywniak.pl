@@ -32,15 +32,11 @@ if($jsonRequest) {
     $fail=static function(string $message,int $status): never { http_response_code($status); echo json_encode(['message'=>$message],JSON_UNESCAPED_UNICODE); exit; };
     if(mb_strlen($message)<10 || mb_strlen($message)>4000 || mb_strlen($page)>1000) $fail('Wpisz uwagę od 10 do 4000 znaków.',400);
     if($page!=='' && (!filter_var($page,FILTER_VALIDATE_URL)||!str_starts_with($page,'https://'))) $fail('Adres strony musi być adresem HTTPS.',400);
-    if(!is_array($annotation)||!is_array($annotation['rect']??null)) $fail('Zaznacz obszar strony, którego dotyczy uwaga.',400);
-    $rect=$annotation['rect']; foreach(['x','y','width','height'] as $key) if(!isset($rect[$key])||!is_numeric($rect[$key])||(float)$rect[$key]<0||(float)$rect[$key]>1) $fail('Niepoprawne zaznaczenie obszaru.',400);
-    $element=is_array($annotation['element']??null)?array_intersect_key($annotation['element'],array_flip(['tag','id','classes','text'])):[];
-    foreach($element as $key=>$value) $element[$key]=mb_substr(trim((string)$value),0,240);
-    $safeAnnotation=['rect'=>array_map(static fn($key)=>(float)$rect[$key],['x','y','width','height']),'viewport'=>['width'=>max(1,min(10000,(int)($annotation['viewport']['width']??1))),'height'=>max(1,min(10000,(int)($annotation['viewport']['height']??1)))],'scroll'=>['x'=>max(0,min(100000,(int)($annotation['scroll']['x']??0))),'y'=>max(0,min(100000,(int)($annotation['scroll']['y']??0)))],'element'=>$element];
+    try { $safeAnnotation=projectNormalizeFeedbackAnnotation($annotation); } catch(InvalidArgumentException $error) { $fail($error->getMessage(),400); }
     $db=projectDb(); $db->exec('BEGIN IMMEDIATE');
     try {
         $count=$db->prepare('SELECT COUNT(*) FROM project_feedback WHERE session_id=? AND created_at>=?'); $count->execute([$id,time()-3600]);
-        if((int)$count->fetchColumn()>=5) { $db->rollBack(); $fail('Osiągnięto limit pięciu uwag na godzinę.',429); }
+        if((int)$count->fetchColumn()>=30) { $db->rollBack(); $fail('Osiągnięto limit 30 zgłoszeń na godzinę.',429); }
         $db->prepare('INSERT INTO project_feedback(session_id,image_digest,message,page_url,annotation_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?)')->execute([$id,$feedbackDigest,$message,$page,json_encode($safeAnnotation,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),time(),time()]);
         $feedbackId=(int)$db->lastInsertId(); projectEnqueue($id,'classify_feedback_'.$feedbackId); projectEvent($id,'feedback','received','Klient','Nowa uwaga do wersji '.$feedbackDigest.'.'); $db->commit();
     } catch(Throwable $error) { if($db->inTransaction())$db->rollBack(); error_log('Feedback: '.$error->getMessage()); $fail('Nie udało się zapisać uwagi.',500); }
@@ -51,7 +47,7 @@ if($_SERVER['REQUEST_METHOD']==='POST') {
     if(mb_strlen($message)<10 || mb_strlen($message)>4000 || mb_strlen($page)>1000) feedbackPage('Wpisz uwagę od 10 do 4000 znaków i spróbuj ponownie.',400);
     if($page!=='' && (!filter_var($page,FILTER_VALIDATE_URL) || !str_starts_with($page,'https://'))) feedbackPage('Adres strony musi być adresem HTTPS.',400);
     $db=projectDb(); $db->exec('BEGIN IMMEDIATE');
-    try { $count=$db->prepare('SELECT COUNT(*) FROM project_feedback WHERE session_id=? AND created_at>=?'); $count->execute([$id,time()-3600]); if((int)$count->fetchColumn()>=5) { $db->rollBack(); feedbackPage('Osiągnięto limit pięciu uwag na godzinę. Spróbuj później.',429); } $db->prepare('INSERT INTO project_feedback(session_id,image_digest,message,page_url,created_at,updated_at) VALUES(?,?,?,?,?,?)')->execute([$id,$feedbackDigest,$message,$page,time(),time()]); $feedbackId=(int)$db->lastInsertId(); projectEnqueue($id,'classify_feedback_'.$feedbackId); projectEvent($id,'feedback','received','Klient','Nowa uwaga do wersji '.$feedbackDigest.'.'); $db->commit(); }
+    try { $count=$db->prepare('SELECT COUNT(*) FROM project_feedback WHERE session_id=? AND created_at>=?'); $count->execute([$id,time()-3600]); if((int)$count->fetchColumn()>=30) { $db->rollBack(); feedbackPage('Osiągnięto limit 30 zgłoszeń na godzinę. Spróbuj później.',429); } $db->prepare('INSERT INTO project_feedback(session_id,image_digest,message,page_url,created_at,updated_at) VALUES(?,?,?,?,?,?)')->execute([$id,$feedbackDigest,$message,$page,time(),time()]); $feedbackId=(int)$db->lastInsertId(); projectEnqueue($id,'classify_feedback_'.$feedbackId); projectEvent($id,'feedback','received','Klient','Nowa uwaga do wersji '.$feedbackDigest.'.'); $db->commit(); }
     catch(Throwable $error) { if($db->inTransaction())$db->rollBack(); error_log('Feedback: '.$error->getMessage()); feedbackPage('Nie udało się zapisać uwagi.',500); }
     feedbackPage('Dziękujemy. Uwaga została zapisana przy właściwej wersji podglądu.');
 }

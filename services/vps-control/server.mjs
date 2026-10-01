@@ -22,6 +22,7 @@ const idPattern = /^[a-f0-9]{32}$/;
 const digestPattern = /^sha256:[a-f0-9]{64}$/;
 const commitPattern = /^[a-f0-9]{40}$/;
 const feedbackTokenPattern = /^[a-f0-9]{48}$/;
+const publicApiHost = process.env.PUBLIC_API_HOST || 'api.grzywniak.pl';
 const feedbackScript = await readFile(new URL('./feedback.js', import.meta.url));
 let state = { projects: {}, deployments: {} };
 let mutation = Promise.resolve();
@@ -138,6 +139,35 @@ const proxyPreview = (request, response, project) => {
   upstream.on('error', () => { if (!response.headersSent) json(response, 502, { message: 'Nie udało się pobrać podglądu aplikacji.' }); else response.destroy(); });
   request.pipe(upstream);
 };
+const submitPreviewFeedback = async (request, response, project) => {
+  if (!previewPasswordMatches(project, request.headers.authorization || '')) {
+    response.writeHead(401, { 'www-authenticate': 'Basic realm="Project preview", charset="UTF-8"', 'cache-control': 'no-store' });
+    return response.end();
+  }
+  if (!feedbackTokenPattern.test(project.feedbackToken || '') || typeof project.feedbackUrl !== 'string') return json(response, 409, { message: 'Formularz uwag nie jest aktywny dla tej wersji.' });
+  let endpoint;
+  try { endpoint = new URL(project.feedbackUrl); } catch { return json(response, 502, { message: 'Adres formularza uwag jest nieprawidłowy.' }); }
+  if (endpoint.protocol !== 'https:' || endpoint.hostname !== publicApiHost || !endpoint.pathname.endsWith('/project-feedback.php')) return json(response, 502, { message: 'Adres formularza uwag nie wskazuje zaufanego API.' });
+  let payload;
+  try { payload = await readBody(request); } catch { return json(response, 400, { message: 'Nie udało się odczytać zgłoszenia. Sprawdź treść i spróbuj ponownie.' }); }
+  const safePayload = {
+    project: project.projectId,
+    token: project.feedbackToken,
+    message: typeof payload.message === 'string' ? payload.message : '',
+    page_url: typeof payload.page_url === 'string' ? payload.page_url : '',
+    annotation: payload.annotation,
+  };
+  try {
+    const result = await fetch(endpoint, { method: 'POST', headers: { 'content-type': 'application/json', origin: `https://${project.hostname}`, accept: 'application/json' }, body: JSON.stringify(safePayload), signal: AbortSignal.timeout(20000) });
+    const text = await result.text();
+    let body;
+    try { body = JSON.parse(text); } catch { body = null; }
+    if (!result.ok) return json(response, result.status, { message: typeof body?.message === 'string' ? body.message : `Serwer formularza odrzucił zgłoszenie (HTTP ${result.status}). Spróbuj ponownie.` });
+    return json(response, 201, body && typeof body.message === 'string' ? body : { message: 'Uwaga została zapisana.' });
+  } catch {
+    return json(response, 502, { message: 'Nie udało się połączyć z API uwag. Twoje zgłoszenie pozostało w formularzu; spróbuj ponownie.' });
+  }
+};
 const containerName = (id, kind, digest) => `gw-${id.slice(0, 16)}-${kind}-${digest.slice(7, 19)}`;
 const ensureContainer = async (name, image) => {
   try {
@@ -192,6 +222,7 @@ createServer(async (request, response) => {
       return json(response, 200, { projectId: project.projectId, feedbackToken: project.feedbackToken, feedbackUrl: project.feedbackUrl || '' });
     }
     const previewProject = previewProjectForHost(request.headers['x-forwarded-host'] || request.headers.host);
+    if (previewProject && request.method === 'POST' && url.pathname === '/.well-known/grzywniak/feedback-submit') return await submitPreviewFeedback(request, response, previewProject);
     if (previewProject && !url.pathname.startsWith('/internal/') && !url.pathname.startsWith('/metadata/')) return proxyPreview(request, response, previewProject);
     const metadata = /^\/metadata\/([a-f0-9]{32})\/(preview|production)$/.exec(url.pathname);
     if (request.method === 'GET' && metadata) {

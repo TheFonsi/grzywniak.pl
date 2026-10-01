@@ -19,7 +19,7 @@ assert.equal(previewPasswordMatches(generatedAuth, `Basic ${Buffer.from(`client:
 assert.equal(previewPasswordMatches(generatedAuth, `Basic ${Buffer.from(`wrong:${password}`).toString('base64')}`), false);
 await mkdir(join(root, 'state'), { recursive: true });
 const deploymentId = 'test-preview-deployment';
-await writeFile(join(root, 'state', 'state.json'), JSON.stringify({ projects: { [`${projectId}:preview`]: { projectId, kind: 'preview', hostname: 'p-aaaaaaaaaaaa.grzywniak.pl', repository: 'https://github.com/Grzywniak/test', current: deploymentId, previous: null, ...generatedAuth, feedbackToken: 'b'.repeat(48), feedbackUrl: 'https://api.grzywniak.pl/api/project-feedback.php?project=x' } }, deployments: { [deploymentId]: { projectId, kind: 'preview', container: '127.0.0.1', appPort, imageDigest: `sha256:${'c'.repeat(64)}` } } }));
+await writeFile(join(root, 'state', 'state.json'), JSON.stringify({ projects: { [`${projectId}:preview`]: { projectId, kind: 'preview', hostname: 'p-aaaaaaaaaaaa.grzywniak.pl', repository: 'https://github.com/Grzywniak/test', current: deploymentId, previous: null, ...generatedAuth, feedbackToken: 'b'.repeat(48), feedbackUrl: 'https://not-api.example/project-feedback.php?project=x' } }, deployments: { [deploymentId]: { projectId, kind: 'preview', container: '127.0.0.1', appPort, imageDigest: `sha256:${'c'.repeat(64)}` } } }));
 const app = createServer((request, response) => {
   if (request.url === '/health') { response.writeHead(200, { 'content-type': 'text/plain' }); return response.end('ok'); }
   if (request.url === '/asset.js') { response.writeHead(200, { 'content-type': 'text/javascript' }); return response.end('window.assetLoaded=true'); }
@@ -59,11 +59,20 @@ try {
   assert.match(html, /<script src="\/grzywniak-feedback\.js" defer><\/script><\/body>/, 'Bramka powinna dołączać skrypt nakładki przed zamknięciem body.');
   const script = await fetch(`http://127.0.0.1:${port}/grzywniak-feedback.js`, { headers: appHeaders });
   assert.equal(script.status, 200);
-  assert.match(await script.text(), /gw-feedback-launcher/);
+  const scriptText = await script.text();
+  assert.match(scriptText, /gw-feedback-launcher/);
+  assert.match(scriptText, /Zaznacz kolejny obszar/);
+  assert.match(scriptText, /annotation: annotations\.length === 1/);
+  assert.match(scriptText, /\{ areas: annotations\.map/);
+  assert.match(scriptText, /feedback-submit/);
+  assert.doesNotMatch(scriptText, /endpoint\.origin/, 'Wysyłka zgłoszenia powinna być same-origin, bez przeglądarkowego CORS do API.');
   const asset = await fetch(`http://127.0.0.1:${port}/asset.js`, { headers: appHeaders });
   assert.equal(await asset.text(), 'window.assetLoaded=true', 'Pozostałe zasoby powinny być przekazywane do aplikacji bez zmian.');
   const blockedPreview = await fetch(`http://127.0.0.1:${port}/`, { headers: { host: 'p-aaaaaaaaaaaa.grzywniak.pl', 'x-forwarded-host': 'p-aaaaaaaaaaaa.grzywniak.pl' } });
   assert.equal(blockedPreview.status, 401, 'Bramka musi wymagać hasła przed pokazaniem strony i nakładki.');
+  const feedbackSubmission = await fetch(`http://127.0.0.1:${port}/.well-known/grzywniak/feedback-submit`, { method: 'POST', headers: { ...appHeaders, 'content-type': 'application/json' }, body: JSON.stringify({ message: 'Sprawdź dwa zaznaczone miejsca.', page_url: 'https://p-aaaaaaaaaaaa.grzywniak.pl/', annotation: { areas: [] } }) });
+  assert.equal(feedbackSubmission.status, 502, 'Wysyłka uwag powinna być dostępna pod ścieżką same-origin.');
+  assert.match((await feedbackSubmission.json()).message, /zaufanego API/);
   console.log('VPS control auth, feedback configuration and preview overlay checks OK');
 } finally {
   server.kill();

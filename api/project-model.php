@@ -131,6 +131,23 @@ function projectFeedbackDigest(array $case): ?string {
     return null;
 }
 
+function projectNormalizeFeedbackAnnotation(mixed $annotation): array {
+    if(!is_array($annotation)) throw new InvalidArgumentException('Zaznacz obszar strony, którego dotyczy uwaga.');
+    $areas=is_array($annotation['areas']??null)?$annotation['areas']:[$annotation];
+    if(count($areas)<1 || count($areas)>8) throw new InvalidArgumentException('Zgłoszenie może zawierać od 1 do 8 zaznaczonych obszarów.');
+    $safe=[];
+    foreach($areas as $area) {
+        if(!is_array($area) || !is_array($area['rect']??null)) throw new InvalidArgumentException('Niepoprawne zaznaczenie obszaru.');
+        $rect=$area['rect'];
+        foreach(['x','y','width','height'] as $key) if(!isset($rect[$key])||!is_numeric($rect[$key])||(float)$rect[$key]<0||(float)$rect[$key]>1) throw new InvalidArgumentException('Niepoprawne zaznaczenie obszaru.');
+        if((float)$rect['width']<=0 || (float)$rect['height']<=0) throw new InvalidArgumentException('Zaznaczony obszar jest pusty.');
+        $element=is_array($area['element']??null)?array_intersect_key($area['element'],array_flip(['tag','id','classes','text'])):[];
+        foreach($element as $key=>$value) $element[$key]=mb_substr(trim((string)$value),0,240);
+        $safe[]=['rect'=>array_map(static fn($key)=>(float)$rect[$key],['x','y','width','height']),'viewport'=>['width'=>max(1,min(10000,(int)($area['viewport']['width']??1))),'height'=>max(1,min(10000,(int)($area['viewport']['height']??1)))],'scroll'=>['x'=>max(0,min(100000,(int)($area['scroll']['x']??0))),'y'=>max(0,min(100000,(int)($area['scroll']['y']??0)))],'element'=>$element];
+    }
+    return ['areas'=>$safe];
+}
+
 function projectSeedAgentTasks(string $id,array $tasks): void {
     $stmt=projectDb()->prepare('INSERT OR IGNORE INTO project_agent_tasks(session_id,task_key,title,role,dependencies,acceptance,updated_at) VALUES(?,?,?,?,?,?,?)');
     foreach($tasks as $task) $stmt->execute([$id,(string)$task['id'],(string)$task['title'],(string)$task['role'],json_encode($task['dependencies'],JSON_THROW_ON_ERROR),json_encode($task['acceptance'],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),time()]);
