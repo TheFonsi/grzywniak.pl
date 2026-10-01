@@ -101,8 +101,13 @@ try:
 
     review = request(offer_path, {"action": "review"})
     mock_send = request(offer_path, {"action": "send"})
+    assert review[0] == 200 and review[1]["offer"]["status"] == "REVIEWED", review
+    assert mock_send[0] == 200 and mock_send[1]["offer"]["status"] == "SENT" and not mock_send[1]["offer"].get("acceptedBy"), mock_send
+    start_after_send = request(project_path, {"action": "start", "scope": "Test portfolio project", "owner": "Test admin", "budget": 100}, csrf)
+    confirm_after_send = request(project_path, {"action": "confirm_contract", "evidence": "Test agreement evidence"}, csrf)
+    assert start_after_send[0] == 409 and confirm_after_send[0] == 409, (start_after_send, confirm_after_send)
     accepted = request(offer_path, {"action": "accept"})
-    assert review[0] == 200 and mock_send[0] == 200 and accepted[0] == 200, (review, mock_send, accepted)
+    assert accepted[0] == 200, accepted
     assert accepted[1]["offer"]["status"] == "ACCEPTED"
     assert accepted[1]["offer"]["acceptedBy"] == "gate-test"
 
