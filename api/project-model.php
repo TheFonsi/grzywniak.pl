@@ -221,7 +221,11 @@ function projectSnapshot(array $session): array {
     $status['analysis']=$analysisDone?'done':($briefDone?'ready':'locked');
     $offerStatus=(string)($offer['status']??'');
     // Review or delivery is not acceptance: keep the stage open until an admin accepts it.
-    $status['offer']=$offerStatus==='ACCEPTED'?'done':(in_array($offerStatus,['REVIEWED','SENT'],true)?'needs_you':($analysisDone?'ready':'locked'));
+    $missingOfferAnswers=array_filter(is_array($session['internalAnalysis']['missingInformation']??null)?$session['internalAnalysis']['missingInformation']:[],static function($question) use ($session): bool {
+        $decision=$session['adminDecisions'][trim((string)$question)]??null;
+        return !is_array($decision)||($decision['source']??'')!=='HUMAN'||trim((string)($decision['answer']??''))==='';
+    });
+    $status['offer']=$offerStatus==='ACCEPTED'?'done':(in_array($offerStatus,['REVIEWED','SENT'],true)?'needs_you':(!$analysisDone?'locked':($missingOfferAnswers?'needs_you':'ready')));
     $status['contract']=$signed?'done':(($contract['status']??'')==='SENT'?'needs_you':(($offer['status']??'')==='ACCEPTED'?'needs_you':'locked'));
     $status['kickoff']=$started?($sourceCurrent?'done':'review'):($signed?'needs_you':'locked');
     $status['plan']=projectJobStatus($jobByKind['generate_plan']??null,$started && $sourceCurrent);

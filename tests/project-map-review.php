@@ -11,7 +11,13 @@ try {
     $session=['id'=>$id,'status'=>'COMPLETED','contract'=>['version'=>1],'projectState'=>['businessProblem'=>'Przykład','contactName'=>'Klient']];
     $snapshot=projectSnapshot($session);
     if($snapshot['status']['build']!=='needs_you' || $snapshot['agentTasks'][0]['runner_phase']!=='waiting_merge') throw new RuntimeException('PR oczekujący na przegląd nie jest widoczny na mapie.');
-    $offerSession=array_replace($session,['internalAnalysis'=>['status'=>'COMPLETED']]);
+    $offerSession=array_replace($session,['internalAnalysis'=>['status'=>'COMPLETED','missingInformation'=>['Budżet testowy']]]);
+    $blockedOffer=projectSnapshot($offerSession);
+    if($blockedOffer['status']['offer']!=='needs_you') throw new RuntimeException('Oferta nie wskazuje decyzji administratora, gdy analiza ma nierozstrzygnięte braki.');
+    $offerSession['adminDecisions']=['Budżet testowy'=>['source'=>'HUMAN','answer'=>'Nieustalony; nie wpisywać do oferty.']];
+    if(projectSnapshot($offerSession)['status']['offer']!=='ready') throw new RuntimeException('Rozstrzygnięcie brakującej informacji nie odblokowało etapu oferty.');
+    $offerSession['adminDecisions']=[];
+    $offerSession['internalAnalysis']['missingInformation']=[];
     foreach(['DRAFT'=>'ready','REVIEWED'=>'needs_you','SENT'=>'needs_you','ACCEPTED'=>'done'] as $offerStatus=>$expected) {
         $offerSession['offer']=['status'=>$offerStatus];
         $snapshot=projectSnapshot($offerSession);
