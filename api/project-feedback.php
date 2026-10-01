@@ -43,11 +43,11 @@ if($jsonRequest) {
         $db->exec('BEGIN IMMEDIATE');
         $transactionOpen=true;
         $count=$db->prepare('SELECT COUNT(*) FROM project_feedback WHERE session_id=? AND created_at>=?'); $count->execute([$id,time()-3600]);
-        if((int)$count->fetchColumn()>=30) { $db->rollBack(); $fail('Osiągnięto limit 30 zgłoszeń na godzinę.',429); }
+        if((int)$count->fetchColumn()>=30) { $db->exec('ROLLBACK'); $fail('Osiągnięto limit 30 zgłoszeń na godzinę.',429); }
         $db->prepare('INSERT INTO project_feedback(session_id,image_digest,message,page_url,annotation_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?)')->execute([$id,$feedbackDigest,$message,$page,json_encode($safeAnnotation,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),time(),time()]);
-        $feedbackId=(int)$db->lastInsertId(); projectEnqueue($id,'classify_feedback_'.$feedbackId); projectEvent($id,'feedback','received','Klient','Nowa uwaga do wersji '.$feedbackDigest.'.'); $db->commit(); $transactionOpen=false;
+        $feedbackId=(int)$db->lastInsertId(); projectEnqueue($id,'classify_feedback_'.$feedbackId); projectEvent($id,'feedback','received','Klient','Nowa uwaga do wersji '.$feedbackDigest.'.'); $db->exec('COMMIT'); $transactionOpen=false;
     } catch(Throwable $error) {
-        if($transactionOpen && $db instanceof PDO) { try { $db->rollBack(); } catch(Throwable) {} }
+        if($transactionOpen && $db instanceof PDO) { try { $db->exec('ROLLBACK'); } catch(Throwable) {} }
         $diagnostic=['time'=>gmdate('c'),'reference'=>$requestId,'type'=>get_class($error),'code'=>(string)$error->getCode(),'message'=>substr(str_replace(["\r","\n"],' ',$error->getMessage()),0,1200)];
         try {
             $logPath=storage().'/feedback-errors.log';
@@ -66,8 +66,8 @@ if($_SERVER['REQUEST_METHOD']==='POST') {
     if(mb_strlen($message)<10 || mb_strlen($message)>4000 || mb_strlen($page)>1000) feedbackPage('Wpisz uwagę od 10 do 4000 znaków i spróbuj ponownie.',400);
     if($page!=='' && (!filter_var($page,FILTER_VALIDATE_URL) || !str_starts_with($page,'https://'))) feedbackPage('Adres strony musi być adresem HTTPS.',400);
     $db=projectDb(); $db->exec('BEGIN IMMEDIATE');
-    try { $count=$db->prepare('SELECT COUNT(*) FROM project_feedback WHERE session_id=? AND created_at>=?'); $count->execute([$id,time()-3600]); if((int)$count->fetchColumn()>=30) { $db->rollBack(); feedbackPage('Osiągnięto limit 30 zgłoszeń na godzinę. Spróbuj później.',429); } $db->prepare('INSERT INTO project_feedback(session_id,image_digest,message,page_url,created_at,updated_at) VALUES(?,?,?,?,?,?)')->execute([$id,$feedbackDigest,$message,$page,time(),time()]); $feedbackId=(int)$db->lastInsertId(); projectEnqueue($id,'classify_feedback_'.$feedbackId); projectEvent($id,'feedback','received','Klient','Nowa uwaga do wersji '.$feedbackDigest.'.'); $db->commit(); }
-    catch(Throwable $error) { if($db->inTransaction())$db->rollBack(); error_log('Feedback: '.$error->getMessage()); feedbackPage('Nie udało się zapisać uwagi.',500); }
+    try { $count=$db->prepare('SELECT COUNT(*) FROM project_feedback WHERE session_id=? AND created_at>=?'); $count->execute([$id,time()-3600]); if((int)$count->fetchColumn()>=30) { $db->exec('ROLLBACK'); feedbackPage('Osiągnięto limit 30 zgłoszeń na godzinę. Spróbuj później.',429); } $db->prepare('INSERT INTO project_feedback(session_id,image_digest,message,page_url,created_at,updated_at) VALUES(?,?,?,?,?,?)')->execute([$id,$feedbackDigest,$message,$page,time(),time()]); $feedbackId=(int)$db->lastInsertId(); projectEnqueue($id,'classify_feedback_'.$feedbackId); projectEvent($id,'feedback','received','Klient','Nowa uwaga do wersji '.$feedbackDigest.'.'); $db->exec('COMMIT'); }
+    catch(Throwable $error) { try { $db->exec('ROLLBACK'); } catch(Throwable) {}  error_log('Feedback: '.$error->getMessage()); feedbackPage('Nie udało się zapisać uwagi.',500); }
     feedbackPage('Dziękujemy. Uwaga została zapisana przy właściwej wersji podglądu.');
 }
 if($_SERVER['REQUEST_METHOD']!=='GET') feedbackPage('Niedozwolona metoda.',405);

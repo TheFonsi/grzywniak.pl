@@ -19,6 +19,8 @@ catch(InvalidArgumentException) {}
 
 $executionSource=(string)file_get_contents(__DIR__.'/../api/project-execution.php');
 if(str_contains($executionSource,'->commit()') || str_contains($executionSource,'->rollBack()')) throw new RuntimeException('BEGIN IMMEDIATE musi być kończony przez SQL COMMIT lub ROLLBACK.');
+$feedbackSource=(string)file_get_contents(__DIR__.'/../api/project-feedback.php');
+if(str_contains($feedbackSource,'->commit()') || str_contains($feedbackSource,'->rollBack()') || !str_contains($feedbackSource,"exec('COMMIT')") || !str_contains($feedbackSource,"exec('ROLLBACK')")) throw new RuntimeException('Formularz uwag musi kończyć ręcznie rozpoczętą transakcję SQL poleceniem COMMIT lub ROLLBACK.');
 
 $db=new PDO('sqlite::memory:');
 $db->setAttribute(PDO::ATTR_ERRMODE,PDO::ERRMODE_EXCEPTION);
