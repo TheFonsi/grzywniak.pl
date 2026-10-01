@@ -121,7 +121,23 @@ $session['contract']['offerVersion']=$session['offer']['version']; writeSession(
     plan = next(job for job in start[1]["project"]["jobs"] if job["kind"] == "generate_plan")
     assert plan["state"] == "queued", plan
 
-    print("HTTP workflow gates passed: fake test contact cannot complete a brief; DRAFT offer and stale contract are blocked; accepted current offer and matching contract queue the plan.")
+    # Execute exactly the deterministic planning job in the disposable API copy.
+    # The worker may enqueue repository creation, but this test must never call GitHub.
+    worker_env = dict(env, PROJECT_AI_MOCK="true")
+    worker = subprocess.run(["php", "api/project-worker.php", "--once"], cwd=work, env=worker_env, text=True, capture_output=True)
+    assert worker.returncode == 0, (worker.stdout, worker.stderr)
+    db = sqlite3.connect(work / "api" / "storage" / "sessions.sqlite")
+    case_row = db.execute("SELECT data FROM project_cases WHERE session_id=?", (session_id,)).fetchone()
+    assert case_row, "The worker should persist the generated project plan."
+    project_case = json.loads(case_row[0])
+    assert project_case["plan"]["templateDecision"]["templateId"] == "web-vite"
+    assert {task["id"] for task in project_case["plan"]["tasks"]} == {"ux", "frontend", "qa"}
+    states = dict(db.execute("SELECT kind,state FROM project_jobs WHERE session_id=?", (session_id,)).fetchall())
+    db.close()
+    assert states["generate_plan"] == "done", states
+    assert states["create_repository"] == "queued", states
+
+    print("HTTP workflow gates passed: fake test contact cannot complete a brief; DRAFT offer and stale contract are blocked; accepted current offer and matching contract queue and generate the plan; repository creation remains queued without contacting GitHub.")
 finally:
     server.terminate()
     server.wait(timeout=5)
