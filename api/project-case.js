@@ -39,7 +39,7 @@
   minimap.innerHTML = '<svg viewBox="0 0 3390 455" preserveAspectRatio="none"><g id="mini-nodes"></g><rect id="mini-viewport" y="0" height="455" fill="#89b0ff33" stroke="#a6c6ff" stroke-width="18"/></svg>';
   mapWrap.append(minimap);
   const miniStyle = document.createElement("style");
-  miniStyle.textContent = '.map-wrap{position:relative}.node.review{border-color:#c7a477;background:#3d322b}.map-hint{position:absolute;top:12px;right:13px;z-index:2;padding:6px 9px;border:1px solid #354969;border-radius:8px;background:#0b1524df;color:#aebfda;font-size:11px;pointer-events:none}.minimap{position:absolute;right:13px;bottom:13px;width:235px;height:72px;padding:5px;border:1px solid #52709d;border-radius:10px;background:#0b1524ed;box-shadow:0 8px 26px #0009;cursor:crosshair}.minimap svg{width:100%;height:100%}.minimap:hover,.minimap:focus-visible{border-color:#afc7ff;outline:0}@media(max-width:600px){.minimap{width:160px;height:53px}.map-hint{font-size:10px;right:9px;top:9px}}';
+  miniStyle.textContent = '.map-wrap{position:relative}.node.review{border-color:#c7a477;background:#3d322b}.map-hint{position:absolute;top:12px;right:13px;z-index:2;padding:6px 9px;border:1px solid #354969;border-radius:8px;background:#0b1524df;color:#aebfda;font-size:11px;pointer-events:none}.minimap{position:absolute;right:13px;bottom:13px;width:235px;height:72px;padding:5px;border:1px solid #52709d;border-radius:10px;background:#0b1524ed;box-shadow:0 8px 26px #0009;cursor:crosshair}.minimap svg{width:100%;height:100%}.minimap:hover,.minimap:focus-visible{border-color:#afc7ff;outline:0}.feedback-image-open{display:block;max-width:100%;padding:0;border:0;background:transparent;color:#abc1e7;text-align:left}.feedback-image-open:focus-visible{outline:2px solid #86a9ff;outline-offset:3px;border-radius:8px}.feedback-image-hint{font-size:11px}.feedback-review{display:grid;gap:10px;margin:14px 0;padding:14px;border:1px solid #526b99;border-radius:12px;background:#182640}.feedback-review>strong{font-size:14px}.feedback-review>p{margin:0;color:#b8c9e4;font-size:12px;line-height:1.5}.feedback-lightbox{position:fixed;inset:0;z-index:100;background:#030711ed;display:flex;align-items:center;justify-content:center;padding:60px 24px 24px}.feedback-lightbox[hidden]{display:none}.feedback-lightbox img{display:block;max-width:min(96vw,1800px);max-height:calc(100vh - 90px);object-fit:contain;border:1px solid #53698c;border-radius:8px;background:#fff;box-shadow:0 22px 80px #000b}.feedback-lightbox button{position:absolute;top:16px;right:20px;padding:9px 14px;border:1px solid #60749a;border-radius:10px;background:#17233a;color:#fff;font:inherit;cursor:pointer}@media(max-width:600px){.minimap{width:160px;height:53px}.map-hint{font-size:10px;right:9px;top:9px}}';
   document.head.append(miniStyle);
 
   function modalFormKey(form) {
@@ -316,10 +316,10 @@
       return section("Uwagi klienta", notes.length ? notes.map((note) => {
         const job = data.jobs.find((item) => item.kind === `classify_feedback_${note.id}`);
         const analysis = note.analysis || {};
-          const areas = Array.isArray(note.annotation?.areas) ? note.annotation.areas : (note.annotation?.rect ? [note.annotation] : []);
-        const annotationMarkup = areas.length ? `<div class="feedback-annotation"><strong>${areas.length} zaznaczonych obszarów</strong><div class="feedback-areas">${areas.map((area, index) => {
-            const storedRect = area.rect || {};
-            const mark = Array.isArray(storedRect) ? { x: storedRect[0], y: storedRect[1], width: storedRect[2], height: storedRect[3] } : storedRect;
+        const areas = Array.isArray(note.annotation?.areas) ? note.annotation.areas : (note.annotation?.rect ? [note.annotation] : []);
+        const annotationMarkup = areas.length ? `<div class="feedback-annotation"><strong>${areas.length} zaznaczonych obszar\u00f3w</strong><div class="feedback-areas">${areas.map((area, index) => {
+          const storedRect = area.rect || {};
+          const mark = Array.isArray(storedRect) ? { x: storedRect[0], y: storedRect[1], width: storedRect[2], height: storedRect[3] } : storedRect;
           const target = area.element || {};
           const viewportWidth = Math.max(1, Number(area.viewport?.width) || 16);
           const viewportHeight = Math.max(1, Number(area.viewport?.height) || 9);
@@ -329,14 +329,19 @@
           const scale = Math.min(360 / cropWidth, 260 / cropHeight);
           const thumbWidth = cropWidth * scale;
           const thumbHeight = cropHeight * scale;
-          const capturedPage = typeof area.screenshot === "string" && area.screenshot.startsWith("data:image/jpeg;base64,")
-            ? `<img alt="Zrzut obrazu strony wokół obszaru ${index + 1}" src="${escapeHtml(area.screenshot)}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:fill">`
+          const hasScreenshot = typeof area.screenshot === "string" && area.screenshot.startsWith("data:image/jpeg;base64,");
+          const capturedPage = hasScreenshot
+            ? `<img alt="Zrzut obrazu strony wok\u00f3\u0142 zaznaczenia ${index + 1}" src="${escapeHtml(area.screenshot)}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:fill">`
             : typeof area.snapshot === "string" && area.snapshot.length ? `<iframe title="Starszy zapisany widok strony, obszar ${index + 1}" sandbox="" referrerpolicy="no-referrer" loading="lazy" srcdoc="${escapeHtml(area.snapshot)}" style="position:absolute;left:${-context.x * viewportWidth * scale}px;top:${-context.y * viewportHeight * scale}px;width:${viewportWidth}px;height:${viewportHeight}px;transform:scale(${scale});transform-origin:top left;pointer-events:none;border:0;background:#fff"></iframe>` : "";
           const markX = (Number(mark.x) - context.x) / context.width;
           const markY = (Number(mark.y) - context.y) / context.height;
-          return `<div class="feedback-area"><strong>Obszar ${index + 1}</strong><div aria-label="Zrzut obrazu strony z zaznaczeniem klienta" style="position:relative;overflow:hidden;width:${thumbWidth}px;height:${thumbHeight}px;max-width:100%;background:#e9eef5;border:1px solid #9aaabd;border-radius:6px;margin:8px 0">${capturedPage}<span style="position:absolute;left:${Math.max(0, Math.min(100, markX * 100))}%;top:${Math.max(0, Math.min(100, markY * 100))}%;width:${Math.max(0, Math.min(100, Number(mark.width) / context.width * 100))}%;height:${Math.max(0, Math.min(100, Number(mark.height) / context.height * 100))}%;background:#3284df55;border:2px solid #1670ce;box-sizing:border-box"></span></div>${area.note ? `<p><strong>Notatka klienta:</strong> ${escapeHtml(area.note)}</p>` : ""}<small>Przewinięcie strony: ${escapeHtml(area.scroll?.y || 0)} px<br>${target.id ? `#${escapeHtml(target.id)}` : ""}${target.classes ? ` · ${escapeHtml(target.classes)}` : ""}${target.text ? `<br>${escapeHtml(target.text)}` : ""}</small></div>`;
+          const crop = `<div class="feedback-crop" aria-label="Zrzut strony z zaznaczeniem klienta" style="position:relative;overflow:hidden;width:${thumbWidth}px;height:${thumbHeight}px;max-width:100%;background:#e9eef5;border:1px solid #9aaabd;border-radius:6px;margin:8px 0">${capturedPage}<span style="position:absolute;left:${Math.max(0, Math.min(100, markX * 100))}%;top:${Math.max(0, Math.min(100, markY * 100))}%;width:${Math.max(0, Math.min(100, Number(mark.width) / context.width * 100))}%;height:${Math.max(0, Math.min(100, Number(mark.height) / context.height * 100))}%;background:#3284df55;border:2px solid #1670ce;box-sizing:border-box"></span></div>`;
+          const imageView = hasScreenshot ? `<button class="feedback-image-open" type="button" aria-label="Powi\u0119ksz obraz obszaru ${index + 1}">${crop}<span class="feedback-image-hint">Kliknij, aby powi\u0119kszy\u0107</span></button>` : crop;
+          return `<div class="feedback-area"><strong>Obszar ${index + 1}</strong>${imageView}${area.note ? `<p><strong>Notatka klienta:</strong> ${escapeHtml(area.note)}</p>` : ""}<small>Przewini\u0119cie strony: ${escapeHtml(area.scroll?.y || 0)} px<br>${target.id ? `#${escapeHtml(target.id)}` : ""}${target.classes ? ` \u00b7 ${escapeHtml(target.classes)}` : ""}${target.text ? `<br>${escapeHtml(target.text)}` : ""}</small></div>`;
         }).join("")}</div></div>` : "";
-        return `<div class="event"><time>${date(note.created_at)} · wersja ${escapeHtml(note.image_digest)}</time><p>${escapeHtml(note.message)}</p>${note.page_url ? `<p><strong>Podstrona klienta (informacja wewnętrzna):</strong> <code>${escapeHtml(note.page_url)}</code></p>` : ""}${annotationMarkup}<p>Stan: ${escapeHtml(note.state)}${note.category ? ` · ${escapeHtml(categories[note.category] || note.category)}` : ""}</p>${analysis.rationale ? `<p><strong>Ocena agenta:</strong> ${escapeHtml(analysis.rationale)}</p><p><strong>Dalszy krok:</strong> ${escapeHtml(analysis.suggestedAction || "")}</p><p>Zakres: ${escapeHtml(analysis.scopeImpact || "")} · termin: ${escapeHtml(analysis.timelineImpact || "")}</p>` : ""}${note.state === "new" ? `<p>Klasyfikacja: ${escapeHtml(job?.state || "w kolejce")}</p>${job?.error ? `<p class="error-text">${escapeHtml(job.error)}</p><form class="form" data-action="retry_job"><input type="hidden" name="kind" value="${escapeHtml(job.kind)}"><button class="primary">Ponów klasyfikację</button></form>` : ""}` : ""}${note.state === "triaged" && note.category === "bug" ? `<form class="form" data-action="request_fix"><input type="hidden" name="feedbackId" value="${escapeHtml(note.id)}"><button class="primary">Zleć poprawkę agentom</button></form>` : ""}${["triaged", "fixed_pending_client"].includes(note.state) ? `<form class="form" data-action="resolve_feedback"><input type="hidden" name="feedbackId" value="${escapeHtml(note.id)}"><label>Podstawa rozstrzygnięcia lub akceptacji poprawki<textarea name="resolution" rows="2" minlength="8" maxlength="1000" required></textarea></label><button class="primary">Zapisz rozstrzygnięcie</button></form>` : ""}</div>`;
+        const editableMessage = note.admin_message ?? note.message;
+        const review = note.state === "triaged" && note.category === "bug" ? `<div class="feedback-review"><strong>Weryfikacja przed przekazaniem</strong><p>Agenci nie rozpoczn\u0105 poprawki, dop\u00f3ki nie zatwierdzisz tre\u015bci. Mo\u017cesz najpierw zapisa\u0107 redakcj\u0119 robocz\u0105.</p><form class="form" data-action="edit_feedback"><input type="hidden" name="feedbackId" value="${escapeHtml(note.id)}"><label>Tre\u015b\u0107 przygotowana dla agent\u00f3w<textarea name="message" rows="4" minlength="10" maxlength="4000" required>${escapeHtml(editableMessage)}</textarea></label><button class="tool">Zapisz redakcj\u0119 bez zlecania pracy</button></form><form class="form" data-action="request_fix"><input type="hidden" name="feedbackId" value="${escapeHtml(note.id)}"><label>Tre\u015b\u0107 zatwierdzana dla agent\u00f3w<textarea name="message" rows="4" minlength="10" maxlength="4000" required>${escapeHtml(editableMessage)}</textarea></label><button class="primary">Zatwierd\u017a i przeka\u017c agentom</button></form></div>` : note.state === "in_fix" ? `<p><strong>Tre\u015b\u0107 zatwierdzona dla agent\u00f3w:</strong> ${escapeHtml(note.approved_message || note.admin_message || note.message)}${note.approved_by ? `<br><small>Zatwierdzi\u0142: ${escapeHtml(note.approved_by)}${note.approved_at ? ` \u00b7 ${date(note.approved_at)}` : ""}</small>` : ""}</p>` : "";
+        return `<div class="event"><time>${date(note.created_at)} \u00b7 wersja ${escapeHtml(note.image_digest)}</time><p><strong>Oryginalna tre\u015b\u0107 klienta:</strong> ${escapeHtml(note.message)}</p>${note.admin_message && note.state === "triaged" ? `<p><strong>Zapisana redakcja:</strong> ${escapeHtml(note.admin_message)}</p>` : ""}${note.page_url ? `<p><strong>Podstrona klienta (informacja wewn\u0119trzna):</strong> <code>${escapeHtml(note.page_url)}</code></p>` : ""}${annotationMarkup}<p>Stan: ${escapeHtml(note.state)}${note.category ? ` \u00b7 ${escapeHtml(categories[note.category] || note.category)}` : ""}</p>${analysis.rationale ? `<p><strong>Ocena agenta:</strong> ${escapeHtml(analysis.rationale)}</p><p><strong>Dalszy krok:</strong> ${escapeHtml(analysis.suggestedAction || "")}</p><p>Zakres: ${escapeHtml(analysis.scopeImpact || "")} \u00b7 termin: ${escapeHtml(analysis.timelineImpact || "")}</p>` : ""}${note.state === "new" ? `<p>Klasyfikacja: ${escapeHtml(job?.state || "w kolejce")}</p>${job?.error ? `<p class="error-text">${escapeHtml(job.error)}</p><form class="form" data-action="retry_job"><input type="hidden" name="kind" value="${escapeHtml(job.kind)}"><button class="primary">Pon\u00f3w klasyfikacj\u0119</button></form>` : ""}` : ""}${review}${["triaged", "fixed_pending_client"].includes(note.state) ? `<form class="form" data-action="resolve_feedback"><input type="hidden" name="feedbackId" value="${escapeHtml(note.id)}"><label>Podstawa rozstrzygni\u0119cia lub akceptacji poprawki<textarea name="resolution" rows="2" minlength="8" maxlength="1000" required></textarea></label><button class="primary">Zapisz rozstrzygni\u0119cie</button></form>` : ""}</div>`;
       }).join("") : "<p>Nie ma jeszcze uwag do wysłanej wersji.</p>", true);
     }
     if (stageId === "release") {
@@ -401,9 +406,42 @@
     event.preventDefault();
     submitAction(form);
   });
+  let lightboxTrigger;
+  function closeFeedbackLightbox() {
+    const lightbox = $(".feedback-lightbox");
+    if (!lightbox) return;
+    lightbox.remove();
+    lightboxTrigger?.focus?.();
+    lightboxTrigger = null;
+  }
+  $("#dialog-content").addEventListener("click", (event) => {
+    const trigger = event.target.closest(".feedback-image-open");
+    if (!trigger) return;
+    const source = trigger.querySelector("img")?.currentSrc;
+    if (!source) return;
+    closeFeedbackLightbox();
+    lightboxTrigger = trigger;
+    const lightbox = document.createElement("div");
+    lightbox.className = "feedback-lightbox";
+    lightbox.setAttribute("role", "dialog");
+    lightbox.setAttribute("aria-modal", "true");
+    lightbox.setAttribute("aria-label", "Powiększony obraz zaznaczenia klienta");
+    const close = document.createElement("button");
+    close.type = "button";
+    close.textContent = "Zamknij ✕";
+    close.setAttribute("aria-label", "Zamknij powiększony obraz");
+    close.addEventListener("click", closeFeedbackLightbox);
+    const image = document.createElement("img");
+    image.src = source;
+    image.alt = trigger.querySelector("img")?.alt || "Zrzut strony z zaznaczeniem klienta";
+    lightbox.addEventListener("click", (closeEvent) => { if (closeEvent.target === lightbox) closeFeedbackLightbox(); });
+    lightbox.append(close, image);
+    document.body.append(lightbox);
+    close.focus();
+  });
   $("#close").addEventListener("click", closeStage);
   $("#overlay").addEventListener("click", (event) => { if (event.target.id === "overlay") closeStage(); });
-  document.addEventListener("keydown", (event) => { if (event.key === "Escape" && !$("#overlay").hidden) closeStage(); });
+  document.addEventListener("keydown", (event) => { if (event.key === "Escape" && $(".feedback-lightbox")) { closeFeedbackLightbox(); return; } if (event.key === "Escape" && !$("#overlay").hidden) closeStage(); });
   $("#refresh").addEventListener("click", () => load(Boolean(currentStage)).catch(showError));
   $("#zoom-in").addEventListener("click", () => changeZoom(0.15));
   $("#zoom-out").addEventListener("click", () => changeZoom(-0.15));
@@ -429,7 +467,7 @@
   }
   load().then(focusCurrent).catch(showError);
   setInterval(() => {
-    if (document.hidden || $("#dialog-content form :focus")) return;
+    if (document.hidden || $("#dialog-content form :focus") || $(".feedback-lightbox")) return;
     load(Boolean(currentStage)).catch(showError);
   }, 5000);
 })();

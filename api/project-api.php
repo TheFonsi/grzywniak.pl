@@ -163,18 +163,29 @@ try {
         $stmt->execute([time(),$feedbackId,$id]);
         if($stmt->rowCount()!==1) throw new DomainException('Uwaga nie jest już otwarta.');
         projectEvent($id,'feedback','resolved',$adminUser,'Uwaga #'.$feedbackId.': '.$resolution);
+    } elseif($action==='edit_feedback') {
+        $feedbackId=filter_var($body['feedbackId']??null,FILTER_VALIDATE_INT);
+        $message=trim((string)($body['message']??''));
+        if(!$feedbackId || mb_strlen($message)<10 || mb_strlen($message)>4000) throw new DomainException('Poprawiona treść musi mieć od 10 do 4000 znaków.');
+        $stmt=$db->prepare("UPDATE project_feedback SET admin_message=?,updated_at=? WHERE id=? AND session_id=? AND state='triaged' AND category='bug'");
+        $stmt->execute([$message,time(),$feedbackId,$id]);
+        if($stmt->rowCount()!==1) throw new DomainException('Tę uwagę można edytować tylko przed zatwierdzeniem poprawki.');
+        projectEvent($id,'feedback','edited',$adminUser,'Zapisano redakcję uwagi #'.$feedbackId.'. Nie przekazano jej agentom.');
     } elseif($action==='request_fix') {
         $feedbackId=filter_var($body['feedbackId']??null,FILTER_VALIDATE_INT);
-        if(!$feedbackId) throw new DomainException('Niepoprawna uwaga.');
+        $message=trim((string)($body['message']??''));
+        if(!$feedbackId || mb_strlen($message)<10 || mb_strlen($message)>4000) throw new DomainException('Treść dla agentów musi mieć od 10 do 4000 znaków.');
         $find=$db->prepare("SELECT message,image_digest FROM project_feedback WHERE id=? AND session_id=? AND state='triaged' AND category='bug'");
         $find->execute([$feedbackId,$id]); $feedback=$find->fetch(PDO::FETCH_ASSOC);
         if(!$feedback) throw new DomainException('Uwaga nie jest już otwarta.');
         $fix='fix_'.$feedbackId; $qa='qa_fix_'.$feedbackId;
         $insert=$db->prepare('INSERT OR IGNORE INTO project_agent_tasks(session_id,task_key,title,role,dependencies,acceptance,updated_at) VALUES(?,?,?,?,?,?,?)');
-        $insert->execute([$id,$fix,'Popraw uwagę klienta #'.$feedbackId,'frontend','[]',json_encode(['Zrealizuj uwagę do wersji '.$feedback['image_digest'].': '.$feedback['message'],'Otwórz pull request i przejdź CI.'],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),time()]);
+        $insert->execute([$id,$fix,'Popraw uwagę klienta #'.$feedbackId,'frontend','[]',json_encode(['Zrealizuj wyłącznie treść zatwierdzoną przez administratora do wersji '.$feedback['image_digest'].': '.$message,'Otwórz pull request i przejdź CI.'],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),time()]);
         $insert->execute([$id,$qa,'Sprawdź poprawkę #'.$feedbackId,'qa',json_encode([$fix],JSON_THROW_ON_ERROR),json_encode(['Sprawdź poprawkę, bezpieczeństwo i regresję.','Zwróć commitSha, imageDigest i qaPassed dla nowej wersji.'],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),time()]);
-        $db->prepare("UPDATE project_feedback SET state='in_fix',updated_at=? WHERE id=? AND session_id=?")->execute([time(),$feedbackId,$id]);
-        projectEvent($id,'feedback','fix_requested',$adminUser,'Zlecono poprawkę uwagi #'.$feedbackId.' oraz ponowną kontrolę QA.');
+        $approve=$db->prepare("UPDATE project_feedback SET admin_message=?,approved_message=?,approved_by=?,approved_at=?,state='in_fix',updated_at=? WHERE id=? AND session_id=? AND state='triaged' AND category='bug'");
+        $approve->execute([$message,$message,$adminUser,time(),time(),$feedbackId,$id]);
+        if($approve->rowCount()!==1) throw new DomainException('Uwaga została już zatwierdzona lub zmieniła stan.');
+        projectEvent($id,'feedback','fix_requested',$adminUser,'Zatwierdzono treść i zlecono agentom poprawkę uwagi #'.$feedbackId.' oraz ponowną kontrolę QA.');
     } elseif($action==='approve_production') {
         $evidence=trim((string)($body['evidence']??''));
         if(mb_strlen($evidence)<8 || mb_strlen($evidence)>1000) throw new DomainException('Zapisz podstawę akceptacji klienta i decyzji produkcyjnej (8–1000 znaków).');

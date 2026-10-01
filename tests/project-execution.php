@@ -36,6 +36,9 @@ $capacityDb->setAttribute(PDO::ATTR_ERRMODE,PDO::ERRMODE_EXCEPTION);
 $capacityDb->exec("CREATE TABLE project_agent_tasks(state TEXT); CREATE TABLE project_ai_calls(state TEXT); INSERT INTO project_agent_tasks VALUES('running'),('done'); INSERT INTO project_ai_calls VALUES('reserved'),('settled')");
 if(projectAiCapacityUsed($capacityDb)!==2 || !projectJobRequiresAiCapacity('classify_feedback_17') || !projectJobRequiresAiCapacity('generate_plan') || projectJobRequiresAiCapacity('publish_preview')) throw new RuntimeException('Limit równoległości musi liczyć tylko zadania aktywne, a wywołania AI muszą czekać w kolejce.');
 $adminSource=(string)file_get_contents(__DIR__.'/../api/project-case.js');
+if(!str_contains($adminSource,'feedback-image-open') || !str_contains($adminSource,'feedback-lightbox') || !str_contains($adminSource,'data-action="edit_feedback"') || !str_contains($adminSource,'data-action="request_fix"')) throw new RuntimeException('Panel must support image zoom, editing, and approval before agent work.');
+$projectApiSource=(string)file_get_contents(__DIR__.'/../api/project-api.php');
+if(!str_contains($projectApiSource,'SET admin_message=?') || !str_contains($projectApiSource,'approved_message=?') || !str_contains($projectApiSource,"state='triaged' AND category='bug'")) throw new RuntimeException('Only an administrator-approved edit may be sent to coding agents.');
 if(!str_contains($adminSource,'sandbox=""') || !str_contains($adminSource,'srcdoc="${escapeHtml(area.snapshot)}"')) throw new RuntimeException('Panel musi bezpiecznie renderować zapisany podgląd klienta obok zaznaczenia.');
 
 $db=new PDO('sqlite::memory:');
