@@ -13,6 +13,8 @@ if ($from === false || $to === false) throw new RuntimeException('Offer function
 eval(substr($offerSource, $from, $to - $from));
 function checkE2E(bool $ok, string $message): void { if (!$ok) throw new RuntimeException($message); }
 
+$discoveryPrompt = file_get_contents(__DIR__ . '/../api/discovery-prompt.php');
+checkE2E(str_contains($discoveryPrompt, 'projectStateUpdate.contactName') && str_contains($discoveryPrompt, 'nazwa firmy:'), 'A name given in natural conversation must be saved to the contact/company field.');
 $id = bin2hex(random_bytes(16));
 $session = [
     'id' => $id, 'status' => 'COMPLETED', 'createdAt' => time(), 'updatedAt' => time(),
