@@ -73,7 +73,9 @@
     const scale = Math.min(thumbWidth / width, thumbHeight / height);
     const frame = document.createElement("iframe");
     frame.title = `Podgląd zaznaczonego obszaru ${index + 1}`;
-    frame.setAttribute("sandbox", "");
+    // The snapshot needs its original same-origin stylesheets and assets to render.
+    // Scripts remain blocked by the sandbox.
+    frame.setAttribute("sandbox", "allow-same-origin");
     frame.setAttribute("aria-hidden", "true");
     frame.style.width = `${annotation.viewport.width}px`;
     frame.style.height = `${annotation.viewport.height}px`;

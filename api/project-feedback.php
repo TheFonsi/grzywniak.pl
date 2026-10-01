@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__.'/project-model.php';
+require_once __DIR__.'/project-settings-model.php';
 header('Content-Type: text/html; charset=utf-8');
 header('Cache-Control: no-store');
 header('Referrer-Policy: no-referrer');
@@ -30,16 +31,26 @@ if($jsonRequest) {
     if($_SERVER['REQUEST_METHOD']!=='POST') { http_response_code(405); echo json_encode(['message'=>'Niedozwolona metoda.']); exit; }
     $message=trim((string)($payload['message']??'')); $page=trim((string)($payload['page_url']??'')); $annotation=$payload['annotation']??null;
     $fail=static function(string $message,int $status): never { http_response_code($status); echo json_encode(['message'=>$message],JSON_UNESCAPED_UNICODE); exit; };
-    if(mb_strlen($message)<10 || mb_strlen($message)>4000 || mb_strlen($page)>1000) $fail('Wpisz uwagę od 10 do 4000 znaków.',400);
+    $messageLength=function_exists('mb_strlen')?mb_strlen($message,'UTF-8'):strlen($message);
+    $pageLength=function_exists('mb_strlen')?mb_strlen($page,'UTF-8'):strlen($page);
+    if($messageLength<10 || $messageLength>4000 || $pageLength>1000) $fail('Wpisz uwagę od 10 do 4000 znaków.',400);
     if($page!=='' && (!filter_var($page,FILTER_VALIDATE_URL)||!str_starts_with($page,'https://'))) $fail('Adres strony musi być adresem HTTPS.',400);
     try { $safeAnnotation=projectNormalizeFeedbackAnnotation($annotation); } catch(InvalidArgumentException $error) { $fail($error->getMessage(),400); }
-    $db=projectDb(); $db->exec('BEGIN IMMEDIATE');
+    $db=null; $transactionOpen=false;
     try {
+        $db=projectDb();
+        $db->exec('BEGIN IMMEDIATE');
+        $transactionOpen=true;
         $count=$db->prepare('SELECT COUNT(*) FROM project_feedback WHERE session_id=? AND created_at>=?'); $count->execute([$id,time()-3600]);
         if((int)$count->fetchColumn()>=30) { $db->rollBack(); $fail('Osiągnięto limit 30 zgłoszeń na godzinę.',429); }
         $db->prepare('INSERT INTO project_feedback(session_id,image_digest,message,page_url,annotation_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?)')->execute([$id,$feedbackDigest,$message,$page,json_encode($safeAnnotation,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),time(),time()]);
-        $feedbackId=(int)$db->lastInsertId(); projectEnqueue($id,'classify_feedback_'.$feedbackId); projectEvent($id,'feedback','received','Klient','Nowa uwaga do wersji '.$feedbackDigest.'.'); $db->commit();
-    } catch(Throwable $error) { if($db->inTransaction())$db->rollBack(); error_log('Feedback: '.$error->getMessage()); $fail('Nie udało się zapisać uwagi.',500); }
+        $feedbackId=(int)$db->lastInsertId(); projectEnqueue($id,'classify_feedback_'.$feedbackId); projectEvent($id,'feedback','received','Klient','Nowa uwaga do wersji '.$feedbackDigest.'.'); $db->commit(); $transactionOpen=false;
+    } catch(Throwable $error) {
+        if($transactionOpen && $db instanceof PDO) { try { $db->rollBack(); } catch(Throwable) {} }
+        error_log('Feedback: '.$error->getMessage());
+        if($error instanceof PDOException && str_contains(strtolower($error->getMessage()),'locked')) $fail('Serwer jest chwilowo zajęty. Twoja uwaga nie została wysłana; spróbuj ponownie.',503);
+        $fail('Nie udało się zapisać uwagi. Spróbuj ponownie za chwilę.',500);
+    }
     http_response_code(201); echo json_encode(['message'=>'Uwaga została zapisana przy właściwej wersji podglądu.'],JSON_UNESCAPED_UNICODE); exit;
 }
 if($_SERVER['REQUEST_METHOD']==='POST') {

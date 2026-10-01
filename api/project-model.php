@@ -142,7 +142,7 @@ function projectNormalizeFeedbackAnnotation(mixed $annotation): array {
         foreach(['x','y','width','height'] as $key) if(!isset($rect[$key])||!is_numeric($rect[$key])||(float)$rect[$key]<0||(float)$rect[$key]>1) throw new InvalidArgumentException('Niepoprawne zaznaczenie obszaru.');
         if((float)$rect['width']<=0 || (float)$rect['height']<=0) throw new InvalidArgumentException('Zaznaczony obszar jest pusty.');
         $element=is_array($area['element']??null)?array_intersect_key($area['element'],array_flip(['tag','id','classes','text'])):[];
-        foreach($element as $key=>$value) $element[$key]=mb_substr(trim((string)$value),0,240);
+        foreach($element as $key=>$value) $element[$key]=function_exists('mb_substr')?mb_substr(trim((string)$value),0,240,'UTF-8'):substr(trim((string)$value),0,240);
         $safe[]=['rect'=>array_map(static fn($key)=>(float)$rect[$key],['x','y','width','height']),'viewport'=>['width'=>max(1,min(10000,(int)($area['viewport']['width']??1))),'height'=>max(1,min(10000,(int)($area['viewport']['height']??1)))],'scroll'=>['x'=>max(0,min(100000,(int)($area['scroll']['x']??0))),'y'=>max(0,min(100000,(int)($area['scroll']['y']??0)))],'element'=>$element];
     }
     return ['areas'=>$safe];

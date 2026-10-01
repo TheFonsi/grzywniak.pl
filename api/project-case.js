@@ -19,6 +19,9 @@
   let refreshing = false;
   const mapShell = $("#map-shell");
   const mapBoard = $("#map-board");
+  const mapHint = document.createElement("div");
+  mapHint.className = "map-hint";
+  mapHint.textContent = "Kółko myszy przewija mapę poziomo";
   const mapSizer = document.createElement("div");
   mapSizer.style.cssText = "position:relative;width:3390px;height:455px";
   mapBoard.replaceWith(mapSizer);
@@ -28,6 +31,7 @@
   mapWrap.className = "map-wrap";
   mapShell.replaceWith(mapWrap);
   mapWrap.append(mapShell);
+  mapWrap.append(mapHint);
   const minimap = document.createElement("button");
   minimap.type = "button";
   minimap.className = "minimap";
@@ -35,7 +39,7 @@
   minimap.innerHTML = '<svg viewBox="0 0 3390 455" preserveAspectRatio="none"><g id="mini-nodes"></g><rect id="mini-viewport" y="0" height="455" fill="#89b0ff33" stroke="#a6c6ff" stroke-width="18"/></svg>';
   mapWrap.append(minimap);
   const miniStyle = document.createElement("style");
-  miniStyle.textContent = '.map-wrap{position:relative}.node.review{border-color:#c7a477;background:#3d322b}.minimap{position:absolute;right:13px;bottom:13px;width:235px;height:72px;padding:5px;border:1px solid #52709d;border-radius:10px;background:#0b1524ed;box-shadow:0 8px 26px #0009;cursor:crosshair}.minimap svg{width:100%;height:100%}.minimap:hover,.minimap:focus-visible{border-color:#afc7ff;outline:0}@media(max-width:600px){.minimap{width:160px;height:53px}}';
+  miniStyle.textContent = '.map-wrap{position:relative}.node.review{border-color:#c7a477;background:#3d322b}.map-hint{position:absolute;top:12px;right:13px;z-index:2;padding:6px 9px;border:1px solid #354969;border-radius:8px;background:#0b1524df;color:#aebfda;font-size:11px;pointer-events:none}.minimap{position:absolute;right:13px;bottom:13px;width:235px;height:72px;padding:5px;border:1px solid #52709d;border-radius:10px;background:#0b1524ed;box-shadow:0 8px 26px #0009;cursor:crosshair}.minimap svg{width:100%;height:100%}.minimap:hover,.minimap:focus-visible{border-color:#afc7ff;outline:0}@media(max-width:600px){.minimap{width:160px;height:53px}.map-hint{font-size:10px;right:9px;top:9px}}';
   document.head.append(miniStyle);
 
   function modalFormKey(form) {
@@ -396,6 +400,15 @@
   function focusCurrent() { if (!project) return; const stage = project.stages.find((item) => ["needs_you", "error", "working", "queued", "ready"].includes(project.status[item.id])) || project.stages.at(-1); $("#map-shell").scrollTo({ left: Math.max(0, stage.x * zoom - $("#map-shell").clientWidth / 2 + 100), top: 0, behavior: "smooth" }); }
   function updateMinimap() { const viewport = $("#mini-viewport"); viewport.setAttribute("x", String(mapShell.scrollLeft / zoom)); viewport.setAttribute("width", String(Math.min(3390, mapShell.clientWidth / zoom))); }
   mapShell.addEventListener("scroll", updateMinimap);
+  mapShell.addEventListener("wheel", (event) => {
+    if (event.ctrlKey || mapShell.scrollWidth <= mapShell.clientWidth) return;
+    const delta = event.deltaX || event.deltaY;
+    if (!delta) return;
+    const next = Math.max(0, Math.min(mapShell.scrollWidth - mapShell.clientWidth, mapShell.scrollLeft + delta));
+    if (next === mapShell.scrollLeft) return;
+    event.preventDefault();
+    mapShell.scrollLeft = next;
+  }, { passive: false });
   minimap.addEventListener("click", (event) => { const rect = minimap.getBoundingClientRect(); const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left - 5) / Math.max(1, rect.width - 10))); mapShell.scrollTo({ left: ratio * 3390 * zoom - mapShell.clientWidth / 2, behavior: "smooth" }); });
   function showError(error) {
     $("#summary").textContent = error.message || "Nie udało się pobrać sprawy.";
