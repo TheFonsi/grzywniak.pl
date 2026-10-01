@@ -26,6 +26,10 @@ function projectDb(): PDO {
     if(!in_array('approved_message',array_column($feedbackColumns,'name'),true)) $db->exec('ALTER TABLE project_feedback ADD COLUMN approved_message TEXT');
     if(!in_array('approved_by',array_column($feedbackColumns,'name'),true)) $db->exec('ALTER TABLE project_feedback ADD COLUMN approved_by TEXT');
     if(!in_array('approved_at',array_column($feedbackColumns,'name'),true)) $db->exec('ALTER TABLE project_feedback ADD COLUMN approved_at INTEGER');
+    if(!in_array('admin_decision',array_column($feedbackColumns,'name'),true)) $db->exec('ALTER TABLE project_feedback ADD COLUMN admin_decision TEXT');
+    if(!in_array('decision_note',array_column($feedbackColumns,'name'),true)) $db->exec('ALTER TABLE project_feedback ADD COLUMN decision_note TEXT');
+    if(!in_array('decision_by',array_column($feedbackColumns,'name'),true)) $db->exec('ALTER TABLE project_feedback ADD COLUMN decision_by TEXT');
+    if(!in_array('decision_at',array_column($feedbackColumns,'name'),true)) $db->exec('ALTER TABLE project_feedback ADD COLUMN decision_at INTEGER');
     return $db;
 }
 
@@ -123,7 +127,7 @@ function projectAiCalls(string $id): array {
 }
 
 function projectFeedback(string $id): array {
-    $stmt=projectDb()->prepare('SELECT id,image_digest,message,admin_message,approved_message,approved_by,approved_at,page_url,state,category,analysis,annotation_json,created_at,updated_at FROM project_feedback WHERE session_id=? ORDER BY id DESC LIMIT 100');
+    $stmt=projectDb()->prepare('SELECT id,image_digest,message,admin_message,approved_message,approved_by,approved_at,admin_decision,decision_note,decision_by,decision_at,page_url,state,category,analysis,annotation_json,created_at,updated_at FROM project_feedback WHERE session_id=? ORDER BY id DESC LIMIT 100');
     $stmt->execute([$id]); $rows=$stmt->fetchAll(PDO::FETCH_ASSOC);
     foreach($rows as &$row) { $row['analysis']=json_decode((string)($row['analysis']??''),true); $row['annotation']=json_decode((string)($row['annotation_json']??''),true); unset($row['annotation_json']); }
     return $rows;
