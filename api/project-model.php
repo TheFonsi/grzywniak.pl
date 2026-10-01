@@ -54,6 +54,17 @@ function projectStages(): array {
     ];
 }
 
+function projectContractMatchesAcceptedOffer(array $session): bool {
+    $offer=$session['offer']??[];
+    $contract=$session['contract']??[];
+    $offerVersion=(int)($offer['version']??0);
+    return ($offer['status']??'')==='ACCEPTED'
+        && $offerVersion>0
+        && (int)($contract['version']??0)>0
+        && array_key_exists('offerVersion',$contract)
+        && (int)$contract['offerVersion']===$offerVersion;
+}
+
 function projectCase(string $id): array {
     $stmt = projectDb()->prepare('SELECT data FROM project_cases WHERE session_id = ?');
     $stmt->execute([$id]);
@@ -213,9 +224,10 @@ function projectSnapshot(array $session): array {
     $analysisDone=($session['internalAnalysis']['status']??'')==='COMPLETED';
     $offer=$session['offer']??[];
     $contract=$session['contract']??[];
-    $signed=(int)($case['contractSignedVersion']??0)>0 && (int)($case['contractSignedVersion']??0)===(int)($contract['version']??0);
+    $contractMatchesAcceptedOffer=projectContractMatchesAcceptedOffer($session);
+    $signed=$contractMatchesAcceptedOffer && (int)($case['contractSignedVersion']??0)>0 && (int)($case['contractSignedVersion']??0)===(int)($contract['version']??0);
     $started=!empty($case['startedAt']);
-    $sourceCurrent=$started && (int)($case['sourceContractVersion']??0)===(int)($contract['version']??0);
+    $sourceCurrent=$started && $contractMatchesAcceptedOffer && (int)($case['sourceContractVersion']??0)===(int)($contract['version']??0);
     $status=[];
     $status['brief']=$briefDone?'done':'waiting_client';
     $status['analysis']=$analysisDone?'done':($briefDone?'ready':'locked');
@@ -226,7 +238,7 @@ function projectSnapshot(array $session): array {
         return !is_array($decision)||($decision['source']??'')!=='HUMAN'||trim((string)($decision['answer']??''))==='';
     });
     $status['offer']=$offerStatus==='ACCEPTED'?'done':(in_array($offerStatus,['REVIEWED','SENT'],true)?'needs_you':(!$analysisDone?'locked':($missingOfferAnswers?'needs_you':'ready')));
-    $status['contract']=$signed?'done':(($contract['status']??'')==='SENT'?'needs_you':(($offer['status']??'')==='ACCEPTED'?'needs_you':'locked'));
+    $status['contract']=$signed?'done':(($offer['status']??'')==='ACCEPTED'?'needs_you':'locked');
     $status['kickoff']=$started?($sourceCurrent?'done':'review'):($signed?'needs_you':'locked');
     $status['plan']=projectJobStatus($jobByKind['generate_plan']??null,$started && $sourceCurrent);
     if($started && !$sourceCurrent && !empty($case['plan'])) $status['plan']='review';

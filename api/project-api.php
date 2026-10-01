@@ -50,6 +50,7 @@ try {
     if($action==='confirm_contract') {
         $contract=$session['contract']??[];
         $evidence=trim((string)($body['evidence']??''));
+        if(!projectContractMatchesAcceptedOffer($session)) throw new DomainException('Umowa musi dotyczyć aktualnej, zaakceptowanej wersji oferty.');
         if(empty($contract['pdfBase64']) || (int)($contract['version']??0)<1) throw new DomainException('Najpierw przygotuj aktualną wersję umowy PDF.');
         if(mb_strlen($evidence)<8 || mb_strlen($evidence)>500) throw new DomainException('Wpisz sposób i datę potwierdzenia zawarcia umowy (8–500 znaków).');
         $case['contractSignedVersion']=(int)$contract['version'];
@@ -59,6 +60,7 @@ try {
         projectEvent($id,'contract','confirmed',$adminUser,'Potwierdzono zawarcie umowy v'.$case['contractSignedVersion'].': '.$evidence);
     } elseif($action==='start') {
         $contract=$session['contract']??[];
+        if(!projectContractMatchesAcceptedOffer($session)) throw new DomainException('Najpierw zaakceptuj aktualną wersję oferty i przygotuj do niej umowę.');
         if(empty($case['contractSignedVersion']) || (int)$case['contractSignedVersion']!==(int)($contract['version']??0)) throw new DomainException('Potwierdź zawarcie aktualnej wersji umowy.');
         if(!empty($case['startedAt'])) throw new DomainException('Realizacja została już uruchomiona.');
         $scope=trim((string)($body['scope']??'')); $owner=trim((string)($body['owner']??'')); $budget=$body['budget']??null;
