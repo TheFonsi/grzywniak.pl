@@ -170,7 +170,7 @@ const submitPreviewFeedback = async (request, response, project) => {
     let body;
     try { body = JSON.parse(text); } catch { body = null; }
     if (!result.ok) return json(response, result.status, { ...(body && typeof body === 'object' ? body : {}), message: typeof body?.message === 'string' ? body.message : `Serwer formularza odrzucił zgłoszenie (HTTP ${result.status}). Spróbuj ponownie.` });
-    if (closing) await serialized(async () => { project.feedbackClosedDigest = project.feedbackDigest; await save(); });
+    if (closing) await serialized(async () => { project.feedbackClosedDigest = project.feedbackDigest; project.feedbackClosedAt = Number(body?.closedAt) || Math.floor(Date.now() / 1000); await save(); });
     return json(response, closing ? 200 : 201, body && typeof body.message === 'string' ? body : { message: closing ? 'Lista uwag zostala zamknieta.' : 'Uwaga zostala zapisana.' });
   } catch {
     return json(response, 502, { message: 'Nie udało się połączyć z API uwag. Twoje zgłoszenie pozostało w formularzu; spróbuj ponownie.' });
@@ -227,7 +227,7 @@ createServer(async (request, response) => {
       const hostname = String(request.headers['x-forwarded-host'] || request.headers.host || '').split(',')[0].split(':')[0].trim().toLowerCase();
       const project = Object.values(state.projects).find((item) => item.kind === 'preview' && item.hostname === hostname);
       if (!project || !previewPasswordMatches(project, request.headers.authorization || '') || !feedbackTokenPattern.test(project.feedbackToken || '')) return json(response, 404, { message: 'Konfiguracja uwag nie jest dostępna.' });
-      return json(response, 200, { projectId: project.projectId, feedbackToken: project.feedbackToken, feedbackUrl: project.feedbackUrl || '', feedbackClosed: project.feedbackClosedDigest === project.feedbackDigest && Boolean(project.feedbackDigest) });
+      return json(response, 200, { projectId: project.projectId, feedbackToken: project.feedbackToken, feedbackUrl: project.feedbackUrl || '', feedbackClosed: project.feedbackClosedDigest === project.feedbackDigest && Boolean(project.feedbackDigest), feedbackClosedAt: project.feedbackClosedDigest === project.feedbackDigest ? (project.feedbackClosedAt || null) : null });
     }
     const previewProject = previewProjectForHost(request.headers['x-forwarded-host'] || request.headers.host);
     if (previewProject && request.method === 'POST' && url.pathname === '/.well-known/grzywniak/feedback-submit') return await submitPreviewFeedback(request, response, previewProject);
@@ -263,7 +263,7 @@ createServer(async (request, response) => {
       const project = await serialized(async () => {
         const value = state.projects[`${body.projectId}:preview`];
         if (!value || value.hostname !== expectedHostname(body.projectId, 'preview') || !value.previewAuthHash) throw new Error('Najpierw zabezpiecz środowisko podglądu hasłem.');
-        if (value.feedbackDigest !== body.feedbackDigest) value.feedbackClosedDigest = null;
+        if (value.feedbackDigest !== body.feedbackDigest) { value.feedbackClosedDigest = null; value.feedbackClosedAt = null; }
         value.feedbackToken = body.feedbackToken; value.feedbackUrl = body.feedbackUrl; value.feedbackDigest = body.feedbackDigest;
         await save();
         return value;

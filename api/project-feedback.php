@@ -31,15 +31,15 @@ if($jsonRequest) {
     header('Content-Type: application/json; charset=utf-8');
     if($_SERVER['REQUEST_METHOD']!=='POST') { http_response_code(405); echo json_encode(['message'=>'Niedozwolona metoda.']); exit; }
     if(($payload['action']??'')==='close') {
-        if($feedbackClosed) { http_response_code(200); echo json_encode(['message'=>'Lista uwag jest juz zamknieta.','closed'=>true],JSON_UNESCAPED_UNICODE); exit; }
+        if($feedbackClosed) { $closedAt=(int)($case['feedbackClosedAt']??0); if(!$closedAt) { $lookup=projectDb()->prepare('SELECT closed_at FROM project_feedback_closures WHERE session_id=? AND image_digest=?'); $lookup->execute([$id,$feedbackDigest]); $closedAt=(int)$lookup->fetchColumn(); } http_response_code(200); echo json_encode(['message'=>'Lista uwag jest juz zamknieta.','closed'=>true,'closedAt'=>$closedAt],JSON_UNESCAPED_UNICODE); exit; }
         $db=projectDb(); $db->exec('BEGIN IMMEDIATE');
         try {
-            $db->prepare('INSERT OR IGNORE INTO project_feedback_closures(session_id,image_digest,closed_at) VALUES(?,?,?)')->execute([$id,$feedbackDigest,time()]);
-            $case['feedbackClosedDigest']=$feedbackDigest; projectSave($id,$case);
-            projectEvent($id,'feedback','client_closed','Klient','Klient potwierdzil wyslanie wszystkich uwag do wersji '.$feedbackDigest.'.');
+            $lookup=$db->prepare('SELECT closed_at FROM project_feedback_closures WHERE session_id=? AND image_digest=?'); $lookup->execute([$id,$feedbackDigest]); $closedAt=(int)$lookup->fetchColumn();
+            if(!$closedAt) { $closedAt=time(); $db->prepare('INSERT INTO project_feedback_closures(session_id,image_digest,closed_at) VALUES(?,?,?)')->execute([$id,$feedbackDigest,$closedAt]); projectEvent($id,'feedback','client_closed','Klient','Klient potwierdzil wyslanie wszystkich uwag do wersji '.$feedbackDigest.'.'); }
+            $case['feedbackClosedDigest']=$feedbackDigest; $case['feedbackClosedAt']=$closedAt; projectSave($id,$case);
             $db->exec('COMMIT');
         } catch(Throwable $error) { try{$db->exec('ROLLBACK');}catch(Throwable){} error_log('Feedback close failed: '.$error->getMessage()); http_response_code(500); echo json_encode(['message'=>'Nie udalo sie zamknac listy uwag. Sprobuj ponownie.'],JSON_UNESCAPED_UNICODE); exit; }
-        http_response_code(200); echo json_encode(['message'=>'Dziekujemy. Zglaszanie uwag do tej wersji zostalo zakonczone.','closed'=>true],JSON_UNESCAPED_UNICODE); exit;
+        http_response_code(200); echo json_encode(['message'=>'Dziekujemy. Zglaszanie uwag do tej wersji zostalo zakonczone.','closed'=>true,'closedAt'=>$closedAt],JSON_UNESCAPED_UNICODE); exit;
     }
     if($feedbackClosed) { http_response_code(409); echo json_encode(['message'=>'Zgłaszanie uwag do tej wersji zostało już zakończone.'],JSON_UNESCAPED_UNICODE); exit; }
     $requestId=bin2hex(random_bytes(6));

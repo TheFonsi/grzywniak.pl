@@ -53,7 +53,7 @@
   let annotations = [];
   let start = null;
   let viewerReturnTarget = null;
-  const setClosed = () => { config = config || {}; config.feedbackClosed = true; panel.classList.add("gw-closed"); launcher.disabled = false; launcher.textContent = "Uwagi zako\u0144czone"; launcher.title = "Zg\u0142aszanie uwag do tej wersji jest zako\u0144czone. Kliknij, aby zobaczy\u0107 potwierdzenie."; panel.querySelector(".gw-note").textContent = "Zg\u0142aszanie uwag do tej wersji zosta\u0142o zako\u0144czone."; const completion = panel.querySelector(".gw-completion"); completion.hidden = false; completion.textContent = "Dzi\u0119kujemy. Lista uwag zosta\u0142a zamkni\u0119ta. Nie mo\u017cna ju\u017c doda\u0107 uwag do tej wersji podgl\u0105du."; panel.querySelector(".gw-finish-note").hidden = true; form.querySelectorAll("button,textarea").forEach((control) => { control.disabled = true; }); select.disabled = true; };
+  const setClosed = () => { config = config || {}; config.feedbackClosed = true; panel.classList.add("gw-closed"); launcher.disabled = false; launcher.textContent = "Uwagi zako\u0144czone"; launcher.title = "Zg\u0142aszanie uwag do tej wersji jest zako\u0144czone. Kliknij, aby zobaczy\u0107 potwierdzenie."; panel.querySelector(".gw-note").textContent = "Zg\u0142aszanie uwag do tej wersji zosta\u0142o zako\u0144czone."; const completion = panel.querySelector(".gw-completion"); completion.hidden = false; const closedAt = Number(config.feedbackClosedAt); const closedLabel = closedAt ? ` ${new Date(closedAt * 1000).toLocaleString("pl-PL")}.` : ""; completion.textContent = `Dzi\u0119kujemy. Lista uwag zosta\u0142a zamkni\u0119ta${closedLabel} Nie mo\u017cna ju\u017c doda\u0107 uwag do tej wersji podgl\u0105du.`; panel.querySelector(".gw-finish-note").hidden = true; form.querySelectorAll("button,textarea").forEach((control) => { control.disabled = true; }); select.disabled = true; };
 
   const hideViewer = () => {
     viewer.classList.remove("gw-open");
@@ -303,6 +303,7 @@
       const response = await fetch("/.well-known/grzywniak/feedback-submit", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "close" }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message || "Nie uda\u0142o si\u0119 zamkn\u0105\u0107 listy uwag.");
+      config.feedbackClosedAt = Number(result.closedAt) || Math.floor(Date.now() / 1000);
       setClosed();
       message.textContent = result.message || "Zg\u0142aszanie uwag zosta\u0142o zako\u0144czone.";
     } catch (error) {

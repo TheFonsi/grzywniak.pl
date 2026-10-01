@@ -322,7 +322,9 @@
       const dispatchDisabled = !closed || undecided.length > 0 || approved.length === 0 || alreadySent;
       const dispatchReason = !digest ? "Najpierw wyslij klientowi aktualny podgl\u0105d." : !closed ? "Przekazanie odblokuje si\u0119, gdy klient potwierdzi w podgl\u0105dzie, \u017ce wys\u0142a\u0142 ju\u017c wszystkie uwagi." : undecided.length ? "Najpierw zaakceptuj albo odrzu\u0107 ka\u017cd\u0105 uwag\u0119 z tej wersji." : approved.length === 0 ? "Brak zaakceptowanych uwag do przekazania." : alreadySent ? "Pakiet uwag zosta\u0142 ju\u017c przekazany agentom." : "";
       const dispatch = `<section class="feedback-dispatch"><strong>Przekazanie uwag agentom</strong><p>${escapeHtml(dispatchReason || `${approved.length} zaakceptowanych uwag gotowych do przekazania.`)}</p><form class="form" data-action="dispatch_feedback_fixes"><button class="primary" ${dispatchDisabled ? "disabled" : ""}>Przeka\u017c zaakceptowane uwagi do poprawek</button></form></section>`;
-      const closure = closed ? `<p class="feedback-closed">Klient potwierdzi\u0142 zako\u0144czenie zg\u0142aszania uwag do tej wersji.</p>` : `<p class="feedback-open">Oczekujemy na potwierdzenie klienta, \u017ce lista uwag jest kompletna.</p>`;
+      const closureEvent = data.events.find((event) => event.stage === "feedback" && event.kind === "client_closed" && String(event.details).includes(digest));
+      const closedAt = Number(data.case.feedbackClosedAt) || Number(closureEvent?.created_at) || 0;
+      const closure = closed ? `<p class="feedback-closed">Klient potwierdzi\u0142 komplet uwag do tej wersji${closedAt ? `: ${date(closedAt)}.` : "."}</p>` : `<p class="feedback-open">Oczekujemy na potwierdzenie klienta, \u017ce lista uwag jest kompletna.</p>`;
       const rendered = notes.length ? notes.map((note) => {
         const areas = Array.isArray(note.annotation?.areas) ? note.annotation.areas : (note.annotation?.rect ? [note.annotation] : []);
         const annotationMarkup = areas.length ? `<div class="feedback-annotation"><strong>${areas.length} zaznaczonych obszar\u00f3w</strong><div class="feedback-areas">${areas.map((area, index) => {
