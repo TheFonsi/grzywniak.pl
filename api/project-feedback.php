@@ -30,6 +30,11 @@ if($jsonRequest) {
     if($_SERVER['REQUEST_METHOD']==='OPTIONS') { http_response_code(204); exit; }
     header('Content-Type: application/json; charset=utf-8');
     if($_SERVER['REQUEST_METHOD']!=='POST') { http_response_code(405); echo json_encode(['message'=>'Niedozwolona metoda.']); exit; }
+    if(($payload['action']??'')==='status') {
+        $lookup=projectDb()->prepare('SELECT closed_at FROM project_feedback_closures WHERE session_id=? AND image_digest=?'); $lookup->execute([$id,$feedbackDigest]); $closedAt=(int)$lookup->fetchColumn();
+        if(!$closedAt && $feedbackClosed) $closedAt=(int)($case['feedbackClosedAt']??0);
+        http_response_code(200); echo json_encode(['feedbackClosed'=>$closedAt>0 || $feedbackClosed,'feedbackClosedAt'=>$closedAt?:null],JSON_UNESCAPED_UNICODE); exit;
+    }
     if(($payload['action']??'')==='close') {
         if($feedbackClosed) { $closedAt=(int)($case['feedbackClosedAt']??0); if(!$closedAt) { $lookup=projectDb()->prepare('SELECT closed_at FROM project_feedback_closures WHERE session_id=? AND image_digest=?'); $lookup->execute([$id,$feedbackDigest]); $closedAt=(int)$lookup->fetchColumn(); } http_response_code(200); echo json_encode(['message'=>'Lista uwag jest juz zamknieta.','closed'=>true,'closedAt'=>$closedAt],JSON_UNESCAPED_UNICODE); exit; }
         $db=projectDb(); $db->exec('BEGIN IMMEDIATE');

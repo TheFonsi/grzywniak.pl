@@ -227,7 +227,18 @@ createServer(async (request, response) => {
       const hostname = String(request.headers['x-forwarded-host'] || request.headers.host || '').split(',')[0].split(':')[0].trim().toLowerCase();
       const project = Object.values(state.projects).find((item) => item.kind === 'preview' && item.hostname === hostname);
       if (!project || !previewPasswordMatches(project, request.headers.authorization || '') || !feedbackTokenPattern.test(project.feedbackToken || '')) return json(response, 404, { message: 'Konfiguracja uwag nie jest dostępna.' });
-      return json(response, 200, { projectId: project.projectId, feedbackToken: project.feedbackToken, feedbackUrl: project.feedbackUrl || '', feedbackClosed: project.feedbackClosedDigest === project.feedbackDigest && Boolean(project.feedbackDigest), feedbackClosedAt: project.feedbackClosedDigest === project.feedbackDigest ? (project.feedbackClosedAt || null) : null });
+      let feedbackClosed = project.feedbackClosedDigest === project.feedbackDigest && Boolean(project.feedbackDigest);
+      let feedbackClosedAt = feedbackClosed ? (project.feedbackClosedAt || null) : null;
+      try {
+        const statusResponse = await fetch(project.feedbackUrl, { method: 'POST', headers: { 'content-type': 'application/json', origin: `https://${project.hostname}`, accept: 'application/json' }, body: JSON.stringify({ project: project.projectId, token: project.feedbackToken, action: 'status' }), signal: AbortSignal.timeout(8000) });
+        if (statusResponse.ok) {
+          const status = await statusResponse.json();
+          feedbackClosed = status.feedbackClosed === true;
+          feedbackClosedAt = Number(status.feedbackClosedAt) || null;
+          await serialized(async () => { project.feedbackClosedDigest = feedbackClosed ? project.feedbackDigest : null; project.feedbackClosedAt = feedbackClosedAt; await save(); });
+        }
+      } catch {}
+      return json(response, 200, { projectId: project.projectId, feedbackToken: project.feedbackToken, feedbackUrl: project.feedbackUrl || '', feedbackClosed, feedbackClosedAt });
     }
     const previewProject = previewProjectForHost(request.headers['x-forwarded-host'] || request.headers.host);
     if (previewProject && request.method === 'POST' && url.pathname === '/.well-known/grzywniak/feedback-submit') return await submitPreviewFeedback(request, response, previewProject);
