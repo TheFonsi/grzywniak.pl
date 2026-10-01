@@ -64,6 +64,10 @@ try {
   assert.match(scriptText, /Zaznacz kolejny obszar/);
   assert.match(scriptText, /annotation: annotations\.length === 1/);
   assert.match(scriptText, /\{ areas: annotations\.map/);
+  assert.match(scriptText, /Notatka do tego obszaru/);
+  assert.match(scriptText, /annotation\.note = note\.value/);
+  assert.match(scriptText, /rect\.x \* annotation\.viewport\.width \* scale/);
+  assert.match(scriptText, /gw-thumb-selection/);
   assert.doesNotMatch(scriptText, /sandbox/, 'Miniatury muszą dziedziczyć pochodzenie podglądu, aby style nie były blokowane przez CORS.');
   assert.match(scriptText, /\^on\/i\.test\(attribute\.name\)/, 'Kopia strony musi usuwać atrybuty obsługi zdarzeń przed renderowaniem.');
   assert.match(scriptText, /feedback-submit/);

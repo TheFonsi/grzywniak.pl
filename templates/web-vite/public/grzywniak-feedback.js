@@ -10,7 +10,7 @@
     #gw-feedback-panel textarea{width:100%;min-height:105px;resize:vertical;border:1px solid #aab7c5;border-radius:9px;padding:10px;font:inherit;color:#17212c}
     #gw-feedback-panel button{border:0;border-radius:8px;padding:10px 13px;font:600 14px system-ui;cursor:pointer}#gw-feedback-panel button:disabled{opacity:.55;cursor:wait}#gw-feedback-panel .gw-primary{background:#245a91;color:#fff;width:100%;margin-top:10px}#gw-feedback-panel .gw-select{background:#e8f0f8;color:#173b5d}#gw-feedback-panel .gw-close{position:absolute;right:12px;top:12px;background:#edf1f5;color:#263747;padding:6px 10px}
     #gw-feedback-panel .gw-note{font-size:12px}#gw-feedback-panel .gw-message{min-height:20px;margin:10px 0 0;color:#245a36}#gw-feedback-areas{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:9px;margin:12px 0}#gw-feedback-areas:empty{display:none}
-    #gw-feedback-panel .gw-area-card{position:relative;min-width:0;padding:8px;border:1px solid #d5deea;border-radius:10px;background:#f7f9fc}#gw-feedback-panel .gw-area-card strong{display:block;margin-bottom:6px;font-size:12px;color:#35465b}#gw-feedback-panel .gw-thumb{position:relative;overflow:hidden;width:100%;height:82px;background:#e8edf4;border:1px solid #cbd5e1;border-radius:6px}#gw-feedback-panel .gw-thumb iframe{position:absolute;top:0;left:0;border:0;transform-origin:top left;pointer-events:none;background:#fff}#gw-feedback-panel .gw-area-card .gw-remove{position:absolute;right:6px;top:5px;padding:3px 7px;background:#e9edf3;color:#344458;font-size:12px}
+    #gw-feedback-panel .gw-area-card{position:relative;min-width:0;padding:8px;border:1px solid #d5deea;border-radius:10px;background:#f7f9fc}#gw-feedback-panel .gw-area-card strong{display:block;margin-bottom:6px;font-size:12px;color:#35465b}#gw-feedback-panel .gw-thumb{position:relative;overflow:hidden;width:100%;height:82px;background:#e8edf4;border:1px solid #cbd5e1;border-radius:6px}#gw-feedback-panel .gw-thumb iframe{position:absolute;top:0;left:0;border:0;transform-origin:top left;pointer-events:none;background:#fff}#gw-feedback-panel .gw-thumb-selection{position:absolute;inset:0;border:2px solid #e24646;border-radius:5px;box-shadow:inset 0 0 0 999px #e2464614;pointer-events:none}#gw-feedback-panel .gw-area-note{display:block;width:100%;min-height:54px;margin-top:8px;resize:vertical;border:1px solid #c7d1df;border-radius:7px;padding:7px;font:12px/1.4 system-ui;color:#17212c;background:#fff}#gw-feedback-panel .gw-area-card .gw-remove{position:absolute;right:6px;top:5px;padding:3px 7px;background:#e9edf3;color:#344458;font-size:12px}
     #gw-feedback-selection{position:fixed;inset:0;z-index:2147483002;cursor:crosshair;touch-action:none;background:#12395c10;display:none}
     #gw-feedback-selection.gw-selecting{display:block}#gw-feedback-selection:after{content:"Przeciągnij, aby zaznaczyć obszar · Esc anuluje";position:fixed;top:14px;left:50%;transform:translateX(-50%);background:#12395c;color:#fff;padding:9px 14px;border-radius:999px;font:13px system-ui;white-space:nowrap}
     #gw-feedback-rect{position:fixed;z-index:2147483003;border:2px solid #2484e8;background:#2484e82b;pointer-events:none;display:none}
@@ -73,17 +73,11 @@
     const rect = annotation.rect;
     const width = Math.max(1, rect.width * annotation.viewport.width);
     const height = Math.max(1, rect.height * annotation.viewport.height);
-    const thumbWidth = 156;
-    const thumbHeight = 82;
-    const scale = Math.min(thumbWidth / width, thumbHeight / height);
     const frame = document.createElement("iframe");
     frame.title = `Podgląd zaznaczonego obszaru ${index + 1}`;
     frame.setAttribute("aria-hidden", "true");
     frame.style.width = `${annotation.viewport.width}px`;
     frame.style.height = `${annotation.viewport.height}px`;
-    frame.style.left = `${-rect.x * annotation.viewport.width}px`;
-    frame.style.top = `${-rect.y * annotation.viewport.height}px`;
-    frame.style.transform = `scale(${scale})`;
     frame.srcdoc = snapshot;
     const card = document.createElement("div");
     card.className = "gw-area-card";
@@ -97,9 +91,31 @@
     remove.addEventListener("click", () => { annotations.splice(index, 1); renderAreas(); });
     const thumb = document.createElement("div");
     thumb.className = "gw-thumb";
-    thumb.append(frame);
-    card.append(title, remove, thumb);
+    const highlight = document.createElement("span");
+    highlight.className = "gw-thumb-selection";
+    highlight.setAttribute("aria-hidden", "true");
+    thumb.append(frame, highlight);
+    const note = document.createElement("textarea");
+    note.className = "gw-area-note";
+    note.maxLength = 1000;
+    note.placeholder = "Notatka do tego obszaru (opcjonalnie)";
+    note.setAttribute("aria-label", `Notatka do obszaru ${index + 1}`);
+    note.value = annotation.note || "";
+    note.addEventListener("input", () => { annotation.note = note.value; });
+    card.append(title, remove, thumb, note);
     areasEl.append(card);
+    const scale = Math.min(thumb.clientWidth / width, thumb.clientHeight / height);
+    const visibleWidth = width * scale;
+    const visibleHeight = height * scale;
+    const offsetX = (thumb.clientWidth - visibleWidth) / 2;
+    const offsetY = (thumb.clientHeight - visibleHeight) / 2;
+    frame.style.left = `${offsetX - rect.x * annotation.viewport.width * scale}px`;
+    frame.style.top = `${offsetY - rect.y * annotation.viewport.height * scale}px`;
+    frame.style.transform = `scale(${scale})`;
+    highlight.style.left = `${offsetX}px`;
+    highlight.style.top = `${offsetY}px`;
+    highlight.style.width = `${visibleWidth}px`;
+    highlight.style.height = `${visibleHeight}px`;
   };
   const renderAreas = () => {
     areasEl.replaceChildren();
@@ -149,10 +165,11 @@
       viewport: { width: innerWidth, height: innerHeight },
       scroll,
       element: { tag: element.tagName.toLowerCase(), id: element.id || "", classes: typeof element.className === "string" ? element.className.slice(0, 240) : "", text: (element.innerText || "").trim().slice(0, 240) },
+      note: "",
       snapshot,
     });
-    renderAreas();
     panel.classList.add("gw-open");
+    renderAreas();
   });
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") { start = null; selection.classList.remove("gw-selecting"); rectEl.style.display = "none"; panel.classList.add("gw-open"); }

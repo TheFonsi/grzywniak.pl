@@ -10,9 +10,9 @@ if(projectContactLogin(['contactEmail'=>'invalid','contactPhone'=>'123'])!==null
 $feedbackDigest='sha256:'.str_repeat('a',64);
 if(projectFeedbackDigest(['feedbackEnabledDigest'=>$feedbackDigest])!==$feedbackDigest) throw new RuntimeException('Aktywny formularz uwag musi działać niezależnie od statusu wysłania e-maila.');
 if(projectFeedbackDigest(['previewSentDigest'=>$feedbackDigest])!==$feedbackDigest) throw new RuntimeException('Starsze sprawy z wysłanym podglądem nadal muszą przyjmować uwagi.');
-$area=['rect'=>['x'=>0.1,'y'=>0.2,'width'=>0.3,'height'=>0.4],'viewport'=>['width'=>1280,'height'=>720],'scroll'=>['x'=>0,'y'=>120],'element'=>['tag'=>'button','text'=>'Save']];
+$area=['rect'=>['x'=>0.1,'y'=>0.2,'width'=>0.3,'height'=>0.4],'viewport'=>['width'=>1280,'height'=>720],'scroll'=>['x'=>0,'y'=>120],'element'=>['tag'=>'button','text'=>'Save'],'note'=>'Przycisk ma być bardziej widoczny.'];
 $multiAnnotation=projectNormalizeFeedbackAnnotation(['areas'=>[$area,$area]]);
-if(count($multiAnnotation['areas'])!==2 || $multiAnnotation['areas'][1]['element']['tag']!=='button') throw new RuntimeException('Multiple selected areas were not preserved.');
+if(count($multiAnnotation['areas'])!==2 || $multiAnnotation['areas'][1]['element']['tag']!=='button' || $multiAnnotation['areas'][1]['note']!==$area['note']) throw new RuntimeException('Multiple selected areas and their notes were not preserved.');
 if(count(projectNormalizeFeedbackAnnotation($area)['areas'])!==1) throw new RuntimeException('Legacy single area annotations must remain supported.');
 try { projectNormalizeFeedbackAnnotation(['areas'=>array_fill(0,9,$area)]); throw new RuntimeException('Area limit was not enforced.'); }
 catch(InvalidArgumentException) {}
