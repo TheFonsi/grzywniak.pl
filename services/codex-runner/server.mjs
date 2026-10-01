@@ -34,7 +34,7 @@ const inflight = new Set();
 
 const reply = (res, status, body) => { res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' }); res.end(JSON.stringify(body)); };
 const authorized = (req) => { const a = Buffer.from((req.headers.authorization || '').replace(/^Bearer /, '')); const b = Buffer.from(token); return token.length >= 32 && a.length === b.length && timingSafeEqual(a, b); };
-const bodyJson = async (req) => { let text = ''; for await (const part of req) { text += part; if (text.length > 18000) throw new Error('Zbyt duże żądanie.'); } const body = JSON.parse(text || '{}'); if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error('Niepoprawny JSON.'); return body; };
+const bodyJson = async (req) => { let text = ''; for await (const part of req) { text += part; if (Buffer.byteLength(text, 'utf8') > 700000) throw new Error('Zbyt duże żądanie.'); } const body = JSON.parse(text || '{}'); if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error('Niepoprawny JSON.'); return body; };
 const repositoryName = (url) => { const prefix = `https://github.com/${githubOrg}/`; if (typeof url !== 'string' || !url.startsWith(prefix)) return null; const name = url.slice(prefix.length); return safeName.test(name) ? name : null; };
 const persist = () => { const next = saving.then(async () => { const file = `${stateFile}.tmp`; await writeFile(file, JSON.stringify(tasks), { mode: 0o600 }); await rename(file, stateFile); }); saving = next.catch(() => {}); return next; };
 const run = (bin, args, options = {}) => new Promise((resolveRun, rejectRun) => {

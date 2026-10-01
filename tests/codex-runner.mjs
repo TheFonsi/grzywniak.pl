@@ -30,7 +30,9 @@ try {
   const missing = await fetch(`http://127.0.0.1:${port}/v1/tasks/${'a'.repeat(32)}:test:1`, { headers: { authorization: `Bearer ${token}` } });
   assert.equal(missing.status, 404);
   const id = `${'a'.repeat(32)}:frontend:1`;
-  const task = { id, projectId: 'a'.repeat(32), taskId: 'frontend', role: 'frontend', title: 'Zbuduj widok', acceptance: ['Widok działa'], approvedScope: 'Strona projektu', repository: 'https://github.com/Grzywniak/example', maxCostPln: 20, timeoutMinutes: 60 };
+  const screenshot = `FEEDBACK_SCREENSHOT_DATA:data:image/jpeg;base64,${Buffer.alloc(20_000, 7).toString('base64')}`;
+  const task = { id, projectId: 'a'.repeat(32), taskId: 'frontend', role: 'frontend', title: 'Zbuduj widok', acceptance: ['Widok działa', screenshot], approvedScope: 'Strona projektu', repository: 'https://github.com/Grzywniak/example', maxCostPln: 20, timeoutMinutes: 60 };
+  assert(JSON.stringify(task).length > 18_000, 'Test musi przekroczyć poprzedni limit żądania 18 KB.');
   const submit = () => fetch(`http://127.0.0.1:${port}/v1/tasks`, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json', 'idempotency-key': id }, body: JSON.stringify(task) });
   assert.equal((await submit()).status, 202);
   assert.equal((await submit()).status, 200);
