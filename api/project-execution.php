@@ -97,7 +97,7 @@ function projectAiCapacityUsed(PDO $db): int {
 }
 
 function projectJobRequiresAiCapacity(string $kind): bool {
-    return $kind==='generate_plan';
+    return $kind==='generate_plan' || (bool)preg_match('/^classify_feedback_[1-9][0-9]*$/',$kind);
 }
 
 function projectDispatchAgentTask(): bool {

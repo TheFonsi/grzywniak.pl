@@ -213,7 +213,7 @@ function runOneJob(): bool {
     $stale->execute([time(),time()-900]);
     $maxConcurrency=max(1,(int)projectSetting('AGENT_MAX_CONCURRENCY'));
     $capacityUsed=projectAiCapacityUsed($db);
-    $jobStmt=$db->prepare("SELECT * FROM project_jobs WHERE state='queued' AND kind NOT LIKE 'classify_feedback_%' AND (? < ? OR kind<>'generate_plan') ORDER BY id LIMIT 1");
+    $jobStmt=$db->prepare("SELECT * FROM project_jobs WHERE state='queued' AND (? < ? OR (kind<>'generate_plan' AND kind NOT LIKE 'classify_feedback_%')) ORDER BY id LIMIT 1");
     $jobStmt->execute([$capacityUsed,$maxConcurrency]);
     $job=$jobStmt->fetch(PDO::FETCH_ASSOC);
     if(!$job) { $db->exec('COMMIT'); return false; }
