@@ -72,12 +72,30 @@ function projectCase(string $id): array {
     return is_array($data) ? $data : [];
 }
 
+function projectContactEmailIsValid(string $email): bool {
+    $email=trim($email);
+    if($email==='' || !filter_var($email,FILTER_VALIDATE_EMAIL)) return false;
+    $domain=strtolower(substr(strrchr($email,'@')?:'',1));
+    foreach(['.invalid','.example','.test','.localhost'] as $reservedSuffix) if($domain===$reservedSuffix || str_ends_with($domain,$reservedSuffix)) return false;
+    return true;
+}
+
+function projectContactPhoneIsValid(string $phone): bool {
+    $phone=trim($phone);
+    $digits=preg_replace('/\D+/','',$phone)??'';
+    if(strlen($digits)<7 || strlen($digits)>15 || !preg_match('/^[+0-9(). -]+$/',$phone)) return false;
+    $national=$digits;
+    if(str_starts_with($national,'0048') && strlen($national)===13) $national=substr($national,4);
+    elseif(str_starts_with($national,'48') && strlen($national)===11) $national=substr($national,2);
+    if(preg_match('/^0{7,}$/',$national) || preg_match('/^(\d)\1{8,}$/',$national) || preg_match('/^(?:0123456789|1234567890|9876543210)$/',$national)) return false;
+    return true;
+}
+
 function projectContactLogin(array $state): ?string {
     $email=trim((string)($state['contactEmail']??''));
-    if($email!=='' && filter_var($email,FILTER_VALIDATE_EMAIL)) return $email;
+    if(projectContactEmailIsValid($email)) return $email;
     $phone=trim((string)($state['contactPhone']??''));
-    $digits=preg_replace('/\D+/','',$phone)??'';
-    if(strlen($digits)>=7 && strlen($digits)<=15 && preg_match('/^[+0-9(). -]+$/',$phone)) return $phone;
+    if(projectContactPhoneIsValid($phone)) return $phone;
     return null;
 }
 

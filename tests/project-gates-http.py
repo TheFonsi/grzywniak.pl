@@ -1,6 +1,6 @@
 """Isolated HTTP regression checks for the offer, contract and kickoff gates."""
 from pathlib import Path
-import base64, http.cookiejar, json, os, shutil, socket, subprocess, tempfile, time
+import base64, http.cookiejar, json, os, shutil, socket, sqlite3, subprocess, tempfile, time
 import urllib.request, urllib.error
 
 root = Path(__file__).resolve().parents[1]
@@ -11,9 +11,9 @@ work = Path(tempfile.mkdtemp(prefix="project-gates-http-", dir=tmp_root))
 for source in (root / "api").glob("*.php"):
     shutil.copy2(source, work / "api" / source.name)
 
-env = dict(os.environ, ADMIN_USERNAME="gate-test", ADMIN_PASSWORD="test-password", DISCOVERY_MAIL_MOCK="true")
+env = dict(os.environ, ADMIN_USERNAME="gate-test", ADMIN_PASSWORD="test-password", DISCOVERY_MAIL_MOCK="true", DISCOVERY_MOCK="true")
 (work / ".env").write_text(
-    "ADMIN_USERNAME=gate-test\nADMIN_PASSWORD=test-password\nDISCOVERY_MAIL_MOCK=true\n",
+    "ADMIN_USERNAME=gate-test\nADMIN_PASSWORD=test-password\nDISCOVERY_MAIL_MOCK=true\nDISCOVERY_MOCK=true\n",
     encoding="utf-8",
 )
 seed = r"""
@@ -72,6 +72,24 @@ try:
     else:
         raise RuntimeError("Isolated PHP server did not become ready.")
 
+    chat_code, chat_session = request("/api/discovery.php?action=session", {"language": "pl"})
+    assert chat_code == 200, (chat_code, chat_session)
+    chat_id = chat_session["session"]["id"]
+    chat_db = sqlite3.connect(work / "api" / "storage" / "sessions.sqlite")
+    row = chat_db.execute("SELECT data FROM sessions WHERE id=?", (chat_id,)).fetchone()
+    chat_data = json.loads(row[0])
+    if not isinstance(chat_data.get("projectState"), dict): chat_data["projectState"] = {}
+    chat_data["projectState"].update({"businessProblem": "Pozyskiwanie zapytań dla Jar-Bud", "targetUsers": "Inwestorzy i firmy", "mustHaveFeatures": "Strona portfolio i formularz kontaktu", "budget": "Do ustalenia", "deadline": "Do ustalenia"})
+    chat_db.execute("UPDATE sessions SET data=? WHERE id=?", (json.dumps(chat_data, ensure_ascii=False), chat_id))
+    chat_db.commit(); chat_db.close()
+    fake_contact = "Dane fikcyjne tylko do testu: firma: Jar-Bud Grzywniak, telefon +48 000 000 000, e-mail jarbud-test@example.invalid."
+    sent = request(f"/api/discovery.php?action=message&sessionId={chat_id}", {"message": fake_contact})
+    assert sent[0] == 200, sent
+    finish = request(f"/api/discovery.php?action=finish&sessionId={chat_id}", {})
+    assert finish[0] == 200 and finish[1]["session"]["readyForSummary"] is False and finish[1]["session"]["status"] == "NEEDS_INFORMATION", finish
+    complete_fake = request(f"/api/discovery.php?action=complete&sessionId={chat_id}", {})
+    assert complete_fake[0] == 409, complete_fake
+
     code, project = request(project_path)
     assert code == 200, (code, project)
     csrf = project["csrf"]
@@ -103,7 +121,7 @@ $session['contract']['offerVersion']=$session['offer']['version']; writeSession(
     plan = next(job for job in start[1]["project"]["jobs"] if job["kind"] == "generate_plan")
     assert plan["state"] == "queued", plan
 
-    print("Project offer HTTP gates passed: DRAFT blocked; current accepted offer and matching contract required; kickoff queued plan.")
+    print("HTTP workflow gates passed: fake test contact cannot complete a brief; DRAFT offer and stale contract are blocked; accepted current offer and matching contract queue the plan.")
 finally:
     server.terminate()
     server.wait(timeout=5)
