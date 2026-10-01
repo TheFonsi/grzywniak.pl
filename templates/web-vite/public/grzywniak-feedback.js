@@ -8,7 +8,7 @@
     #gw-feedback-panel{position:fixed;z-index:2147483001;right:22px;bottom:80px;width:min(460px,calc(100vw - 28px));max-height:min(78vh,700px);overflow:auto;padding:18px;background:#fff;color:#182230;border:1px solid #cfdae5;border-radius:16px;box-shadow:0 16px 50px #0004;font:14px/1.45 system-ui;display:none}
     #gw-feedback-panel.gw-open{display:block}#gw-feedback-panel *{box-sizing:border-box}#gw-feedback-panel h2{font-size:18px;margin:0 38px 6px 0}#gw-feedback-panel p{margin:6px 0 14px;color:#536273}
     #gw-feedback-panel textarea{width:100%;min-height:105px;resize:vertical;border:1px solid #aab7c5;border-radius:9px;padding:10px;font:inherit;color:#17212c}
-    #gw-feedback-panel button{border:0;border-radius:8px;padding:10px 13px;font:600 14px system-ui;cursor:pointer}#gw-feedback-panel button:disabled{opacity:.55;cursor:wait}#gw-feedback-panel .gw-primary{background:#245a91;color:#fff;width:100%;margin-top:10px}#gw-feedback-panel .gw-finish{width:100%;margin-top:10px;background:#e8f0f8;color:#173b5d}#gw-feedback-panel.gw-closed .gw-finish{display:none}#gw-feedback-panel.gw-closed textarea,#gw-feedback-panel.gw-closed .gw-select,#gw-feedback-panel.gw-closed .gw-remove{display:none}#gw-feedback-panel .gw-select{background:#e8f0f8;color:#173b5d}#gw-feedback-panel .gw-close{position:absolute;right:12px;top:12px;background:#edf1f5;color:#263747;padding:6px 10px}#gw-feedback-panel .gw-finish-note{margin:12px 0 4px;padding:10px;border-radius:8px;background:#f3f6fa;color:#35465b;font-size:12px}#gw-feedback-panel .gw-completion{margin-top:12px;padding:12px;border:1px solid #8dc7a0;border-radius:9px;background:#edf8f0;color:#17552b;font-weight:600}
+    #gw-feedback-panel button{border:0;border-radius:8px;padding:10px 13px;font:600 14px system-ui;cursor:pointer}#gw-feedback-panel button:disabled{opacity:.55;cursor:wait}#gw-feedback-panel .gw-primary{background:#245a91;color:#fff;width:100%;margin-top:10px}#gw-feedback-panel .gw-finish{width:100%;margin-top:10px;background:#e8f0f8;color:#173b5d}#gw-feedback-panel.gw-closed .gw-finish{display:none}#gw-feedback-panel.gw-closed textarea,#gw-feedback-panel.gw-closed .gw-select,#gw-feedback-panel.gw-closed .gw-remove{display:none}#gw-feedback-panel .gw-select{background:#e8f0f8;color:#173b5d}#gw-feedback-panel .gw-close{position:absolute;right:12px;top:12px;background:#edf1f5;color:#263747;padding:6px 10px}#gw-feedback-panel .gw-finish-note{margin:12px 0 4px;padding:10px;border-radius:8px;background:#f3f6fa;color:#35465b;font-size:12px}#gw-feedback-panel .gw-completion{margin-top:12px;padding:12px;border:1px solid #8dc7a0;border-radius:9px;background:#edf8f0;color:#17552b;font-weight:600}#gw-feedback-panel .gw-accept{margin-top:12px;padding:12px;border:1px solid #9ab7da;border-radius:9px;background:#f0f5fb}#gw-feedback-panel .gw-accept p{margin:7px 0;color:#35465b;font-size:12px}#gw-feedback-panel .gw-accept-button{width:100%;background:#168455;color:#fff}#gw-feedback-panel .gw-accept-button:disabled{opacity:.65;cursor:not-allowed}#gw-feedback-panel .gw-accept[hidden]{display:none}
     #gw-feedback-panel .gw-note{font-size:12px}#gw-feedback-panel .gw-message{min-height:20px;margin:10px 0 0;color:#245a36}#gw-feedback-areas{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:9px;margin:12px 0}#gw-feedback-areas:empty{display:none}
     #gw-feedback-panel .gw-area-card{position:relative;min-width:0;padding:8px;border:1px solid #d5deea;border-radius:10px;background:#f7f9fc}#gw-feedback-panel .gw-area-card strong{display:block;margin-bottom:6px;font-size:12px;color:#35465b}#gw-feedback-panel .gw-thumb{position:relative;display:block;overflow:hidden;max-width:100%;padding:0;background:#e8edf4;border:1px solid #cbd5e1;border-radius:6px;cursor:zoom-in}#gw-feedback-panel .gw-thumb iframe,#gw-feedback-panel .gw-thumb img{position:absolute;top:0;left:0;border:0;transform-origin:top left;pointer-events:none;background:#fff}#gw-feedback-panel .gw-thumb-selection{position:absolute;border:2px solid #e24646;border-radius:5px;box-shadow:inset 0 0 0 999px #e2464614;pointer-events:none}#gw-feedback-panel .gw-area-note{display:block;width:100%;min-height:54px;margin-top:8px;resize:vertical;border:1px solid #c7d1df;border-radius:7px;padding:7px;font:12px/1.4 system-ui;color:#17212c;background:#fff}#gw-feedback-panel .gw-area-card .gw-remove{position:absolute;right:6px;top:5px;padding:3px 7px;background:#e9edf3;color:#344458;font-size:12px}
     #gw-feedback-viewer{position:fixed;inset:0;z-index:2147483004;display:none;align-items:center;justify-content:center;padding:24px;background:#07111de8;color:#fff;font:14px/1.45 system-ui}#gw-feedback-viewer.gw-open{display:flex}#gw-feedback-viewer .gw-viewer-dialog{position:relative;display:flex;flex-direction:column;gap:12px;max-width:100%;max-height:100%}#gw-feedback-viewer .gw-viewer-title{padding-right:52px;font-size:16px}#gw-feedback-viewer .gw-viewer-close{position:absolute;right:0;top:-6px;border:0;border-radius:8px;background:#fff;color:#142033;font-size:24px;line-height:1;padding:7px 12px;cursor:pointer}#gw-feedback-viewer .gw-viewer-crop{position:relative;overflow:hidden;max-width:calc(100vw - 48px);max-height:calc(100vh - 100px);background:#fff;border:2px solid #fff;border-radius:8px}#gw-feedback-viewer iframe,#gw-feedback-viewer img{position:absolute;top:0;left:0;border:0;transform-origin:top left;pointer-events:none;background:#fff}#gw-feedback-viewer .gw-viewer-selection{position:absolute;border:3px solid #e24646;box-shadow:inset 0 0 0 999px #e2464614;pointer-events:none}
@@ -27,7 +27,7 @@
   const panel = document.createElement("section");
   panel.id = "gw-feedback-panel";
   panel.setAttribute("aria-label", "Uwagi do podglądu");
-  panel.innerHTML = '<button class="gw-close" type="button" aria-label="Zamknij">\u00d7</button><h2>Uwagi do podgl\u0105du</h2><p class="gw-note">Mo\u017cesz wskaza\u0107 kilka miejsc, a potem opisa\u0107 je jednym zg\u0142oszeniem.</p><button class="gw-select" type="button">Zaznacz obszar na stronie</button><div id="gw-feedback-areas" aria-live="polite"></div><form><textarea required minlength="10" maxlength="4000" placeholder="Opisz problem lub zmian\u0119 (min. 10 znak\u00f3w)"></textarea><button class="gw-primary" type="submit">Wy\u015blij uwag\u0119</button></form><p class="gw-finish-note">Gdy wy\u015blesz wszystkie uwagi, kliknij poni\u017cej. Po zamkni\u0119ciu nie b\u0119dzie mo\u017cna doda\u0107 kolejnych do tej wersji.</p><button class="gw-finish" type="button">Zako\u0144cz zg\u0142aszanie uwag</button><div class="gw-completion" role="status" aria-live="polite" hidden></div><p class="gw-message" role="status" aria-live="polite"></p>';
+  panel.innerHTML = '<button class="gw-close" type="button" aria-label="Zamknij">\u00d7</button><h2>Uwagi do podgl\u0105du</h2><p class="gw-note">Mo\u017cesz wskaza\u0107 kilka miejsc, a potem opisa\u0107 je jednym zg\u0142oszeniem.</p><button class="gw-select" type="button">Zaznacz obszar na stronie</button><div id="gw-feedback-areas" aria-live="polite"></div><form><textarea required minlength="10" maxlength="4000" placeholder="Opisz problem lub zmian\u0119 (min. 10 znak\u00f3w)"></textarea><button class="gw-primary" type="submit">Wy\u015blij uwag\u0119</button></form><p class="gw-finish-note">Gdy wy\u015blesz wszystkie uwagi, kliknij poni\u017cej. Po zamkni\u0119ciu nie b\u0119dzie mo\u017cna doda\u0107 kolejnych do tej wersji.</p><button class="gw-finish" type="button">Zako\u0144cz zg\u0142aszanie uwag</button><section class="gw-accept" hidden><strong>Akceptacja wersji</strong><p class="gw-accept-message"></p><button class="gw-accept-button" type="button">Akceptuj w pe\u0142ni t\u0119 wersj\u0119 do publikacji</button></section><div class="gw-completion" role="status" aria-live="polite" hidden></div><p class="gw-message" role="status" aria-live="polite"></p>';
   const selection = document.createElement("div");
   selection.id = "gw-feedback-selection";
   const rectEl = document.createElement("div");
@@ -43,6 +43,9 @@
   const close = panel.querySelector(".gw-close");
   const select = panel.querySelector(".gw-select");
   const finish = panel.querySelector(".gw-finish");
+  const acceptSection = panel.querySelector(".gw-accept");
+  const acceptButton = panel.querySelector(".gw-accept-button");
+  const acceptMessage = panel.querySelector(".gw-accept-message");
   const areasEl = panel.querySelector("#gw-feedback-areas");
   const message = panel.querySelector(".gw-message");
   const form = panel.querySelector("form");
@@ -53,7 +56,8 @@
   let annotations = [];
   let start = null;
   let viewerReturnTarget = null;
-  const setClosed = () => { config = config || {}; config.feedbackClosed = true; panel.classList.add("gw-closed"); launcher.disabled = false; launcher.textContent = "Uwagi zako\u0144czone"; launcher.title = "Zg\u0142aszanie uwag do tej wersji jest zako\u0144czone. Kliknij, aby zobaczy\u0107 potwierdzenie."; panel.querySelector(".gw-note").textContent = "Zg\u0142aszanie uwag do tej wersji zosta\u0142o zako\u0144czone."; const completion = panel.querySelector(".gw-completion"); completion.hidden = false; const closedAt = Number(config.feedbackClosedAt); const closedLabel = closedAt ? ` ${new Date(closedAt * 1000).toLocaleString("pl-PL")}.` : ""; completion.textContent = `Dzi\u0119kujemy. Lista uwag zosta\u0142a zamkni\u0119ta${closedLabel} Nie mo\u017cna ju\u017c doda\u0107 uwag do tej wersji podgl\u0105du.`; panel.querySelector(".gw-finish-note").hidden = true; form.querySelectorAll("button,textarea").forEach((control) => { control.disabled = true; }); select.disabled = true; };
+  const setClosed = () => { config = config || {}; config.feedbackClosed = true; panel.classList.add("gw-closed"); launcher.disabled = false; launcher.textContent = "Uwagi zako\u0144czone"; launcher.title = "Zg\u0142aszanie uwag do tej wersji jest zako\u0144czone. Kliknij, aby zobaczy\u0107 potwierdzenie."; panel.querySelector(".gw-note").textContent = "Zg\u0142aszanie uwag do tej wersji zosta\u0142o zako\u0144czone."; const completion = panel.querySelector(".gw-completion"); completion.hidden = false; const closedAt = Number(config.feedbackClosedAt); const closedLabel = closedAt ? ` ${new Date(closedAt * 1000).toLocaleString("pl-PL")}.` : ""; completion.textContent = `Lista uwag zamkni\u0119ta${closedLabel}`; panel.querySelector(".gw-finish-note").hidden = true; form.querySelectorAll("button,textarea").forEach((control) => { control.disabled = true; }); select.disabled = true; renderAcceptance(); };
+  const renderAcceptance = () => { if (!config?.feedbackClosed) { acceptSection.hidden = true; return; } acceptSection.hidden = false; const acceptedAt = Number(config.previewAcceptedAt); acceptMessage.textContent = config.previewAccepted ? `Dzi\u0119kujemy. Zaakceptowano w pe\u0142ni t\u0119 wersj\u0119 ${acceptedAt ? new Date(acceptedAt * 1000).toLocaleString("pl-PL") : ""}. Administrator podejmie decyzj\u0119 o publikacji.` : (config.acceptanceMessage || "Po zako\u0144czeniu i rozpatrzeniu wszystkich uwag mo\u017cesz zaakceptowa\u0107 t\u0119 wersj\u0119."); acceptButton.hidden = Boolean(config.previewAccepted); acceptButton.disabled = !config.canAccept; };
 
   const hideViewer = () => {
     viewer.classList.remove("gw-open");
@@ -290,8 +294,26 @@
 
   fetch("/.well-known/grzywniak/feedback-config", { credentials: "same-origin", cache: "no-store" })
     .then((response) => { if (!response.ok) throw new Error("Uwagi nie są jeszcze aktywne."); return response.json(); })
-    .then((value) => { config = value; if (value.feedbackClosed) setClosed(); })
+    .then((value) => { config = value; if (value.feedbackClosed) setClosed(); else renderAcceptance(); })
     .catch(() => { launcher.title = "Formularz uwag zostanie włączony po zatwierdzeniu podglądu."; launcher.disabled = true; launcher.textContent = "Uwagi niedostępne"; });
+
+  acceptButton.addEventListener("click", async () => {
+    if (!config?.canAccept || config.previewAccepted) return;
+    if (!confirm("Czy w pe\u0142ni akceptujesz t\u0119 konkretn\u0105 wersj\u0119 podgl\u0105du do publikacji? Po akceptacji uwagi do niej zostan\u0105 zamkni\u0119te; zmiany b\u0119d\u0105 wymaga\u0142y nowej wersji.")) return;
+    acceptButton.disabled = true;
+    acceptMessage.textContent = "Zapisywanie akceptacji wersji...";
+    try {
+      const response = await fetch("/.well-known/grzywniak/feedback-submit", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "accept" }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || "Nie uda\u0142o si\u0119 zapisa\u0107 akceptacji.");
+      config.previewAccepted = true;
+      config.previewAcceptedAt = Number(result.acceptedAt) || Math.floor(Date.now() / 1000);
+      renderAcceptance();
+    } catch (error) {
+      acceptButton.disabled = false;
+      acceptMessage.textContent = error.message || "Nie uda\u0142o si\u0119 zapisa\u0107 akceptacji.";
+    }
+  });
 
   finish.addEventListener("click", async () => {
     if (!config || config.feedbackClosed) return;
@@ -304,6 +326,7 @@
       const result = await response.json();
       if (!response.ok) throw new Error(result.message || "Nie uda\u0142o si\u0119 zamkn\u0105\u0107 listy uwag.");
       config.feedbackClosedAt = Number(result.closedAt) || Math.floor(Date.now() / 1000);
+      try { const statusResponse = await fetch("/.well-known/grzywniak/feedback-config", { credentials: "same-origin", cache: "no-store" }); if (statusResponse.ok) Object.assign(config, await statusResponse.json()); } catch {}
       setClosed();
       message.textContent = result.message || "Zg\u0142aszanie uwag zosta\u0142o zako\u0144czone.";
     } catch (error) {

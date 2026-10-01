@@ -51,7 +51,9 @@ try {
   assert.equal(allowed.status, 200, 'Poprawne hasło powinno odblokować podgląd.');
   const config = await fetch(`http://127.0.0.1:${port}/internal/feedback-config`, { headers: { ...headers, authorization: `Basic ${Buffer.from(`client:${password}`).toString('base64')}` } });
   assert.equal(config.status, 200);
-  assert.equal((await config.json()).feedbackToken, 'b'.repeat(48));
+  const feedbackConfig = await config.json();
+  assert.equal(feedbackConfig.feedbackToken, 'b'.repeat(48));
+  assert.equal(feedbackConfig.canAccept, false);
   const appHeaders = { host: 'p-aaaaaaaaaaaa.grzywniak.pl', 'x-forwarded-host': 'p-aaaaaaaaaaaa.grzywniak.pl', authorization: `Basic ${Buffer.from(`client:${password}`).toString('base64')}` };
   const preview = await fetch(`http://127.0.0.1:${port}/`, { headers: appHeaders });
   const html = await preview.text();
@@ -69,6 +71,9 @@ try {
   assert.match(scriptText, /annotation: \{ areas: annotations \}/);
   assert.match(scriptText, /window\.html2canvas\(document\.documentElement/);
   assert.match(scriptText, /screenshot: image/);
+  assert.match(scriptText, /gw-accept-button/);
+  assert.match(scriptText, /action: \"accept\"/);
+  assert.match(scriptText, /config\.previewAccepted/);
   assert.match(scriptText, /toDataURL\("image\/jpeg"/);
   assert.match(scriptText, /node\.removeAttribute\("value"\)/, 'Zapisany podgląd nie może przenosić wpisanych wartości pól formularza.');
   assert.match(scriptText, /Notatka do tego obszaru/);

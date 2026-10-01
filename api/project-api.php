@@ -213,7 +213,8 @@ try {
         if(mb_strlen($evidence)<8 || mb_strlen($evidence)>1000) throw new DomainException('Zapisz podstawę akceptacji klienta i decyzji produkcyjnej (8–1000 znaków).');
         $preview=projectLatestPreviewJob($id);
         $result=$preview && $preview['state']==='done'?json_decode((string)$preview['result'],true):null;
-        if(!is_array($result) || ($case['previewSentDigest']??'')!==($result['imageDigest']??null)) throw new DomainException('Najpierw wyślij klientowi aktualną wersję podglądu.');
+        if(!is_array($result)) throw new DomainException('Najpierw przygotuj aktualna wersje podgladu dla klienta.');
+        if(($case['previewAcceptedDigest']??'')!==($result['imageDigest']??null) || empty($case['previewAcceptedAt'])) throw new DomainException('Klient musi najpierw zaakceptowac te konkretna wersje podgladu.');
         $open=$db->prepare("SELECT COUNT(*) FROM project_feedback WHERE session_id=? AND state!='resolved'"); $open->execute([$id]);
         if((int)$open->fetchColumn()>0) throw new DomainException('Najpierw rozstrzygnij wszystkie otwarte uwagi klienta.');
         $existing=$db->prepare("SELECT 1 FROM project_jobs WHERE session_id=? AND kind='publish_production'"); $existing->execute([$id]);

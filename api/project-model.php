@@ -252,7 +252,9 @@ function projectSnapshot(array $session): array {
     $currentFeedback=array_values(array_filter($feedback,static fn($entry)=>is_array($latestPreviewResult) && $entry['image_digest']===($latestPreviewResult['imageDigest']??null)));
     if($currentFeedback) $status['feedback']=count(array_filter($currentFeedback,static fn($entry)=>$entry['state']!=='resolved'))?'review':'done';
     elseif(is_array($latestPreviewResult) && ($case['feedbackClosedDigest']??'')===($latestPreviewResult['imageDigest']??null)) $status['feedback']='done';
-    $status['release']=projectJobStatus($jobByKind['publish_production']??null,$previewSent);
+    $previewAccepted=is_array($latestPreviewResult) && ($case['previewAcceptedDigest']??'')===($latestPreviewResult['imageDigest']??null) && !empty($case['previewAcceptedAt']);
+    $releaseJob=$jobByKind['publish_production']??null;
+    $status['release']=(!$previewAccepted && !$releaseJob && is_array($latestPreviewResult))?'waiting_client':projectJobStatus($releaseJob,$previewAccepted);
     if($status['release']==='ready') $status['release']='needs_you';
     $status['handover']=!empty($case['handoverAt'])?'done':($status['release']==='done'?'needs_you':'locked');
     $name=trim((string)($session['projectState']['businessProblem']??''));

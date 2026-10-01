@@ -161,9 +161,11 @@ const submitPreviewFeedback = async (request, response, project) => {
   if (endpoint.protocol !== 'https:' || endpoint.hostname !== publicApiHost || !endpoint.pathname.endsWith('/project-feedback.php')) return json(response, 502, { message: 'Adres formularza uwag nie wskazuje zaufanego API.' });
   let payload;
   try { payload = await readBody(request); } catch { return json(response, 400, { message: 'Nie udało się odczytać zgłoszenia. Sprawdź treść i spróbuj ponownie.' }); }
-  const closing = payload.action === 'close';
-  if (project.feedbackClosedDigest === project.feedbackDigest && project.feedbackDigest && !closing) return json(response, 409, { message: 'Zglaszanie uwag do tej wersji zostalo juz zakonczone.' });
-  const safePayload = { project: project.projectId, token: project.feedbackToken, ...(closing ? { action: 'close' } : { message: typeof payload.message === 'string' ? payload.message : '', page_url: typeof payload.page_url === 'string' ? payload.page_url : '', annotation: payload.annotation }) };
+  const action = ['close', 'status', 'accept'].includes(payload.action) ? payload.action : null;
+  const closing = action === 'close';
+  const accepting = action === 'accept';
+  if (project.feedbackClosedDigest === project.feedbackDigest && project.feedbackDigest && !action) return json(response, 409, { message: 'Zglaszanie uwag do tej wersji zostalo juz zakonczone.' });
+  const safePayload = { project: project.projectId, token: project.feedbackToken, ...(action ? { action } : { message: typeof payload.message === 'string' ? payload.message : '', page_url: typeof payload.page_url === 'string' ? payload.page_url : '', annotation: payload.annotation }) };
   try {
     const result = await fetch(endpoint, { method: 'POST', headers: { 'content-type': 'application/json', origin: `https://${project.hostname}`, accept: 'application/json' }, body: JSON.stringify(safePayload), signal: AbortSignal.timeout(20000) });
     const text = await result.text();
@@ -171,7 +173,8 @@ const submitPreviewFeedback = async (request, response, project) => {
     try { body = JSON.parse(text); } catch { body = null; }
     if (!result.ok) return json(response, result.status, { ...(body && typeof body === 'object' ? body : {}), message: typeof body?.message === 'string' ? body.message : `Serwer formularza odrzucił zgłoszenie (HTTP ${result.status}). Spróbuj ponownie.` });
     if (closing) await serialized(async () => { project.feedbackClosedDigest = project.feedbackDigest; project.feedbackClosedAt = Number(body?.closedAt) || Math.floor(Date.now() / 1000); await save(); });
-    return json(response, closing ? 200 : 201, body && typeof body.message === 'string' ? body : { message: closing ? 'Lista uwag zostala zamknieta.' : 'Uwaga zostala zapisana.' });
+    if (accepting) await serialized(async () => { project.feedbackAcceptedDigest = project.feedbackDigest; project.feedbackAcceptedAt = Number(body?.acceptedAt) || Math.floor(Date.now() / 1000); await save(); });
+    return json(response, closing || accepting ? 200 : 201, body && typeof body.message === 'string' ? body : { message: closing ? 'Lista uwag zostala zamknieta.' : (accepting ? 'Wersja zostala zaakceptowana.' : 'Uwaga zostala zapisana.') });
   } catch {
     return json(response, 502, { message: 'Nie udało się połączyć z API uwag. Twoje zgłoszenie pozostało w formularzu; spróbuj ponownie.' });
   }
@@ -229,16 +232,18 @@ createServer(async (request, response) => {
       if (!project || !previewPasswordMatches(project, request.headers.authorization || '') || !feedbackTokenPattern.test(project.feedbackToken || '')) return json(response, 404, { message: 'Konfiguracja uwag nie jest dostępna.' });
       let feedbackClosed = project.feedbackClosedDigest === project.feedbackDigest && Boolean(project.feedbackDigest);
       let feedbackClosedAt = feedbackClosed ? (project.feedbackClosedAt || null) : null;
+      let feedbackStatus = null;
       try {
         const statusResponse = await fetch(project.feedbackUrl, { method: 'POST', headers: { 'content-type': 'application/json', origin: `https://${project.hostname}`, accept: 'application/json' }, body: JSON.stringify({ project: project.projectId, token: project.feedbackToken, action: 'status' }), signal: AbortSignal.timeout(8000) });
         if (statusResponse.ok) {
           const status = await statusResponse.json();
+          feedbackStatus = status;
           feedbackClosed = status.feedbackClosed === true;
           feedbackClosedAt = Number(status.feedbackClosedAt) || null;
-          await serialized(async () => { project.feedbackClosedDigest = feedbackClosed ? project.feedbackDigest : null; project.feedbackClosedAt = feedbackClosedAt; await save(); });
+          await serialized(async () => { project.feedbackClosedDigest = feedbackClosed ? project.feedbackDigest : null; project.feedbackClosedAt = feedbackClosedAt; project.feedbackAcceptedDigest = status.previewAccepted === true ? project.feedbackDigest : null; project.feedbackAcceptedAt = Number(status.previewAcceptedAt) || null; project.feedbackCanAccept = status.canAccept === true; project.feedbackAcceptanceMessage = typeof status.acceptanceMessage === 'string' ? status.acceptanceMessage : ''; await save(); });
         }
       } catch {}
-      return json(response, 200, { projectId: project.projectId, feedbackToken: project.feedbackToken, feedbackUrl: project.feedbackUrl || '', feedbackClosed, feedbackClosedAt });
+      return json(response, 200, { projectId: project.projectId, feedbackToken: project.feedbackToken, feedbackUrl: project.feedbackUrl || '', feedbackClosed, feedbackClosedAt, previewAccepted: feedbackStatus ? feedbackStatus.previewAccepted === true : project.feedbackAcceptedDigest === project.feedbackDigest, previewAcceptedAt: feedbackStatus ? (Number(feedbackStatus.previewAcceptedAt) || null) : (project.feedbackAcceptedDigest === project.feedbackDigest ? (project.feedbackAcceptedAt || null) : null), canAccept: feedbackStatus ? feedbackStatus.canAccept === true : Boolean(project.feedbackCanAccept), acceptanceMessage: feedbackStatus ? (feedbackStatus.acceptanceMessage || '') : (project.feedbackAcceptanceMessage || '') });
     }
     const previewProject = previewProjectForHost(request.headers['x-forwarded-host'] || request.headers.host);
     if (previewProject && request.method === 'POST' && url.pathname === '/.well-known/grzywniak/feedback-submit') return await submitPreviewFeedback(request, response, previewProject);
@@ -274,7 +279,7 @@ createServer(async (request, response) => {
       const project = await serialized(async () => {
         const value = state.projects[`${body.projectId}:preview`];
         if (!value || value.hostname !== expectedHostname(body.projectId, 'preview') || !value.previewAuthHash) throw new Error('Najpierw zabezpiecz środowisko podglądu hasłem.');
-        if (value.feedbackDigest !== body.feedbackDigest) { value.feedbackClosedDigest = null; value.feedbackClosedAt = null; }
+        if (value.feedbackDigest !== body.feedbackDigest) { value.feedbackClosedDigest = null; value.feedbackClosedAt = null; value.feedbackAcceptedDigest = null; value.feedbackAcceptedAt = null; value.feedbackCanAccept = false; value.feedbackAcceptanceMessage = ''; }
         value.feedbackToken = body.feedbackToken; value.feedbackUrl = body.feedbackUrl; value.feedbackDigest = body.feedbackDigest;
         await save();
         return value;

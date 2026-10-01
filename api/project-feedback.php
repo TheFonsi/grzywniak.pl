@@ -33,7 +33,31 @@ if($jsonRequest) {
     if(($payload['action']??'')==='status') {
         $lookup=projectDb()->prepare('SELECT closed_at FROM project_feedback_closures WHERE session_id=? AND image_digest=?'); $lookup->execute([$id,$feedbackDigest]); $closedAt=(int)$lookup->fetchColumn();
         if(!$closedAt && $feedbackClosed) $closedAt=(int)($case['feedbackClosedAt']??0);
-        http_response_code(200); echo json_encode(['feedbackClosed'=>$closedAt>0 || $feedbackClosed,'feedbackClosedAt'=>$closedAt?:null],JSON_UNESCAPED_UNICODE); exit;
+        $acceptedAt=($case['previewAcceptedDigest']??'')===$feedbackDigest?(int)($case['previewAcceptedAt']??0):0;
+        $currentSent=($case['previewSentDigest']??'')===$feedbackDigest || $closedAt>0;
+        $db=projectDb(); $pending=$db->prepare("SELECT COUNT(*) FROM project_feedback WHERE session_id=? AND image_digest=? AND state!='resolved'"); $pending->execute([$id,$feedbackDigest]); $pendingCount=(int)$pending->fetchColumn();
+        $active=$db->prepare("SELECT COUNT(*) FROM project_feedback WHERE session_id=? AND state='in_fix'"); $active->execute([$id]); $activeCount=(int)$active->fetchColumn();
+        $canAccept=$closedAt>0 && $currentSent && $pendingCount===0 && $activeCount===0 && !$acceptedAt;
+        $acceptanceMessage=$acceptedAt?'Wersja zostala juz zaakceptowana.':(!$closedAt?'Najpierw zakoncz zglaszanie uwag.':(!$currentSent?'Ta wersja nie zostala jeszcze wyslana klientowi.':($pendingCount>0?'Zatwierdzone uwagi musza zostac poprawione lub rozstrzygniete przed akceptacja.':($activeCount>0?'Poprawki agentow sa jeszcze w trakcie.':'Akceptujesz dokladnie te wersje podgladu.'))));
+        http_response_code(200); echo json_encode(['feedbackClosed'=>$closedAt>0 || $feedbackClosed,'feedbackClosedAt'=>$closedAt?:null,'previewAccepted'=>$acceptedAt>0,'previewAcceptedAt'=>$acceptedAt?:null,'canAccept'=>$canAccept,'acceptanceMessage'=>$acceptanceMessage],JSON_UNESCAPED_UNICODE); exit;
+    }
+    if(($payload['action']??'')==='accept') {
+        $db=projectDb(); $db->exec('BEGIN IMMEDIATE');
+        try {
+            $case=projectCase($id); $latest=projectLatestPreviewJob($id); $latestResult=$latest && $latest['state']==='done'?json_decode((string)$latest['result'],true):null;
+            if(!$feedbackDigest || !is_array($latestResult) || ($latestResult['imageDigest']??'')!==$feedbackDigest) throw new DomainException('Akceptowac mozna tylko aktualny podglad klienta.');
+            $closed=$db->prepare('SELECT closed_at FROM project_feedback_closures WHERE session_id=? AND image_digest=?'); $closed->execute([$id,$feedbackDigest]); $closedAt=(int)$closed->fetchColumn();
+            if(!$closedAt) throw new DomainException('Najpierw zakoncz zglaszanie uwag do tej wersji.');
+            if(($case['previewAcceptedDigest']??'')===$feedbackDigest) { $acceptedAt=(int)($case['previewAcceptedAt']??0); $db->exec('COMMIT'); http_response_code(200); echo json_encode(['message'=>'Ta wersja zostala juz zaakceptowana.','accepted'=>true,'acceptedAt'=>$acceptedAt],JSON_UNESCAPED_UNICODE); exit; }
+            $pending=$db->prepare("SELECT COUNT(*) FROM project_feedback WHERE session_id=? AND image_digest=? AND state!='resolved'"); $pending->execute([$id,$feedbackDigest]);
+            if((int)$pending->fetchColumn()>0) throw new DomainException('Najpierw rozstrzygnij lub wykonaj wszystkie uwagi do tej wersji.');
+            $active=$db->prepare("SELECT COUNT(*) FROM project_feedback WHERE session_id=? AND state='in_fix'"); $active->execute([$id]);
+            if((int)$active->fetchColumn()>0) throw new DomainException('Poprawki agentow sa jeszcze w trakcie. Poczekaj na nowy podglad.');
+            $acceptedAt=time(); $case['previewAcceptedDigest']=$feedbackDigest; $case['previewAcceptedAt']=$acceptedAt; projectSave($id,$case);
+            $db->prepare("UPDATE project_feedback SET state='resolved',admin_decision='accepted',decision_note=?,decision_by='Klient',decision_at=?,updated_at=? WHERE session_id=? AND state='fixed_pending_client'")->execute(['Klient zaakceptowal nowa wersje po wykonaniu poprawki.', $acceptedAt,$acceptedAt,$id]);
+            projectEvent($id,'feedback','preview_accepted','Klient','Klient zaakceptowal w pelni wersje '.$feedbackDigest.' do publikacji.');
+            $db->exec('COMMIT'); http_response_code(200); echo json_encode(['message'=>'Dziekujemy. Ta wersja podgladu zostala zaakceptowana. Administrator podejmie decyzje o publikacji.','accepted'=>true,'acceptedAt'=>$acceptedAt],JSON_UNESCAPED_UNICODE); exit;
+        } catch(Throwable $error) { try{$db->exec('ROLLBACK');}catch(Throwable){} if($error instanceof DomainException) { http_response_code(409); echo json_encode(['message'=>$error->getMessage()],JSON_UNESCAPED_UNICODE); exit; } error_log('Feedback acceptance failed: '.$error->getMessage()); http_response_code(500); echo json_encode(['message'=>'Nie udalo sie zapisac akceptacji. Sprobuj ponownie.'],JSON_UNESCAPED_UNICODE); exit; }
     }
     if(($payload['action']??'')==='close') {
         if($feedbackClosed) { $closedAt=(int)($case['feedbackClosedAt']??0); if(!$closedAt) { $lookup=projectDb()->prepare('SELECT closed_at FROM project_feedback_closures WHERE session_id=? AND image_digest=?'); $lookup->execute([$id,$feedbackDigest]); $closedAt=(int)$lookup->fetchColumn(); } http_response_code(200); echo json_encode(['message'=>'Lista uwag jest juz zamknieta.','closed'=>true,'closedAt'=>$closedAt],JSON_UNESCAPED_UNICODE); exit; }
