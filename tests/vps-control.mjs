@@ -72,6 +72,7 @@ try {
   assert.match(scriptText, /window\.html2canvas\(document\.documentElement/);
   assert.match(scriptText, /screenshot: image/);
   assert.match(scriptText, /gw-accept-button/);
+  assert.match(scriptText, /gw-closed \.gw-primary\{display:none\}/, 'Po zamknięciu listy ukryj nieaktywny przycisk wysyłki uwagi.');
   assert.match(scriptText, /action: \"accept\"/);
   assert.match(scriptText, /config\.previewAccepted/);
   assert.match(scriptText, /toDataURL\("image\/jpeg"/);
