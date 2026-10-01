@@ -46,11 +46,14 @@ const authenticated = (request) => {
   return token.length >= 32 && a.length === b.length && timingSafeEqual(a, b);
 };
 const readBody = async (request) => {
-  let text = '';
+  const chunks = [];
+  let size = 0;
   for await (const chunk of request) {
-    text += chunk;
-    if (text.length > 16000) throw new Error('Żądanie jest zbyt duże.');
+    size += chunk.length;
+    if (size > 900000) throw new Error('Żądanie jest zbyt duże.');
+    chunks.push(chunk);
   }
+  const text = Buffer.concat(chunks).toString('utf8');
   const body = JSON.parse(text || '{}');
   if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error('Niepoprawne dane JSON.');
   return body;

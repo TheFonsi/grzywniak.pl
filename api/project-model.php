@@ -4,6 +4,8 @@ require_once __DIR__ . '/bootstrap.php';
 
 function projectDb(): PDO {
     $db = sessionDb();
+    // The PHP app, worker and feedback endpoint share this SQLite file. WAL lets
+    // the admin read while the worker commits; busy_timeout covers short writes.
     $db->exec('CREATE TABLE IF NOT EXISTS project_cases (session_id TEXT PRIMARY KEY, data TEXT NOT NULL, updated_at INTEGER NOT NULL)');
     $db->exec('CREATE TABLE IF NOT EXISTS project_events (id INTEGER PRIMARY KEY AUTOINCREMENT, session_id TEXT NOT NULL, stage TEXT NOT NULL, kind TEXT NOT NULL, actor TEXT NOT NULL, details TEXT NOT NULL, created_at INTEGER NOT NULL)');
     $db->exec('CREATE TABLE IF NOT EXISTS project_jobs (id INTEGER PRIMARY KEY AUTOINCREMENT, session_id TEXT NOT NULL, kind TEXT NOT NULL, state TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, input TEXT NOT NULL, result TEXT, error TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, UNIQUE(session_id, kind))');
@@ -135,7 +137,7 @@ function projectNormalizeFeedbackAnnotation(mixed $annotation): array {
     if(!is_array($annotation)) throw new InvalidArgumentException('Zaznacz obszar strony, którego dotyczy uwaga.');
     $areas=is_array($annotation['areas']??null)?$annotation['areas']:[$annotation];
     if(count($areas)<1 || count($areas)>8) throw new InvalidArgumentException('Zgłoszenie może zawierać od 1 do 8 zaznaczonych obszarów.');
-    $safe=[];
+    $safe=[]; $snapshotBytes=0;
     foreach($areas as $area) {
         if(!is_array($area) || !is_array($area['rect']??null)) throw new InvalidArgumentException('Niepoprawne zaznaczenie obszaru.');
         $rect=$area['rect'];
@@ -150,7 +152,11 @@ function projectNormalizeFeedbackAnnotation(mixed $annotation): array {
         if((float)$context['width']<=0 || (float)$context['height']<=0 || (float)$context['x']+(float)$context['width']>1.000001 || (float)$context['y']+(float)$context['height']>1.000001) throw new InvalidArgumentException('Obszar kontekstu musi mieścić się w widoku strony.');
         $rect=array_combine(['x','y','width','height'],array_map(static fn($key)=>(float)$rect[$key],['x','y','width','height']));
         $context=array_combine(['x','y','width','height'],array_map(static fn($key)=>(float)$context[$key],['x','y','width','height']));
-        $safe[]=['rect'=>$rect,'context'=>$context,'viewport'=>['width'=>max(1,min(10000,(int)($area['viewport']['width']??1))),'height'=>max(1,min(10000,(int)($area['viewport']['height']??1)))],'scroll'=>['x'=>max(0,min(100000,(int)($area['scroll']['x']??0))),'y'=>max(0,min(100000,(int)($area['scroll']['y']??0)))],'element'=>$element,'note'=>$note];
+        $snapshot=$area['snapshot']??'';
+        if(!is_string($snapshot) || strlen($snapshot)>80000) throw new InvalidArgumentException('Podgląd zaznaczenia jest nieprawidłowy lub przekracza limit 80 KB.');
+        $snapshotBytes+=strlen($snapshot);
+        if($snapshotBytes>600000) throw new InvalidArgumentException('Podglądy obszarów przekraczają 600 KB. Usuń część zaznaczeń i spróbuj ponownie.');
+        $safe[]=['rect'=>$rect,'context'=>$context,'viewport'=>['width'=>max(1,min(10000,(int)($area['viewport']['width']??1))),'height'=>max(1,min(10000,(int)($area['viewport']['height']??1)))],'scroll'=>['x'=>max(0,min(100000,(int)($area['scroll']['x']??0))),'y'=>max(0,min(100000,(int)($area['scroll']['y']??0)))],'element'=>$element,'note'=>$note,'snapshot'=>$snapshot];
     }
     return ['areas'=>$safe];
 }

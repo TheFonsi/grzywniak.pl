@@ -109,6 +109,13 @@
         if (/^on/i.test(attribute.name) || (/^(href|src|action|formaction)$/i.test(attribute.name) && /^\s*javascript:/i.test(attribute.value))) node.removeAttribute(attribute.name);
       });
     });
+    clone.querySelectorAll('input,textarea,select').forEach((node) => {
+      node.value = '';
+      node.removeAttribute('value');
+      if (node.tagName === 'TEXTAREA') node.textContent = '';
+      node.removeAttribute('checked');
+      node.removeAttribute('selected');
+    });
     const body = clone.querySelector("body");
     if (body) { body.style.position = "relative"; body.style.left = `${-scroll.x}px`; body.style.top = `${-scroll.y}px`; }
     const head = clone.querySelector("head");
@@ -259,7 +266,7 @@
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: form.querySelector("textarea").value.trim(), page_url: `${location.origin}${location.pathname}${location.hash}`.slice(0, 1000), annotation: annotations.length === 1 ? (({ snapshot, ...annotation }) => annotation)(annotations[0]) : { areas: annotations.map(({ snapshot, ...annotation }) => annotation) } }),
+      body: JSON.stringify({ message: form.querySelector("textarea").value.trim(), page_url: `${location.origin}${location.pathname}${location.hash}`.slice(0, 1000), annotation: { areas: annotations.map((annotation) => ({ ...annotation, snapshot: annotation.snapshot.length <= 80000 ? annotation.snapshot : "" })) } }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(`${result.message || `Serwer odrzucił zgłoszenie (HTTP ${response.status}).`}${result.reference ? ` (ID: ${result.reference})` : ""}`);

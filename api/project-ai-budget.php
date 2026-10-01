@@ -28,7 +28,7 @@ function projectAiReservation(string $id,string $callKey,string $kind,array $cas
         $db->prepare("INSERT INTO project_ai_calls(call_key,session_id,task_kind,state,reserved_pln,created_at,updated_at) VALUES(?,?,?,'reserved',?,?,?)")->execute([$callKey,$id,$kind,$reserve,time(),time()]);
         $db->exec('COMMIT');
         return $reserve;
-    } catch(Throwable $error) { if($db->inTransaction()) $db->exec('ROLLBACK'); throw $error; }
+    } catch(Throwable $error) { try { $db->exec('ROLLBACK'); } catch(Throwable) {} throw $error; }
 }
 
 function projectAiSettle(string $callKey,array $response,array $rates,float $reserve): void {

@@ -14,6 +14,11 @@ $area=['rect'=>['x'=>0.1,'y'=>0.2,'width'=>0.3,'height'=>0.4],'context'=>['x'=>0
 $multiAnnotation=projectNormalizeFeedbackAnnotation(['areas'=>[$area,$area]]);
 if(count($multiAnnotation['areas'])!==2 || $multiAnnotation['areas'][1]['element']['tag']!=='button' || $multiAnnotation['areas'][1]['note']!==$area['note'] || $multiAnnotation['areas'][1]['context']!=$area['context']) throw new RuntimeException('Multiple selected areas, their context and notes were not preserved.');
 if(count(projectNormalizeFeedbackAnnotation($area)['areas'])!==1) throw new RuntimeException('Legacy single area annotations must remain supported.');
+$snapshot='<!doctype html><html><head><title>Captured page</title></head><body><main>Visible page content</main></body></html>';
+$withSnapshot=projectNormalizeFeedbackAnnotation(['areas'=>[array_merge($area,['snapshot'=>$snapshot])]]);
+if($withSnapshot['areas'][0]['snapshot']!==$snapshot) throw new RuntimeException('Sanitized customer page snapshots must be saved with the selected area.');
+try { projectNormalizeFeedbackAnnotation(['areas'=>[array_merge($area,['snapshot'=>str_repeat('x',80001)])]]); throw new RuntimeException('Oversized feedback snapshot was accepted.'); }
+catch(InvalidArgumentException) {}
 try { projectNormalizeFeedbackAnnotation(['areas'=>array_fill(0,9,$area)]); throw new RuntimeException('Area limit was not enforced.'); }
 catch(InvalidArgumentException) {}
 
@@ -21,6 +26,10 @@ $executionSource=(string)file_get_contents(__DIR__.'/../api/project-execution.ph
 if(str_contains($executionSource,'->commit()') || str_contains($executionSource,'->rollBack()')) throw new RuntimeException('BEGIN IMMEDIATE musi być kończony przez SQL COMMIT lub ROLLBACK.');
 $feedbackSource=(string)file_get_contents(__DIR__.'/../api/project-feedback.php');
 if(str_contains($feedbackSource,'->commit()') || str_contains($feedbackSource,'->rollBack()') || !str_contains($feedbackSource,"exec('COMMIT')") || !str_contains($feedbackSource,"exec('ROLLBACK')")) throw new RuntimeException('Formularz uwag musi kończyć ręcznie rozpoczętą transakcję SQL poleceniem COMMIT lub ROLLBACK.');
+$bootstrapSource=(string)file_get_contents(__DIR__.'/../api/bootstrap.php');
+if(!str_contains($bootstrapSource,"PRAGMA busy_timeout=15000") || !str_contains($bootstrapSource,"PRAGMA journal_mode=WAL")) throw new RuntimeException('SQLite musi używać WAL i dłuższego oczekiwania na krótkie blokady.');
+$adminSource=(string)file_get_contents(__DIR__.'/../api/project-case.js');
+if(!str_contains($adminSource,'sandbox=""') || !str_contains($adminSource,'srcdoc="${escapeHtml(area.snapshot)}"')) throw new RuntimeException('Panel musi bezpiecznie renderować zapisany podgląd klienta obok zaznaczenia.');
 
 $db=new PDO('sqlite::memory:');
 $db->setAttribute(PDO::ATTR_ERRMODE,PDO::ERRMODE_EXCEPTION);

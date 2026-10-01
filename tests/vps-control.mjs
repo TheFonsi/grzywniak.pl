@@ -62,8 +62,9 @@ try {
   const scriptText = await script.text();
   assert.match(scriptText, /gw-feedback-launcher/);
   assert.match(scriptText, /Zaznacz kolejny obszar/);
-  assert.match(scriptText, /annotation: annotations\.length === 1/);
-  assert.match(scriptText, /\{ areas: annotations\.map/);
+  assert.match(scriptText, /annotation: \{ areas: annotations\.map/);
+  assert.match(scriptText, /snapshot: annotation\.snapshot\.length <= 80000/);
+  assert.match(scriptText, /node\.removeAttribute\('value'\)/, 'Zapisany podgląd nie może przenosić wpisanych wartości pól formularza.');
   assert.match(scriptText, /Notatka do tego obszaru/);
   assert.match(scriptText, /annotation\.note = note\.value/);
   assert.match(scriptText, /context\.x \* annotation\.viewport\.width \* scale/);

@@ -310,7 +310,7 @@ function runOneJob(): bool {
         $db->exec('COMMIT');
         echo "Job {$job['id']} done\n";
     } catch(Throwable $error) {
-        if($db->inTransaction()) $db->exec('ROLLBACK');
+        try { $db->exec('ROLLBACK'); } catch(Throwable) {}
         $message=mb_substr($error->getMessage(),0,500);
         $stmt=$db->prepare("UPDATE project_jobs SET state='failed',error=?,updated_at=? WHERE id=?");
         $stmt->execute([$message,time(),$job['id']]);
