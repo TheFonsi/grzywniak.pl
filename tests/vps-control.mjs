@@ -68,6 +68,10 @@ try {
   assert.match(scriptText, /annotation\.note = note\.value/);
   assert.match(scriptText, /rect\.x \* annotation\.viewport\.width \* scale/);
   assert.match(scriptText, /gw-thumb-selection/);
+  assert.match(scriptText, /gw-feedback-viewer/);
+  assert.match(scriptText, /Powiększ zaznaczony obszar/);
+  assert.match(scriptText, /thumbWidth = Math\.min\(320, areasEl\.clientWidth, 110 \* ratio\)/);
+  assert.doesNotMatch(scriptText, /annotation\.element\.tag/, 'Etykieta miniatury nie powinna ujawniać technicznych nazw tagów HTML.');
   assert.doesNotMatch(scriptText, /sandbox/, 'Miniatury muszą dziedziczyć pochodzenie podglądu, aby style nie były blokowane przez CORS.');
   assert.match(scriptText, /\^on\/i\.test\(attribute\.name\)/, 'Kopia strony musi usuwać atrybuty obsługi zdarzeń przed renderowaniem.');
   assert.match(scriptText, /feedback-submit/);
