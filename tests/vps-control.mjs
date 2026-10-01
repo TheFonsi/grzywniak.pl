@@ -73,8 +73,10 @@ try {
   assert.match(scriptText, /screenshot: image/);
   assert.match(scriptText, /gw-accept-button/);
   assert.match(scriptText, /gw-closed \.gw-primary\{display:none\}/, 'Po zamknięciu listy ukryj nieaktywny przycisk wysyłki uwagi.');
-  assert.match(scriptText, /button:disabled\{opacity:\.55;cursor:default\}/, 'Zablokowane przyciski uwag używają zwykłego kursora.');
+  assert.match(scriptText, /button:disabled\{opacity:\.55;cursor:not-allowed!important\}/, "Disabled feedback buttons use an explicit blocked cursor.");
   assert.doesNotMatch(scriptText, /cursor:\s*wait/, 'Panel uwag nie pokazuje obracającego się kursora oczekiwania.');
+  assert.match(scriptText, /aria-busy/, "Submission exposes a clear busy state.");
+  assert.match(scriptText, /submit\.disabled = Boolean/, "A closed feedback list stays locked when a pending request completes.");
   assert.match(scriptText, /action: \"accept\"/);
   assert.match(scriptText, /config\.previewAccepted/);
   assert.match(scriptText, /toDataURL\("image\/jpeg"/);
