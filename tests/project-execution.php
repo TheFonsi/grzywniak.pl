@@ -28,6 +28,10 @@ $feedbackSource=(string)file_get_contents(__DIR__.'/../api/project-feedback.php'
 if(str_contains($feedbackSource,'->commit()') || str_contains($feedbackSource,'->rollBack()') || !str_contains($feedbackSource,"exec('COMMIT')") || !str_contains($feedbackSource,"exec('ROLLBACK')")) throw new RuntimeException('Formularz uwag musi kończyć ręcznie rozpoczętą transakcję SQL poleceniem COMMIT lub ROLLBACK.');
 $bootstrapSource=(string)file_get_contents(__DIR__.'/../api/bootstrap.php');
 if(!str_contains($bootstrapSource,"PRAGMA busy_timeout=15000") || !str_contains($bootstrapSource,"PRAGMA journal_mode=WAL")) throw new RuntimeException('SQLite musi używać WAL i dłuższego oczekiwania na krótkie blokady.');
+$capacityDb=new PDO('sqlite::memory:');
+$capacityDb->setAttribute(PDO::ATTR_ERRMODE,PDO::ERRMODE_EXCEPTION);
+$capacityDb->exec("CREATE TABLE project_agent_tasks(state TEXT); CREATE TABLE project_ai_calls(state TEXT); INSERT INTO project_agent_tasks VALUES('running'),('done'); INSERT INTO project_ai_calls VALUES('reserved'),('settled')");
+if(projectAiCapacityUsed($capacityDb)!==2 || !projectJobRequiresAiCapacity('classify_feedback_17') || !projectJobRequiresAiCapacity('generate_plan') || projectJobRequiresAiCapacity('publish_preview')) throw new RuntimeException('Limit równoległości musi liczyć tylko zadania aktywne, a wywołania AI muszą czekać w kolejce.');
 $adminSource=(string)file_get_contents(__DIR__.'/../api/project-case.js');
 if(!str_contains($adminSource,'sandbox=""') || !str_contains($adminSource,'srcdoc="${escapeHtml(area.snapshot)}"')) throw new RuntimeException('Panel musi bezpiecznie renderować zapisany podgląd klienta obok zaznaczenia.');
 

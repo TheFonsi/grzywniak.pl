@@ -212,7 +212,11 @@ function runOneJob(): bool {
     $db->exec('BEGIN IMMEDIATE');
     $stale=$db->prepare("UPDATE project_jobs SET state='failed',error='Praca została przerwana. Sprawdź wynik u dostawcy i ponów zadanie.',updated_at=? WHERE state='running' AND updated_at<?");
     $stale->execute([time(),time()-900]);
-    $job=$db->query("SELECT * FROM project_jobs WHERE state='queued' ORDER BY id LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    $maxConcurrency=max(1,(int)projectSetting('AGENT_MAX_CONCURRENCY'));
+    $capacityUsed=projectAiCapacityUsed($db);
+    $jobStmt=$db->prepare("SELECT * FROM project_jobs WHERE state='queued' AND (? < ? OR (kind<>'generate_plan' AND kind NOT LIKE 'classify_feedback_%')) ORDER BY id LIMIT 1");
+    $jobStmt->execute([$capacityUsed,$maxConcurrency]);
+    $job=$jobStmt->fetch(PDO::FETCH_ASSOC);
     if(!$job) { $db->exec('COMMIT'); return false; }
     $stmt=$db->prepare("UPDATE project_jobs SET state='running',attempts=attempts+1,updated_at=? WHERE id=?");
     $stmt->execute([time(),$job['id']]);
@@ -312,6 +316,11 @@ function runOneJob(): bool {
     } catch(Throwable $error) {
         try { $db->exec('ROLLBACK'); } catch(Throwable) {}
         $message=mb_substr($error->getMessage(),0,500);
+        if($message==='Limit równoległych agentów jest wykorzystany.' && projectJobRequiresAiCapacity((string)$job['kind'])) {
+            $db->prepare("UPDATE project_jobs SET state='queued',attempts=MAX(0,attempts-1),error=NULL,updated_at=? WHERE id=? AND state='running'")->execute([time(),$job['id']]);
+            fwrite(STDERR,"Job {$job['id']} queued until AI capacity is available\n");
+            return true;
+        }
         $stmt=$db->prepare("UPDATE project_jobs SET state='failed',error=?,updated_at=? WHERE id=?");
         $stmt->execute([$message,time(),$job['id']]);
         projectEvent($id,$stage,'failed',$actor,$message);
@@ -330,6 +339,13 @@ function runOneUnit(): bool {
     try { return projectDispatchAgentTask(); } catch(Throwable $error) { error_log('Agent dispatch: '.$error->getMessage()); return false; }
 }
 projectBackfillAgentTasks();
+$capacityFailure='Limit równoległych agentów jest wykorzystany.';
+$requeue=projectDb();
+$requeue->exec('BEGIN IMMEDIATE');
+try {
+    $requeue->prepare("UPDATE project_jobs SET state='queued',attempts=MAX(0,attempts-1),error=NULL,updated_at=? WHERE state='failed' AND error=? AND (kind='generate_plan' OR kind LIKE 'classify_feedback_%') AND NOT EXISTS (SELECT 1 FROM project_ai_calls WHERE call_key='job:'||project_jobs.id||':'||project_jobs.attempts)")->execute([time(),$capacityFailure]);
+    $requeue->exec('COMMIT');
+} catch(Throwable $error) { try { $requeue->exec('ROLLBACK'); } catch(Throwable) {} throw $error; }
 foreach(projectDb()->query("SELECT id,session_id FROM project_feedback WHERE state='new'")->fetchAll(PDO::FETCH_ASSOC) as $feedback) projectEnqueue((string)$feedback['session_id'],'classify_feedback_'.$feedback['id']);
 if(in_array('--once',$argv,true)) { runOneUnit(); exit; }
 while(true) { runOneUnit(); sleep(5); }

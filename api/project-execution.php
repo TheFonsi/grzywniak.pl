@@ -91,12 +91,21 @@ function projectTaskTotals(PDO $db,string $id): array {
     return [$project,$monthly];
 }
 
+function projectAiCapacityUsed(PDO $db): int {
+    return (int)$db->query("SELECT COUNT(*) FROM project_agent_tasks WHERE state='running'")->fetchColumn()
+        + (int)$db->query("SELECT COUNT(*) FROM project_ai_calls WHERE state='reserved'")->fetchColumn();
+}
+
+function projectJobRequiresAiCapacity(string $kind): bool {
+    return $kind==='generate_plan' || preg_match('/^classify_feedback_[1-9][0-9]*$/',$kind)===1;
+}
+
 function projectDispatchAgentTask(): bool {
     $db=projectDb();
     $db->exec('BEGIN IMMEDIATE');
     try {
         $max=max(1,(int)projectSetting('AGENT_MAX_CONCURRENCY'));
-        $running=(int)$db->query("SELECT COUNT(*) FROM project_agent_tasks WHERE state='running'")->fetchColumn()+(int)$db->query("SELECT COUNT(*) FROM project_ai_calls WHERE state='reserved'")->fetchColumn();
+        $running=projectAiCapacityUsed($db);
         if($running>=$max) { $db->exec('COMMIT'); return false; }
         $tasks=$db->query("SELECT * FROM project_agent_tasks WHERE state='pending' ORDER BY id")->fetchAll(PDO::FETCH_ASSOC);
         $selected=null; $case=[]; $repo=[];

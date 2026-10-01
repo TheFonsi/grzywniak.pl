@@ -21,7 +21,7 @@ function projectAiReservation(string $id,string $callKey,string $kind,array $cas
     $reserve=projectAiMaximumCost($payloadJson,$rates);
     $db=projectDb(); $db->exec('BEGIN IMMEDIATE');
     try {
-        $concurrency=(int)$db->query("SELECT COUNT(*) FROM project_agent_tasks WHERE state='running'")->fetchColumn()+(int)$db->query("SELECT COUNT(*) FROM project_ai_calls WHERE state='reserved'")->fetchColumn();
+        $concurrency=projectAiCapacityUsed($db);
         if($concurrency>=max(1,(int)projectSetting('AGENT_MAX_CONCURRENCY'))) throw new RuntimeException('Limit równoległych agentów jest wykorzystany.');
         [$projectTotal,$monthlyTotal]=projectTaskTotals($db,$id);
         if($reserve>(float)projectSetting('AGENT_TASK_COST_LIMIT_PLN')+0.0001 || $projectTotal+$reserve>(float)($case['budgetPln']??0)+0.0001 || $monthlyTotal+$reserve>(float)projectSetting('AGENT_MONTHLY_LIMIT_PLN')+0.0001) throw new RuntimeException('Limit kosztu zadania, projektu lub miesiąca blokuje wywołanie modelu.');
