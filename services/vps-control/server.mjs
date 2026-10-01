@@ -24,6 +24,7 @@ const commitPattern = /^[a-f0-9]{40}$/;
 const feedbackTokenPattern = /^[a-f0-9]{48}$/;
 const publicApiHost = process.env.PUBLIC_API_HOST || 'api.grzywniak.pl';
 const feedbackScript = await readFile(new URL('./feedback.js', import.meta.url));
+const html2canvasScript = await readFile(new URL('./html2canvas.min.js', import.meta.url));
 let state = { projects: {}, deployments: {} };
 let mutation = Promise.resolve();
 
@@ -114,6 +115,10 @@ const proxyPreview = (request, response, project) => {
     response.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'content-length': feedbackScript.length, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
     return response.end(feedbackScript);
   }
+  if (request.method === 'GET' && request.url?.split('?')[0] === '/grzywniak-html2canvas.js') {
+    response.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'content-length': html2canvasScript.length, 'cache-control': 'public, max-age=3600', 'x-content-type-options': 'nosniff' });
+    return response.end(html2canvasScript);
+  }
   const headers = { ...request.headers, host: `${deployment.container}:${deployment.appPort}`, 'accept-encoding': '' };
   for (const name of ['connection', 'keep-alive', 'proxy-authenticate', 'proxy-authorization', 'te', 'trailer', 'transfer-encoding', 'upgrade']) delete headers[name];
   const upstream = httpRequest({ hostname: deployment.container, port: deployment.appPort, path: request.url || '/', method: request.method, headers, timeout: 30000 }, (upstreamResponse) => {
@@ -125,8 +130,11 @@ const proxyPreview = (request, response, project) => {
       upstreamResponse.on('data', (chunk) => { size += chunk.length; if (size > 2 * 1024 * 1024) { upstream.destroy(new Error('Dokument HTML podglądu przekracza limit.')); return; } chunks.push(chunk); });
       upstreamResponse.on('end', () => {
         const html = Buffer.concat(chunks).toString('utf8');
-        const tag = '<script src="/grzywniak-feedback.js" defer></script>';
-        const injected = /<script\s+src=["']\/grzywniak-feedback\.js["']/i.test(html) ? html : (/<\/body\s*>/i.test(html) ? html.replace(/<\/body\s*>/i, `${tag}</body>`) : `${html}${tag}`);
+        const captureTag = '<script src="/grzywniak-html2canvas.js" defer></script>';
+        const feedbackTag = '<script src="/grzywniak-feedback.js" defer></script>';
+        let injected = html;
+        if (!/<script\s+src=["']\/grzywniak-feedback\.js["']/i.test(injected)) injected = /<\/body\s*>/i.test(injected) ? injected.replace(/<\/body\s*>/i, `${captureTag}${feedbackTag}</body>`) : `${injected}${captureTag}${feedbackTag}`;
+        else if (!/<script\s+src=["']\/grzywniak-html2canvas\.js["']/i.test(injected)) injected = injected.replace(/(<script\s+src=["']\/grzywniak-feedback\.js["'][^>]*>\s*<\/script>)/i, `${captureTag}$1`);
         delete responseHeaders['content-length']; delete responseHeaders.etag;
         responseHeaders['cache-control'] = 'private, no-cache';
         responseHeaders['content-length'] = Buffer.byteLength(injected);

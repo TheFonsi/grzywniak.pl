@@ -154,9 +154,11 @@ function projectNormalizeFeedbackAnnotation(mixed $annotation): array {
         $context=array_combine(['x','y','width','height'],array_map(static fn($key)=>(float)$context[$key],['x','y','width','height']));
         $snapshot=$area['snapshot']??'';
         if(!is_string($snapshot) || strlen($snapshot)>80000) throw new InvalidArgumentException('Podgląd zaznaczenia jest nieprawidłowy lub przekracza limit 80 KB.');
-        $snapshotBytes+=strlen($snapshot);
+        $screenshot=$area['screenshot']??'';
+        if(!is_string($screenshot) || strlen($screenshot)>150000 || ($screenshot!=='' && !preg_match('~^data:image/jpeg;base64,[A-Za-z0-9+/]+={0,2}$~D',$screenshot))) throw new InvalidArgumentException('Obraz zaznaczenia jest nieprawidłowy lub przekracza limit 150 KB.');
+        $snapshotBytes+=strlen($snapshot)+strlen($screenshot);
         if($snapshotBytes>600000) throw new InvalidArgumentException('Podglądy obszarów przekraczają 600 KB. Usuń część zaznaczeń i spróbuj ponownie.');
-        $safe[]=['rect'=>$rect,'context'=>$context,'viewport'=>['width'=>max(1,min(10000,(int)($area['viewport']['width']??1))),'height'=>max(1,min(10000,(int)($area['viewport']['height']??1)))],'scroll'=>['x'=>max(0,min(100000,(int)($area['scroll']['x']??0))),'y'=>max(0,min(100000,(int)($area['scroll']['y']??0)))],'element'=>$element,'note'=>$note,'snapshot'=>$snapshot];
+        $safe[]=['rect'=>$rect,'context'=>$context,'viewport'=>['width'=>max(1,min(10000,(int)($area['viewport']['width']??1))),'height'=>max(1,min(10000,(int)($area['viewport']['height']??1)))],'scroll'=>['x'=>max(0,min(100000,(int)($area['scroll']['x']??0))),'y'=>max(0,min(100000,(int)($area['scroll']['y']??0)))],'element'=>$element,'note'=>$note,'snapshot'=>$snapshot,'screenshot'=>$screenshot];
     }
     return ['areas'=>$safe];
 }

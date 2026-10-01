@@ -17,6 +17,9 @@ if(count(projectNormalizeFeedbackAnnotation($area)['areas'])!==1) throw new Runt
 $snapshot='<!doctype html><html><head><title>Captured page</title></head><body><main>Visible page content</main></body></html>';
 $withSnapshot=projectNormalizeFeedbackAnnotation(['areas'=>[array_merge($area,['snapshot'=>$snapshot])]]);
 if($withSnapshot['areas'][0]['snapshot']!==$snapshot) throw new RuntimeException('Sanitized customer page snapshots must be saved with the selected area.');
+$image='data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2Q==';
+$withImage=projectNormalizeFeedbackAnnotation(['areas'=>[array_merge($area,['screenshot'=>$image])]]);
+if($withImage['areas'][0]['screenshot']!==$image) throw new RuntimeException('Raster image capture must be persisted with the selected area.');
 try { projectNormalizeFeedbackAnnotation(['areas'=>[array_merge($area,['snapshot'=>str_repeat('x',80001)])]]); throw new RuntimeException('Oversized feedback snapshot was accepted.'); }
 catch(InvalidArgumentException) {}
 try { projectNormalizeFeedbackAnnotation(['areas'=>array_fill(0,9,$area)]); throw new RuntimeException('Area limit was not enforced.'); }

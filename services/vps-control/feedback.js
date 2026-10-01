@@ -10,8 +10,8 @@
     #gw-feedback-panel textarea{width:100%;min-height:105px;resize:vertical;border:1px solid #aab7c5;border-radius:9px;padding:10px;font:inherit;color:#17212c}
     #gw-feedback-panel button{border:0;border-radius:8px;padding:10px 13px;font:600 14px system-ui;cursor:pointer}#gw-feedback-panel button:disabled{opacity:.55;cursor:wait}#gw-feedback-panel .gw-primary{background:#245a91;color:#fff;width:100%;margin-top:10px}#gw-feedback-panel .gw-select{background:#e8f0f8;color:#173b5d}#gw-feedback-panel .gw-close{position:absolute;right:12px;top:12px;background:#edf1f5;color:#263747;padding:6px 10px}
     #gw-feedback-panel .gw-note{font-size:12px}#gw-feedback-panel .gw-message{min-height:20px;margin:10px 0 0;color:#245a36}#gw-feedback-areas{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:9px;margin:12px 0}#gw-feedback-areas:empty{display:none}
-    #gw-feedback-panel .gw-area-card{position:relative;min-width:0;padding:8px;border:1px solid #d5deea;border-radius:10px;background:#f7f9fc}#gw-feedback-panel .gw-area-card strong{display:block;margin-bottom:6px;font-size:12px;color:#35465b}#gw-feedback-panel .gw-thumb{position:relative;display:block;overflow:hidden;max-width:100%;padding:0;background:#e8edf4;border:1px solid #cbd5e1;border-radius:6px;cursor:zoom-in}#gw-feedback-panel .gw-thumb iframe{position:absolute;top:0;left:0;border:0;transform-origin:top left;pointer-events:none;background:#fff}#gw-feedback-panel .gw-thumb-selection{position:absolute;border:2px solid #e24646;border-radius:5px;box-shadow:inset 0 0 0 999px #e2464614;pointer-events:none}#gw-feedback-panel .gw-area-note{display:block;width:100%;min-height:54px;margin-top:8px;resize:vertical;border:1px solid #c7d1df;border-radius:7px;padding:7px;font:12px/1.4 system-ui;color:#17212c;background:#fff}#gw-feedback-panel .gw-area-card .gw-remove{position:absolute;right:6px;top:5px;padding:3px 7px;background:#e9edf3;color:#344458;font-size:12px}
-    #gw-feedback-viewer{position:fixed;inset:0;z-index:2147483004;display:none;align-items:center;justify-content:center;padding:24px;background:#07111de8;color:#fff;font:14px/1.45 system-ui}#gw-feedback-viewer.gw-open{display:flex}#gw-feedback-viewer .gw-viewer-dialog{position:relative;display:flex;flex-direction:column;gap:12px;max-width:100%;max-height:100%}#gw-feedback-viewer .gw-viewer-title{padding-right:52px;font-size:16px}#gw-feedback-viewer .gw-viewer-close{position:absolute;right:0;top:-6px;border:0;border-radius:8px;background:#fff;color:#142033;font-size:24px;line-height:1;padding:7px 12px;cursor:pointer}#gw-feedback-viewer .gw-viewer-crop{position:relative;overflow:hidden;max-width:calc(100vw - 48px);max-height:calc(100vh - 100px);background:#fff;border:2px solid #fff;border-radius:8px}#gw-feedback-viewer iframe{position:absolute;top:0;left:0;border:0;transform-origin:top left;pointer-events:none;background:#fff}#gw-feedback-viewer .gw-viewer-selection{position:absolute;border:3px solid #e24646;box-shadow:inset 0 0 0 999px #e2464614;pointer-events:none}
+    #gw-feedback-panel .gw-area-card{position:relative;min-width:0;padding:8px;border:1px solid #d5deea;border-radius:10px;background:#f7f9fc}#gw-feedback-panel .gw-area-card strong{display:block;margin-bottom:6px;font-size:12px;color:#35465b}#gw-feedback-panel .gw-thumb{position:relative;display:block;overflow:hidden;max-width:100%;padding:0;background:#e8edf4;border:1px solid #cbd5e1;border-radius:6px;cursor:zoom-in}#gw-feedback-panel .gw-thumb iframe,#gw-feedback-panel .gw-thumb img{position:absolute;top:0;left:0;border:0;transform-origin:top left;pointer-events:none;background:#fff}#gw-feedback-panel .gw-thumb-selection{position:absolute;border:2px solid #e24646;border-radius:5px;box-shadow:inset 0 0 0 999px #e2464614;pointer-events:none}#gw-feedback-panel .gw-area-note{display:block;width:100%;min-height:54px;margin-top:8px;resize:vertical;border:1px solid #c7d1df;border-radius:7px;padding:7px;font:12px/1.4 system-ui;color:#17212c;background:#fff}#gw-feedback-panel .gw-area-card .gw-remove{position:absolute;right:6px;top:5px;padding:3px 7px;background:#e9edf3;color:#344458;font-size:12px}
+    #gw-feedback-viewer{position:fixed;inset:0;z-index:2147483004;display:none;align-items:center;justify-content:center;padding:24px;background:#07111de8;color:#fff;font:14px/1.45 system-ui}#gw-feedback-viewer.gw-open{display:flex}#gw-feedback-viewer .gw-viewer-dialog{position:relative;display:flex;flex-direction:column;gap:12px;max-width:100%;max-height:100%}#gw-feedback-viewer .gw-viewer-title{padding-right:52px;font-size:16px}#gw-feedback-viewer .gw-viewer-close{position:absolute;right:0;top:-6px;border:0;border-radius:8px;background:#fff;color:#142033;font-size:24px;line-height:1;padding:7px 12px;cursor:pointer}#gw-feedback-viewer .gw-viewer-crop{position:relative;overflow:hidden;max-width:calc(100vw - 48px);max-height:calc(100vh - 100px);background:#fff;border:2px solid #fff;border-radius:8px}#gw-feedback-viewer iframe,#gw-feedback-viewer img{position:absolute;top:0;left:0;border:0;transform-origin:top left;pointer-events:none;background:#fff}#gw-feedback-viewer .gw-viewer-selection{position:absolute;border:3px solid #e24646;box-shadow:inset 0 0 0 999px #e2464614;pointer-events:none}
     #gw-feedback-panel .gw-thumb:focus-visible{outline:3px solid #245a91;outline-offset:2px}
     #gw-feedback-selection{position:fixed;inset:0;z-index:2147483002;cursor:crosshair;touch-action:none;background:#12395c10;display:none}
     #gw-feedback-selection.gw-selecting{display:block}#gw-feedback-selection:after{content:"Przeciągnij, aby zaznaczyć obszar · Esc anuluje";position:fixed;top:14px;left:50%;transform:translateX(-50%);background:#12395c;color:#fff;padding:9px 14px;border-radius:999px;font:13px system-ui;white-space:nowrap}
@@ -67,14 +67,22 @@
     const scale = Math.min((innerWidth - 64) / areaWidth, (innerHeight - 130) / areaHeight);
     const cropWidth = areaWidth * scale;
     const cropHeight = areaHeight * scale;
-    const frame = document.createElement("iframe");
-    frame.title = `Powiększony obszar ${index + 1}`;
-    frame.style.width = `${annotation.viewport.width}px`;
-    frame.style.height = `${annotation.viewport.height}px`;
-    frame.style.left = `${-context.x * annotation.viewport.width * scale}px`;
-    frame.style.top = `${-context.y * annotation.viewport.height * scale}px`;
-    frame.style.transform = `scale(${scale})`;
-    frame.srcdoc = annotation.snapshot;
+    let visual;
+    if (annotation.screenshot) {
+      visual = document.createElement("img");
+      visual.alt = `Zrzut strony wokół obszaru ${index + 1}`;
+      visual.src = annotation.screenshot;
+      visual.style.cssText = `position:absolute;left:0;top:0;width:${cropWidth}px;height:${cropHeight}px;pointer-events:none`;
+    } else {
+      visual = document.createElement("iframe");
+      visual.title = `Powiększony obszar ${index + 1}`;
+      visual.style.width = `${annotation.viewport.width}px`;
+      visual.style.height = `${annotation.viewport.height}px`;
+      visual.style.left = `${-context.x * annotation.viewport.width * scale}px`;
+      visual.style.top = `${-context.y * annotation.viewport.height * scale}px`;
+      visual.style.transform = `scale(${scale})`;
+      visual.srcdoc = annotation.snapshot;
+    }
     const highlight = document.createElement("span");
     highlight.className = "gw-viewer-selection";
     highlight.style.left = `${(rect.x - context.x) * annotation.viewport.width * scale}px`;
@@ -84,7 +92,7 @@
     viewerTitle.textContent = `Powiększony podgląd · obszar ${index + 1}`;
     viewerCrop.style.width = `${cropWidth}px`;
     viewerCrop.style.height = `${cropHeight}px`;
-    viewerCrop.replaceChildren(frame, highlight);
+    viewerCrop.replaceChildren(visual, highlight);
     viewer.classList.add("gw-open");
     closeViewer.focus();
   };
@@ -101,42 +109,50 @@
   });
 
   const point = (event) => ({ x: Math.max(0, Math.min(innerWidth, event.clientX)), y: Math.max(0, Math.min(innerHeight, event.clientY)) });
-  const captureSnapshot = (scroll) => {
-    const clone = document.documentElement.cloneNode(true);
-    clone.querySelectorAll("script,iframe,object,embed,#gw-feedback-launcher,#gw-feedback-panel,#gw-feedback-selection,#gw-feedback-rect").forEach((node) => node.remove());
-    clone.querySelectorAll("*").forEach((node) => {
-      [...node.attributes].forEach((attribute) => {
-        if (/^on/i.test(attribute.name) || (/^(href|src|action|formaction)$/i.test(attribute.name) && /^\s*javascript:/i.test(attribute.value))) node.removeAttribute(attribute.name);
-      });
+  const captureScreenshot = async (rect) => {
+    if (typeof window.html2canvas !== "function") throw new Error("Nie załadował się moduł zrzutu obrazu. Odśwież podgląd i spróbuj ponownie.");
+    const viewport = await window.html2canvas(document.documentElement, {
+      x: scrollX, y: scrollY, width: innerWidth, height: innerHeight,
+      windowWidth: innerWidth, windowHeight: innerHeight, scrollX, scrollY,
+      scale: Math.min(1, 1200 / innerWidth), useCORS: true, allowTaint: false,
+      backgroundColor: "#fff", logging: false,
+      ignoreElements: (node) => /^gw-feedback-/.test(node.id || ""),
+      onclone: (documentCopy) => {
+        documentCopy.querySelectorAll('[id^="gw-feedback-"]').forEach((node) => node.remove());
+        documentCopy.querySelectorAll("input,textarea,select").forEach((node) => { node.value = ""; node.removeAttribute("value"); node.removeAttribute("checked"); node.removeAttribute("selected"); if (node.tagName === "TEXTAREA") node.textContent = ""; });
+      },
     });
-    clone.querySelectorAll('input,textarea,select').forEach((node) => {
-      node.value = '';
-      node.removeAttribute('value');
-      if (node.tagName === 'TEXTAREA') node.textContent = '';
-      node.removeAttribute('checked');
-      node.removeAttribute('selected');
-    });
-    const body = clone.querySelector("body");
-    if (body) { body.style.position = "relative"; body.style.left = `${-scroll.x}px`; body.style.top = `${-scroll.y}px`; }
-    const head = clone.querySelector("head");
-    if (head && !head.querySelector("base")) {
-      const base = document.createElement("base");
-      base.href = location.href;
-      head.prepend(base);
+    const pad = Math.min(120, Math.max(32, Math.max(rect.width * innerWidth, rect.height * innerHeight) * 0.35));
+    const left = Math.max(0, rect.x * innerWidth - pad);
+    const top = Math.max(0, rect.y * innerHeight - pad);
+    const right = Math.min(innerWidth, (rect.x + rect.width) * innerWidth + pad);
+    const bottom = Math.min(innerHeight, (rect.y + rect.height) * innerHeight + pad);
+    const width = Math.max(1, right - left);
+    const height = Math.max(1, bottom - top);
+    const sx = viewport.width / innerWidth;
+    const sy = viewport.height / innerHeight;
+    let image = "";
+    for (const edge of [840, 640, 460, 320]) {
+      const scale = Math.min(1, edge / Math.max(width, height));
+      const output = document.createElement("canvas");
+      output.width = Math.max(1, Math.round(width * scale));
+      output.height = Math.max(1, Math.round(height * scale));
+      output.getContext("2d").drawImage(viewport, left * sx, top * sy, width * sx, height * sy, 0, 0, output.width, output.height);
+      for (const quality of [0.64, 0.45, 0.3]) {
+        image = output.toDataURL("image/jpeg", quality);
+        if (image.length <= 68000) break;
+      }
+      if (image.length <= 68000) break;
     }
-    return "<!doctype html>" + clone.outerHTML;
+    if (image.length > 68000) throw new Error("Nie udało się zmniejszyć obrazu zaznaczenia. Zaznacz mniejszy obszar i spróbuj ponownie.");
+    return { screenshot: image, context: { x: left / innerWidth, y: top / innerHeight, width: width / innerWidth, height: height / innerHeight } };
   };
-  const addAreaCard = (annotation, index, snapshot) => {
+  const addAreaCard = (annotation, index) => {
     const rect = annotation.rect;
     const context = annotation.context || { x: 0, y: 0, width: 1, height: 1 };
     const width = Math.max(1, context.width * annotation.viewport.width);
     const height = Math.max(1, context.height * annotation.viewport.height);
-    const frame = document.createElement("iframe");
-    frame.title = `Podgląd zaznaczonego obszaru ${index + 1}`;
-    frame.setAttribute("aria-hidden", "true");
-    frame.style.width = `${annotation.viewport.width}px`;
-    frame.style.height = `${annotation.viewport.height}px`;
-    frame.srcdoc = snapshot;
+    let visual;
     const card = document.createElement("div");
     card.className = "gw-area-card";
     const title = document.createElement("strong");
@@ -159,7 +175,7 @@
     const highlight = document.createElement("span");
     highlight.className = "gw-thumb-selection";
     highlight.setAttribute("aria-hidden", "true");
-    thumb.append(frame, highlight);
+    thumb.append(highlight);
     const note = document.createElement("textarea");
     note.className = "gw-area-note";
     note.maxLength = 1000;
@@ -179,17 +195,33 @@
     const visibleHeight = height * scale;
     const offsetX = (thumb.clientWidth - visibleWidth) / 2;
     const offsetY = (thumb.clientHeight - visibleHeight) / 2;
-    frame.style.left = `${offsetX - context.x * annotation.viewport.width * scale}px`;
-    frame.style.top = `${offsetY - context.y * annotation.viewport.height * scale}px`;
-    frame.style.transform = `scale(${scale})`;
-    highlight.style.left = `${offsetX + (rect.x - context.x) * annotation.viewport.width * scale}px`;
-    highlight.style.top = `${offsetY + (rect.y - context.y) * annotation.viewport.height * scale}px`;
-    highlight.style.width = `${rect.width * annotation.viewport.width * scale}px`;
-    highlight.style.height = `${rect.height * annotation.viewport.height * scale}px`;
+    if (annotation.screenshot) {
+      visual = document.createElement("img");
+      visual.alt = `Zrzut strony wokół obszaru ${index + 1}`;
+      visual.src = annotation.screenshot;
+      visual.style.cssText = `position:absolute;left:${offsetX}px;top:${offsetY}px;width:${visibleWidth}px;height:${visibleHeight}px;pointer-events:none`;
+    } else {
+      visual = document.createElement("iframe");
+      visual.title = `Podgląd zaznaczonego obszaru ${index + 1}`;
+      visual.setAttribute("aria-hidden", "true");
+      visual.style.width = `${annotation.viewport.width}px`;
+      visual.style.height = `${annotation.viewport.height}px`;
+      visual.srcdoc = annotation.snapshot;
+      visual.style.left = `${offsetX - context.x * annotation.viewport.width * scale}px`;
+      visual.style.top = `${offsetY - context.y * annotation.viewport.height * scale}px`;
+      visual.style.transform = `scale(${scale})`;
+    }
+    thumb.prepend(visual);
+    const markX = (rect.x - context.x) / context.width;
+    const markY = (rect.y - context.y) / context.height;
+    highlight.style.left = `${offsetX + markX * visibleWidth}px`;
+    highlight.style.top = `${offsetY + markY * visibleHeight}px`;
+    highlight.style.width = `${rect.width / context.width * visibleWidth}px`;
+    highlight.style.height = `${rect.height / context.height * visibleHeight}px`;
   };
   const renderAreas = () => {
     areasEl.replaceChildren();
-    annotations.forEach((annotation, index) => addAreaCard(annotation, index, annotation.snapshot));
+    annotations.forEach((annotation, index) => addAreaCard(annotation, index));
     select.textContent = annotations.length ? `Zaznacz kolejny obszar (${annotations.length}/8)` : "Zaznacz obszar na stronie";
   };
 
@@ -213,7 +245,7 @@
     rectEl.style.width = `${Math.abs(current.x - start.x)}px`;
     rectEl.style.height = `${Math.abs(current.y - start.y)}px`;
   });
-  selection.addEventListener("pointerup", (event) => {
+  selection.addEventListener("pointerup", async (event) => {
     if (!start) return;
     const end = point(event);
     const x = Math.min(start.x, end.x);
@@ -228,19 +260,24 @@
     selection.style.display = "";
     start = null;
     const element = target && !panel.contains(target) ? target : document.body;
+    const rect = { x: x / innerWidth, y: y / innerHeight, width: width / innerWidth, height: height / innerHeight };
     const scroll = { x: scrollX, y: scrollY };
-    const snapshot = captureSnapshot(scroll);
-    annotations.push({
-      rect: { x: x / innerWidth, y: y / innerHeight, width: width / innerWidth, height: height / innerHeight },
-      context: { x: 0, y: 0, width: 1, height: 1 },
-      viewport: { width: innerWidth, height: innerHeight },
-      scroll,
-      element: { tag: element.tagName.toLowerCase(), id: element.id || "", classes: typeof element.className === "string" ? element.className.slice(0, 240) : "", text: (element.innerText || "").trim().slice(0, 240) },
-      note: "",
-      snapshot,
-    });
-    panel.classList.add("gw-open");
-    renderAreas();
+    try {
+      const capture = await captureScreenshot(rect);
+      annotations.push({
+        rect, context: capture.context,
+        viewport: { width: innerWidth, height: innerHeight },
+        scroll,
+        element: { tag: element.tagName.toLowerCase(), id: element.id || "", classes: typeof element.className === "string" ? element.className.slice(0, 240) : "", text: (element.innerText || "").trim().slice(0, 240) },
+        note: "", screenshot: capture.screenshot,
+      });
+      panel.classList.add("gw-open");
+      message.textContent = "Zrzut obrazu został dodany. Możesz dodać kolejne miejsce.";
+      renderAreas();
+    } catch (error) {
+      panel.classList.add("gw-open");
+      message.textContent = error.message || "Nie udało się utworzyć zrzutu obszaru. Spróbuj ponownie.";
+    }
   });
   document.addEventListener("keydown", (event) => {
     if (viewer.classList.contains("gw-open") && event.key === "Escape") { hideViewer(); return; }
@@ -266,7 +303,7 @@
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: form.querySelector("textarea").value.trim(), page_url: `${location.origin}${location.pathname}${location.hash}`.slice(0, 1000), annotation: { areas: annotations.map((annotation) => ({ ...annotation, snapshot: annotation.snapshot.length <= 80000 ? annotation.snapshot : "" })) } }),
+        body: JSON.stringify({ message: form.querySelector("textarea").value.trim(), page_url: `${location.origin}${location.pathname}${location.hash}`.slice(0, 1000), annotation: { areas: annotations } }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(`${result.message || `Serwer odrzucił zgłoszenie (HTTP ${response.status}).`}${result.reference ? ` (ID: ${result.reference})` : ""}`);
