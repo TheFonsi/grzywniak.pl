@@ -6,7 +6,6 @@ require_once __DIR__.'/project-provision.php';
 require_once __DIR__.'/project-settings-model.php';
 require_once __DIR__.'/project-templates.php';
 require_once __DIR__.'/project-execution.php';
-require_once __DIR__.'/project-feedback-agent.php';
 if(PHP_SAPI!=='cli') { http_response_code(404); exit; }
 
 function workerRequest(string $method,string $url,?array $body,array $headers,int $timeout=25): array {
@@ -214,7 +213,7 @@ function runOneJob(): bool {
     $stale->execute([time(),time()-900]);
     $maxConcurrency=max(1,(int)projectSetting('AGENT_MAX_CONCURRENCY'));
     $capacityUsed=projectAiCapacityUsed($db);
-    $jobStmt=$db->prepare("SELECT * FROM project_jobs WHERE state='queued' AND (? < ? OR (kind<>'generate_plan' AND kind NOT LIKE 'classify_feedback_%')) ORDER BY id LIMIT 1");
+    $jobStmt=$db->prepare("SELECT * FROM project_jobs WHERE state='queued' AND kind NOT LIKE 'classify_feedback_%' AND (? < ? OR kind<>'generate_plan') ORDER BY id LIMIT 1");
     $jobStmt->execute([$capacityUsed,$maxConcurrency]);
     $job=$jobStmt->fetch(PDO::FETCH_ASSOC);
     if(!$job) { $db->exec('COMMIT'); return false; }
@@ -343,9 +342,9 @@ $capacityFailure='Limit równoległych agentów jest wykorzystany.';
 $requeue=projectDb();
 $requeue->exec('BEGIN IMMEDIATE');
 try {
-    $requeue->prepare("UPDATE project_jobs SET state='queued',attempts=MAX(0,attempts-1),error=NULL,updated_at=? WHERE state='failed' AND error=? AND (kind='generate_plan' OR kind LIKE 'classify_feedback_%') AND NOT EXISTS (SELECT 1 FROM project_ai_calls WHERE call_key='job:'||project_jobs.id||':'||project_jobs.attempts)")->execute([time(),$capacityFailure]);
+    $requeue->prepare("UPDATE project_jobs SET state='queued',attempts=MAX(0,attempts-1),error=NULL,updated_at=? WHERE state='failed' AND error=? AND kind='generate_plan' AND NOT EXISTS (SELECT 1 FROM project_ai_calls WHERE call_key='job:'||project_jobs.id||':'||project_jobs.attempts)")->execute([time(),$capacityFailure]);
     $requeue->exec('COMMIT');
 } catch(Throwable $error) { try { $requeue->exec('ROLLBACK'); } catch(Throwable) {} throw $error; }
-foreach(projectDb()->query("SELECT id,session_id FROM project_feedback WHERE state='new'")->fetchAll(PDO::FETCH_ASSOC) as $feedback) projectEnqueue((string)$feedback['session_id'],'classify_feedback_'.$feedback['id']);
+
 if(in_array('--once',$argv,true)) { runOneUnit(); exit; }
 while(true) { runOneUnit(); sleep(5); }

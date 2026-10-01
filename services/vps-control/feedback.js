@@ -8,7 +8,7 @@
     #gw-feedback-panel{position:fixed;z-index:2147483001;right:22px;bottom:80px;width:min(460px,calc(100vw - 28px));max-height:min(78vh,700px);overflow:auto;padding:18px;background:#fff;color:#182230;border:1px solid #cfdae5;border-radius:16px;box-shadow:0 16px 50px #0004;font:14px/1.45 system-ui;display:none}
     #gw-feedback-panel.gw-open{display:block}#gw-feedback-panel *{box-sizing:border-box}#gw-feedback-panel h2{font-size:18px;margin:0 38px 6px 0}#gw-feedback-panel p{margin:6px 0 14px;color:#536273}
     #gw-feedback-panel textarea{width:100%;min-height:105px;resize:vertical;border:1px solid #aab7c5;border-radius:9px;padding:10px;font:inherit;color:#17212c}
-    #gw-feedback-panel button{border:0;border-radius:8px;padding:10px 13px;font:600 14px system-ui;cursor:pointer}#gw-feedback-panel button:disabled{opacity:.55;cursor:wait}#gw-feedback-panel .gw-primary{background:#245a91;color:#fff;width:100%;margin-top:10px}#gw-feedback-panel .gw-select{background:#e8f0f8;color:#173b5d}#gw-feedback-panel .gw-close{position:absolute;right:12px;top:12px;background:#edf1f5;color:#263747;padding:6px 10px}
+    #gw-feedback-panel button{border:0;border-radius:8px;padding:10px 13px;font:600 14px system-ui;cursor:pointer}#gw-feedback-panel button:disabled{opacity:.55;cursor:wait}#gw-feedback-panel .gw-primary{background:#245a91;color:#fff;width:100%;margin-top:10px}#gw-feedback-panel .gw-finish{width:100%;margin-top:10px;background:#e8f0f8;color:#173b5d}#gw-feedback-panel.gw-closed .gw-finish{display:none}#gw-feedback-panel.gw-closed textarea,#gw-feedback-panel.gw-closed .gw-select,#gw-feedback-panel.gw-closed .gw-remove{display:none}#gw-feedback-panel .gw-select{background:#e8f0f8;color:#173b5d}#gw-feedback-panel .gw-close{position:absolute;right:12px;top:12px;background:#edf1f5;color:#263747;padding:6px 10px}
     #gw-feedback-panel .gw-note{font-size:12px}#gw-feedback-panel .gw-message{min-height:20px;margin:10px 0 0;color:#245a36}#gw-feedback-areas{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:9px;margin:12px 0}#gw-feedback-areas:empty{display:none}
     #gw-feedback-panel .gw-area-card{position:relative;min-width:0;padding:8px;border:1px solid #d5deea;border-radius:10px;background:#f7f9fc}#gw-feedback-panel .gw-area-card strong{display:block;margin-bottom:6px;font-size:12px;color:#35465b}#gw-feedback-panel .gw-thumb{position:relative;display:block;overflow:hidden;max-width:100%;padding:0;background:#e8edf4;border:1px solid #cbd5e1;border-radius:6px;cursor:zoom-in}#gw-feedback-panel .gw-thumb iframe,#gw-feedback-panel .gw-thumb img{position:absolute;top:0;left:0;border:0;transform-origin:top left;pointer-events:none;background:#fff}#gw-feedback-panel .gw-thumb-selection{position:absolute;border:2px solid #e24646;border-radius:5px;box-shadow:inset 0 0 0 999px #e2464614;pointer-events:none}#gw-feedback-panel .gw-area-note{display:block;width:100%;min-height:54px;margin-top:8px;resize:vertical;border:1px solid #c7d1df;border-radius:7px;padding:7px;font:12px/1.4 system-ui;color:#17212c;background:#fff}#gw-feedback-panel .gw-area-card .gw-remove{position:absolute;right:6px;top:5px;padding:3px 7px;background:#e9edf3;color:#344458;font-size:12px}
     #gw-feedback-viewer{position:fixed;inset:0;z-index:2147483004;display:none;align-items:center;justify-content:center;padding:24px;background:#07111de8;color:#fff;font:14px/1.45 system-ui}#gw-feedback-viewer.gw-open{display:flex}#gw-feedback-viewer .gw-viewer-dialog{position:relative;display:flex;flex-direction:column;gap:12px;max-width:100%;max-height:100%}#gw-feedback-viewer .gw-viewer-title{padding-right:52px;font-size:16px}#gw-feedback-viewer .gw-viewer-close{position:absolute;right:0;top:-6px;border:0;border-radius:8px;background:#fff;color:#142033;font-size:24px;line-height:1;padding:7px 12px;cursor:pointer}#gw-feedback-viewer .gw-viewer-crop{position:relative;overflow:hidden;max-width:calc(100vw - 48px);max-height:calc(100vh - 100px);background:#fff;border:2px solid #fff;border-radius:8px}#gw-feedback-viewer iframe,#gw-feedback-viewer img{position:absolute;top:0;left:0;border:0;transform-origin:top left;pointer-events:none;background:#fff}#gw-feedback-viewer .gw-viewer-selection{position:absolute;border:3px solid #e24646;box-shadow:inset 0 0 0 999px #e2464614;pointer-events:none}
@@ -27,7 +27,7 @@
   const panel = document.createElement("section");
   panel.id = "gw-feedback-panel";
   panel.setAttribute("aria-label", "Uwagi do podglądu");
-  panel.innerHTML = '<button class="gw-close" type="button" aria-label="Zamknij">×</button><h2>Uwagi do podglądu</h2><p class="gw-note">Możesz wskazać kilka miejsc, a potem opisać je jednym zgłoszeniem.</p><button class="gw-select" type="button">Zaznacz obszar na stronie</button><div id="gw-feedback-areas" aria-live="polite"></div><form><textarea required minlength="10" maxlength="4000" placeholder="Opisz problem lub zmianę (min. 10 znaków)"></textarea><button class="gw-primary" type="submit">Wyślij uwagę</button></form><p class="gw-message" role="status" aria-live="polite"></p>';
+  panel.innerHTML = '<button class="gw-close" type="button" aria-label="Zamknij">×</button><h2>Uwagi do podglądu</h2><p class="gw-note">Możesz wskazać kilka miejsc, a potem opisać je jednym zgłoszeniem.</p><button class="gw-select" type="button">Zaznacz obszar na stronie</button><div id="gw-feedback-areas" aria-live="polite"></div><form><textarea required minlength="10" maxlength="4000" placeholder="Opisz problem lub zmianę (min. 10 znaków)"></textarea><button class="gw-primary" type="submit">Wyślij uwagę</button></form><button class="gw-finish" type="button">Zako\u0144czy\u0142em zg\u0142aszanie wszystkich uwag</button><p class="gw-message" role="status" aria-live="polite"></p>';
   const selection = document.createElement("div");
   selection.id = "gw-feedback-selection";
   const rectEl = document.createElement("div");
@@ -42,6 +42,7 @@
 
   const close = panel.querySelector(".gw-close");
   const select = panel.querySelector(".gw-select");
+  const finish = panel.querySelector(".gw-finish");
   const areasEl = panel.querySelector("#gw-feedback-areas");
   const message = panel.querySelector(".gw-message");
   const form = panel.querySelector("form");
@@ -52,6 +53,7 @@
   let annotations = [];
   let start = null;
   let viewerReturnTarget = null;
+  const setClosed = () => { config = config || {}; config.feedbackClosed = true; panel.classList.add("gw-closed"); launcher.disabled = false; launcher.textContent = "Uwagi zako\u0144czone"; launcher.title = "Zg\u0142aszanie uwag do tej wersji jest zako\u0144czone."; panel.querySelector(".gw-note").textContent = "Zg\u0142aszanie uwag do tej wersji zosta\u0142o zako\u0144czone."; form.querySelectorAll("button,textarea").forEach((control) => { control.disabled = true; }); select.disabled = true; };
 
   const hideViewer = () => {
     viewer.classList.remove("gw-open");
@@ -102,6 +104,7 @@
   closeViewer.addEventListener("click", hideViewer);
   viewer.addEventListener("click", (event) => { if (event.target === viewer) hideViewer(); });
   select.addEventListener("click", () => {
+    if (config?.feedbackClosed) return;
     if (annotations.length >= 8) { message.textContent = "Możesz dodać maksymalnie 8 obszarów do jednego zgłoszenia."; return; }
     message.textContent = "";
     panel.classList.remove("gw-open");
@@ -287,12 +290,31 @@
 
   fetch("/.well-known/grzywniak/feedback-config", { credentials: "same-origin", cache: "no-store" })
     .then((response) => { if (!response.ok) throw new Error("Uwagi nie są jeszcze aktywne."); return response.json(); })
-    .then((value) => { config = value; })
+    .then((value) => { config = value; if (value.feedbackClosed) setClosed(); })
     .catch(() => { launcher.title = "Formularz uwag zostanie włączony po zatwierdzeniu podglądu."; launcher.disabled = true; launcher.textContent = "Uwagi niedostępne"; });
+
+  finish.addEventListener("click", async () => {
+    if (!config || config.feedbackClosed) return;
+    if (annotations.length || form.querySelector("textarea").value.trim()) { message.textContent = "Wy\u015blij albo usu\u0144 bie\u017c\u0105c\u0105, niewys\u0142an\u0105 uwag\u0119 przed zako\u0144czeniem."; return; }
+    if (!confirm("Czy wys\u0142a\u0142e\u015b ju\u017c wszystkie uwagi do tej wersji? Po zamkni\u0119ciu nie b\u0119dzie mo\u017cna doda\u0107 kolejnych.")) return;
+    finish.disabled = true;
+    message.textContent = "Zapisywanie zako\u0144czenia zg\u0142osze\u0144...";
+    try {
+      const response = await fetch("/.well-known/grzywniak/feedback-submit", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "close" }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || "Nie uda\u0142o si\u0119 zamkn\u0105\u0107 listy uwag.");
+      setClosed();
+      message.textContent = result.message || "Zg\u0142aszanie uwag zosta\u0142o zako\u0144czone.";
+    } catch (error) {
+      finish.disabled = false;
+      message.textContent = error.message || "Nie uda\u0142o si\u0119 zapisa\u0107 zako\u0144czenia zg\u0142osze\u0144.";
+    }
+  });
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     message.textContent = "";
+    if (config?.feedbackClosed) { message.textContent = "Zg\u0142aszanie uwag do tej wersji zosta\u0142o zako\u0144czone."; return; }
     if (!config) { message.textContent = "Formularz uwag nie jest aktywny dla tej wersji."; return; }
     if (!annotations.length) { message.textContent = "Najpierw zaznacz co najmniej jeden obszar strony."; return; }
     const submit = form.querySelector("button[type=submit]");

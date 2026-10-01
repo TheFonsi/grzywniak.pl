@@ -161,20 +161,17 @@ const submitPreviewFeedback = async (request, response, project) => {
   if (endpoint.protocol !== 'https:' || endpoint.hostname !== publicApiHost || !endpoint.pathname.endsWith('/project-feedback.php')) return json(response, 502, { message: 'Adres formularza uwag nie wskazuje zaufanego API.' });
   let payload;
   try { payload = await readBody(request); } catch { return json(response, 400, { message: 'Nie udało się odczytać zgłoszenia. Sprawdź treść i spróbuj ponownie.' }); }
-  const safePayload = {
-    project: project.projectId,
-    token: project.feedbackToken,
-    message: typeof payload.message === 'string' ? payload.message : '',
-    page_url: typeof payload.page_url === 'string' ? payload.page_url : '',
-    annotation: payload.annotation,
-  };
+  const closing = payload.action === 'close';
+  if (project.feedbackClosedDigest === project.feedbackDigest && project.feedbackDigest && !closing) return json(response, 409, { message: 'Zglaszanie uwag do tej wersji zostalo juz zakonczone.' });
+  const safePayload = { project: project.projectId, token: project.feedbackToken, ...(closing ? { action: 'close' } : { message: typeof payload.message === 'string' ? payload.message : '', page_url: typeof payload.page_url === 'string' ? payload.page_url : '', annotation: payload.annotation }) };
   try {
     const result = await fetch(endpoint, { method: 'POST', headers: { 'content-type': 'application/json', origin: `https://${project.hostname}`, accept: 'application/json' }, body: JSON.stringify(safePayload), signal: AbortSignal.timeout(20000) });
     const text = await result.text();
     let body;
     try { body = JSON.parse(text); } catch { body = null; }
     if (!result.ok) return json(response, result.status, { ...(body && typeof body === 'object' ? body : {}), message: typeof body?.message === 'string' ? body.message : `Serwer formularza odrzucił zgłoszenie (HTTP ${result.status}). Spróbuj ponownie.` });
-    return json(response, 201, body && typeof body.message === 'string' ? body : { message: 'Uwaga została zapisana.' });
+    if (closing) await serialized(async () => { project.feedbackClosedDigest = project.feedbackDigest; await save(); });
+    return json(response, closing ? 200 : 201, body && typeof body.message === 'string' ? body : { message: closing ? 'Lista uwag zostala zamknieta.' : 'Uwaga zostala zapisana.' });
   } catch {
     return json(response, 502, { message: 'Nie udało się połączyć z API uwag. Twoje zgłoszenie pozostało w formularzu; spróbuj ponownie.' });
   }
@@ -230,7 +227,7 @@ createServer(async (request, response) => {
       const hostname = String(request.headers['x-forwarded-host'] || request.headers.host || '').split(',')[0].split(':')[0].trim().toLowerCase();
       const project = Object.values(state.projects).find((item) => item.kind === 'preview' && item.hostname === hostname);
       if (!project || !previewPasswordMatches(project, request.headers.authorization || '') || !feedbackTokenPattern.test(project.feedbackToken || '')) return json(response, 404, { message: 'Konfiguracja uwag nie jest dostępna.' });
-      return json(response, 200, { projectId: project.projectId, feedbackToken: project.feedbackToken, feedbackUrl: project.feedbackUrl || '' });
+      return json(response, 200, { projectId: project.projectId, feedbackToken: project.feedbackToken, feedbackUrl: project.feedbackUrl || '', feedbackClosed: project.feedbackClosedDigest === project.feedbackDigest && Boolean(project.feedbackDigest) });
     }
     const previewProject = previewProjectForHost(request.headers['x-forwarded-host'] || request.headers.host);
     if (previewProject && request.method === 'POST' && url.pathname === '/.well-known/grzywniak/feedback-submit') return await submitPreviewFeedback(request, response, previewProject);
@@ -262,11 +259,12 @@ createServer(async (request, response) => {
     }
     if (request.method === 'POST' && url.pathname === '/v1/projects/feedback-token') {
       const body = await readBody(request);
-      if (!idPattern.test(body.projectId) || !feedbackTokenPattern.test(body.feedbackToken) || typeof body.feedbackUrl !== 'string' || body.feedbackUrl.length > 2000) return json(response, 400, { message: 'Niepoprawna konfiguracja formularza uwag.' });
+      if (!idPattern.test(body.projectId) || !feedbackTokenPattern.test(body.feedbackToken) || typeof body.feedbackUrl !== 'string' || body.feedbackUrl.length > 2000 || !digestPattern.test(body.feedbackDigest || '')) return json(response, 400, { message: 'Niepoprawna konfiguracja formularza uwag.' });
       const project = await serialized(async () => {
         const value = state.projects[`${body.projectId}:preview`];
         if (!value || value.hostname !== expectedHostname(body.projectId, 'preview') || !value.previewAuthHash) throw new Error('Najpierw zabezpiecz środowisko podglądu hasłem.');
-        value.feedbackToken = body.feedbackToken; value.feedbackUrl = body.feedbackUrl;
+        if (value.feedbackDigest !== body.feedbackDigest) value.feedbackClosedDigest = null;
+        value.feedbackToken = body.feedbackToken; value.feedbackUrl = body.feedbackUrl; value.feedbackDigest = body.feedbackDigest;
         await save();
         return value;
       });

@@ -18,6 +18,7 @@ function projectDb(): PDO {
     $db->exec('CREATE TABLE IF NOT EXISTS project_ai_calls (call_key TEXT PRIMARY KEY, session_id TEXT NOT NULL, task_kind TEXT NOT NULL, state TEXT NOT NULL, reserved_pln REAL NOT NULL DEFAULT 0, spent_pln REAL NOT NULL DEFAULT 0, input_tokens INTEGER, output_tokens INTEGER, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)');
     $db->exec("INSERT OR IGNORE INTO project_agent_costs(runner_id,session_id,task_key,amount_pln,incurred_at) SELECT 'legacy:'||id,session_id,task_key,spent_pln,updated_at FROM project_agent_tasks t WHERE spent_pln>0 AND NOT EXISTS (SELECT 1 FROM project_agent_costs c WHERE c.session_id=t.session_id AND c.task_key=t.task_key)");
     $db->exec('CREATE TABLE IF NOT EXISTS project_feedback (id INTEGER PRIMARY KEY AUTOINCREMENT, session_id TEXT NOT NULL, image_digest TEXT NOT NULL, message TEXT NOT NULL, page_url TEXT NOT NULL, state TEXT NOT NULL DEFAULT \'new\', created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)');
+    $db->exec('CREATE TABLE IF NOT EXISTS project_feedback_closures (session_id TEXT NOT NULL, image_digest TEXT NOT NULL, closed_at INTEGER NOT NULL, PRIMARY KEY(session_id,image_digest))');
     $feedbackColumns=$db->query('PRAGMA table_info(project_feedback)')->fetchAll(PDO::FETCH_ASSOC);
     if(!in_array('category',array_column($feedbackColumns,'name'),true)) $db->exec('ALTER TABLE project_feedback ADD COLUMN category TEXT');
     if(!in_array('analysis',array_column($feedbackColumns,'name'),true)) $db->exec('ALTER TABLE project_feedback ADD COLUMN analysis TEXT');
@@ -250,6 +251,7 @@ function projectSnapshot(array $session): array {
     $feedback=projectFeedback($id);
     $currentFeedback=array_values(array_filter($feedback,static fn($entry)=>is_array($latestPreviewResult) && $entry['image_digest']===($latestPreviewResult['imageDigest']??null)));
     if($currentFeedback) $status['feedback']=count(array_filter($currentFeedback,static fn($entry)=>$entry['state']!=='resolved'))?'review':'done';
+    elseif(is_array($latestPreviewResult) && ($case['feedbackClosedDigest']??'')===($latestPreviewResult['imageDigest']??null)) $status['feedback']='done';
     $status['release']=projectJobStatus($jobByKind['publish_production']??null,$previewSent);
     if($status['release']==='ready') $status['release']='needs_you';
     $status['handover']=!empty($case['handoverAt'])?'done':($status['release']==='done'?'needs_you':'locked');
