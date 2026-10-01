@@ -133,11 +133,21 @@ $session['contract']['offerVersion']=$session['offer']['version']; writeSession(
     assert project_case["plan"]["templateDecision"]["templateId"] == "web-vite"
     assert {task["id"] for task in project_case["plan"]["tasks"]} == {"ux", "frontend", "qa"}
     states = dict(db.execute("SELECT kind,state FROM project_jobs WHERE session_id=?", (session_id,)).fetchall())
+    repository_job = db.execute("SELECT id FROM project_jobs WHERE session_id=? AND kind='create_repository'", (session_id,)).fetchone()
     db.close()
     assert states["generate_plan"] == "done", states
     assert states["create_repository"] == "queued", states
 
-    print("HTTP workflow gates passed: fake test contact cannot complete a brief; DRAFT offer and stale contract are blocked; accepted current offer and matching contract queue and generate the plan; repository creation remains queued without contacting GitHub.")
+    # With no GitHub App configuration, the worker must stop before any API request.
+    no_github_env = dict(worker_env, GITHUB_APP_ID="", GITHUB_INSTALLATION_ID="", GITHUB_APP_PRIVATE_KEY="", GITHUB_APP_PRIVATE_KEY_FILE="")
+    blocked = subprocess.run(["php", "api/project-worker.php", "--once"], cwd=work, env=no_github_env, text=True, capture_output=True)
+    assert blocked.returncode == 0, (blocked.stdout, blocked.stderr)
+    db = sqlite3.connect(work / "api" / "storage" / "sessions.sqlite")
+    repo_state = db.execute("SELECT state,error FROM project_jobs WHERE id=?", (repository_job[0],)).fetchone()
+    db.close()
+    assert repo_state and repo_state[0] == "failed" and "GitHub App ID" in repo_state[1], repo_state
+
+    print("HTTP workflow gates passed: fake test contact cannot complete a brief; DRAFT offer and stale contract are blocked; accepted current offer and matching contract queue and generate the plan; repository creation stops before GitHub when its App credentials are missing.")
 finally:
     server.terminate()
     server.wait(timeout=5)
