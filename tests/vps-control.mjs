@@ -64,7 +64,8 @@ try {
   assert.match(scriptText, /Zaznacz kolejny obszar/);
   assert.match(scriptText, /annotation: annotations\.length === 1/);
   assert.match(scriptText, /\{ areas: annotations\.map/);
-  assert.match(scriptText, /setAttribute\("sandbox", "allow-same-origin"\)/, 'Miniatury muszą ładować style i zasoby podglądu, ale nadal blokować skrypty.');
+  assert.doesNotMatch(scriptText, /sandbox/, 'Miniatury muszą dziedziczyć pochodzenie podglądu, aby style nie były blokowane przez CORS.');
+  assert.match(scriptText, /\^on\/i\.test\(attribute\.name\)/, 'Kopia strony musi usuwać atrybuty obsługi zdarzeń przed renderowaniem.');
   assert.match(scriptText, /feedback-submit/);
   assert.doesNotMatch(scriptText, /endpoint\.origin/, 'Wysyłka zgłoszenia powinna być same-origin, bez przeglądarkowego CORS do API.');
   const asset = await fetch(`http://127.0.0.1:${port}/asset.js`, { headers: appHeaders });

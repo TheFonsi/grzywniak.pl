@@ -54,6 +54,11 @@
   const captureSnapshot = (scroll) => {
     const clone = document.documentElement.cloneNode(true);
     clone.querySelectorAll("script,iframe,object,embed,#gw-feedback-launcher,#gw-feedback-panel,#gw-feedback-selection,#gw-feedback-rect").forEach((node) => node.remove());
+    clone.querySelectorAll("*").forEach((node) => {
+      [...node.attributes].forEach((attribute) => {
+        if (/^on/i.test(attribute.name) || (/^(href|src|action|formaction)$/i.test(attribute.name) && /^\s*javascript:/i.test(attribute.value))) node.removeAttribute(attribute.name);
+      });
+    });
     const body = clone.querySelector("body");
     if (body) { body.style.position = "relative"; body.style.left = `${-scroll.x}px`; body.style.top = `${-scroll.y}px`; }
     const head = clone.querySelector("head");
@@ -73,9 +78,6 @@
     const scale = Math.min(thumbWidth / width, thumbHeight / height);
     const frame = document.createElement("iframe");
     frame.title = `Podgląd zaznaczonego obszaru ${index + 1}`;
-    // The snapshot needs its original same-origin stylesheets and assets to render.
-    // Scripts remain blocked by the sandbox.
-    frame.setAttribute("sandbox", "allow-same-origin");
     frame.setAttribute("aria-hidden", "true");
     frame.style.width = `${annotation.viewport.width}px`;
     frame.style.height = `${annotation.viewport.height}px`;
