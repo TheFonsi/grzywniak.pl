@@ -4,6 +4,7 @@ require_once __DIR__ . '/bootstrap.php';
 require_once __DIR__ . '/discovery-prompt.php';
 require_once __DIR__ . '/project-model.php';
 require_once __DIR__ . '/discovery-contact.php';
+require_once __DIR__ . '/discovery-summary.php';
 const DISCOVERY_SCOPE_GUARD = 'You handle discovery only for digital products and IT services: websites, web or mobile apps, business systems, software, process automation, integrations, data solutions, and AI features. The client may be from any industry, but the requested solution itself must be digital or IT-related. Requests whose primary goal is a physical, household, culinary, construction, repair, or other non-IT task (for example cooking a meal, laying kitchen tiles, renovation work, or a joke) are out of scope. For an out-of-scope request, reply in the active conversation language with one short, polite sentence saying that you collect requirements only for digital/IT projects and that other matters can be sent through the email form. Set offTopic=true, do not update projectState, do not set readyForSummary, and do not continue discovery. If a request could reasonably describe an IT solution supporting such work, ask one concise question about the digital solution and keep offTopic=false.';
 header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
@@ -106,18 +107,6 @@ function nextDiscoveryQuestion(array $state, string $language): string {
   $phoneDigits=preg_replace('/\D+/','',$phone)??'';
   if(($email===''||!filter_var($email,FILTER_VALIDATE_EMAIL)) && (strlen($phoneDigits)<7 || strlen($phoneDigits)>15 || !preg_match('/^[+0-9(). -]+$/',$phone))) return $pl?'Jaki numer telefonu lub adres e-mail mamy zapisać do kontaktu?':'What phone number or email address should we save for contact?';
   return $pl ? 'Czy jest jeszcze jedna rzecz, którą to rozwiązanie musi dobrze robić od pierwszego dnia?' : 'Is there one more thing this solution must do well from day one?';
-}
-function buildSummary(array $state): array {
-  $sections=[];
-  foreach(['contactName'=>'Kontakt / firma','contactPhone'=>'Telefon kontaktowy','contactEmail'=>'E-mail kontaktowy','businessGoals'=>'Cel projektu','businessProblem'=>'Problem do rozwiązania','targetUsers'=>'Użytkownicy','coreProcesses'=>'Główne działania','mustHaveFeatures'=>'Najważniejszy zakres pierwszej wersji','niceToHaveFeatures'=>'Pomysły na kolejny etap','integrations'=>'Integracje','budget'=>'Podany budżet','deadline'=>'Oczekiwany termin'] as $key=>$title){
-    $value=$state[$key]??null;
-    if ($key === 'integrations' && !$value) continue;
-    $content = $value ? (is_array($value)?array_map('strval',$value):[(string)$value]) : ['Do ustalenia'];
-    if ($key === 'niceToHaveFeatures' && !$value) $content = ['Możliwe rozszerzenia ustalimy po uruchomieniu pierwszej wersji.', 'Do ustalenia wspólnie z zespołem.'];
-    $sections[]=['title'=>$title,'content'=>$content];
-  }
-  $sections[]=['title'=>'Kolejne kroki','content'=>['1. Zespół zweryfikuje zebrane informacje, zakres i najważniejsze założenia projektu.','2. Przygotujemy rozwiązanie dopasowane do potrzeb, harmonogram oraz szczegółową wycenę.','3. Wyślemy wstępną ofertę, gdy wszystko zostanie sprawdzone i opracowane.','4. Skontaktujemy się z Tobą, aby omówić szczegóły.']];
-  return ['title'=>'Brief projektu','sections'=>$sections];
 }
 function sendSummaryEmail(array $session): bool {
   $recipient=getenv('DISCOVERY_TO') ?: (getenv('CONTACT_TO') ?: 'dawid@grzywniak.pl');
