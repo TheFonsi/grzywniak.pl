@@ -10,6 +10,19 @@ if(projectContactLogin(['contactEmail'=>'invalid','contactPhone'=>'123'])!==null
 $feedbackDigest='sha256:'.str_repeat('a',64);
 if(projectFeedbackDigest(['feedbackEnabledDigest'=>$feedbackDigest])!==$feedbackDigest) throw new RuntimeException('Aktywny formularz uwag musi działać niezależnie od statusu wysłania e-maila.');
 if(projectFeedbackDigest(['previewSentDigest'=>$feedbackDigest])!==$feedbackDigest) throw new RuntimeException('Starsze sprawy z wysłanym podglądem nadal muszą przyjmować uwagi.');
+$clientHandoff=['publicationDestination'=>'client_handoff','clientHandoffPreparedAt'=>time(),'clientHandoff'=>[
+    'domain'=>'klient.pl','registrar'=>'DNS operator','verificationEvidence'=>'TXT record checked in DNS','hostingProvider'=>'Client hosting','serverTarget'=>'Confirmed server, application directory and startup method for deployment.',
+    'backupPlan'=>'Files and database backup before release and a documented restore procedure.','dnsTlsPlan'=>'Client points DNS to the server and verifies the TLS certificate after release.',
+    'deliverables'=>'Repository, source code, startup instructions and names of environment variables.','responsibilities'=>'Client deploys the application; agency transfers code under the agreement.',
+    'supportPlan'=>'Post-release support according to the agreed scope and separate cost limit.','domainControlVerified'=>true,'hostingAccessConfirmed'=>true,'clientConfirmed'=>true,
+]];
+if(!projectClientHandoffIsReady($clientHandoff)) throw new RuntimeException('Complete client handoff should unlock the handover stage.');
+$unverifiedHandoff=$clientHandoff; $unverifiedHandoff['clientHandoff']['domainControlVerified']=false;
+if(projectClientHandoffIsReady($unverifiedHandoff)) throw new RuntimeException('A domain string alone must not prove client control.');
+$invalidDomainHandoff=$clientHandoff; $invalidDomainHandoff['clientHandoff']['domain']='made up domain';
+if(projectClientHandoffIsReady($invalidDomainHandoff)) throw new RuntimeException('Malformed domain must not finish publication.');
+$incompleteHandoff=$clientHandoff; $incompleteHandoff['clientHandoff']['supportPlan']='';
+if(projectClientHandoffIsReady($incompleteHandoff)) throw new RuntimeException('Handoff without agreed support must not finish publication.');
 $area=['rect'=>['x'=>0.1,'y'=>0.2,'width'=>0.3,'height'=>0.4],'context'=>['x'=>0,'y'=>0,'width'=>1,'height'=>1],'viewport'=>['width'=>1280,'height'=>720],'scroll'=>['x'=>0,'y'=>120],'element'=>['tag'=>'button','text'=>'Save'],'note'=>'Przycisk ma być bardziej widoczny.'];
 $multiAnnotation=projectNormalizeFeedbackAnnotation(['areas'=>[$area,$area]]);
 if(count($multiAnnotation['areas'])!==2 || $multiAnnotation['areas'][1]['element']['tag']!=='button' || $multiAnnotation['areas'][1]['note']!==$area['note'] || $multiAnnotation['areas'][1]['context']!=$area['context']) throw new RuntimeException('Multiple selected areas, their context and notes were not preserved.');
@@ -38,8 +51,10 @@ if(projectAiCapacityUsed($capacityDb)!==2 || !projectJobRequiresAiCapacity('clas
 $workerSource=(string)file_get_contents(__DIR__.'/../api/project-worker.php');
 if(str_contains($workerSource,"AND kind NOT LIKE 'classify_feedback_%' AND") || !str_contains($workerSource,"kind NOT LIKE 'classify_feedback_%')) ORDER BY id LIMIT 1")) throw new RuntimeException('AI feedback classification jobs must wait for and then use an available concurrency slot.');
 $adminSource=(string)file_get_contents(__DIR__.'/../api/project-case.js');
+if(!str_contains($adminSource,'data-action="prepare_client_handover"') || !str_contains($adminSource,'const openFeedback = data.feedback.some') || !str_contains($adminSource,'clientRoute ? "Zapisz kompletne przekazanie klientowi"')) throw new RuntimeException('Panel musi prowadzić klienta przez kompletną, odrębną ścieżkę przekazania i blokować ją przy otwartych uwagach.');
 if(!str_contains($adminSource,'feedback-image-open') || !str_contains($adminSource,'feedback-lightbox-selection') || !str_contains($adminSource,'feedback-number') || !str_contains($adminSource,'data-action="edit_feedback"') || !str_contains($adminSource,'data-action="approve_feedback"') || !str_contains($adminSource,'data-action="reject_feedback"') || !str_contains($adminSource,'data-action="dispatch_feedback_fixes"')) throw new RuntimeException('Panel must number feedback, show annotations when zoomed, allow admin review, and dispatch only approved notes.');
 $projectApiSource=(string)file_get_contents(__DIR__.'/../api/project-api.php');
+if(!str_contains($projectApiSource,"action==='prepare_client_handover'") || !str_contains($projectApiSource,'projectClientHandoffIsReady($case)') || !str_contains($projectApiSource,'clientHandoffPreparedAt')) throw new RuntimeException('API must gate client handover on an accepted preview and a verified, complete destination checklist.');
 if(!str_contains($projectApiSource,'SET admin_message=?') || !str_contains($projectApiSource,'approved_message=?') || !str_contains($projectApiSource,"state='approved'") || !str_contains($projectApiSource,"state='in_fix'") || !str_contains($projectApiSource,"admin_decision='rejected'")) throw new RuntimeException('Only an administrator-approved edit may be sent to coding agents, and feedback decisions must be stored.');
 if(!str_contains($projectApiSource,"foreach(\$screenshots as \$screenshot) \$acceptance[]='FEEDBACK_SCREENSHOT_DATA:'.\$screenshot")) throw new RuntimeException('Agent tasks must receive the customer-selected screenshots after annotation metadata is sanitized.');
 if(!str_contains($adminSource,'sandbox=""') || !str_contains($adminSource,'srcdoc="${escapeHtml(area.snapshot)}"')) throw new RuntimeException('Panel musi bezpiecznie renderować zapisany podgląd klienta obok zaznaczenia.');

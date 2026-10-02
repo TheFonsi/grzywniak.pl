@@ -360,11 +360,53 @@
       const previewResult = parseResult(previewJob);
       const digest = previewResult?.imageDigest || "";
       const accepted = Boolean(digest && data.case.previewAcceptedDigest === digest && data.case.previewAcceptedAt);
-      let body = result ? `<p>Produkcja: <a href="${escapeHtml(result.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(result.url)} \u2197</a></p><p>Commit: ${escapeHtml(result.commitSha)}</p><p>Obraz: ${escapeHtml(result.imageDigest)}</p>` : job ? `<p>Stan: ${escapeHtml(labels[data.status.release])}.</p>` : !digest ? "<p>Najpierw przygotuj aktualny podgl\u0105d dla klienta.</p>" : !accepted ? "<p>Oczekujemy na pe\u0142n\u0105 akceptacj\u0119 klienta dla tej wersji podgl\u0105du. Po akceptacji mo\u017cesz zatwierdzi\u0107 publikacj\u0119.</p>" : `<p>Klient zaakceptowa\u0142 t\u0119 wersj\u0119 ${date(data.case.previewAcceptedAt)}. Zatwierdzenie uruchomi wdro\u017cenie dok\u0142adnie tego obrazu.</p><form class="form" data-action="approve_production"><label>Podstawa Twojej zgody na publikacj\u0119<textarea name="evidence" rows="3" minlength="8" maxlength="1000" required></textarea></label><button class="primary">Zatwierd\u017a publikacj\u0119 zaakceptowanej wersji</button></form>`;
+      const openFeedback = data.feedback.some((note) => note.state !== "resolved");
+      const handoff = data.case.clientHandoff || {};
+      const prepared = Boolean(data.case.clientHandoffPreparedAt);
+      let body;
+      if (prepared) {
+        body = `<div class="feedback-closed"><strong>Etap publikacji zako\u0144czony: wdro\u017cenie po stronie klienta</strong><p>Nie wdro\u017cono produkcji na infrastrukturze Grzywniak. Nast\u0119pny krok to przekazanie klientowi uzgodnionego pakietu.</p></div><p>Domena: <code>${escapeHtml(handoff.domain)}</code> &middot; hosting: ${escapeHtml(handoff.hostingProvider)}</p><p>Weryfikacja domeny: ${escapeHtml(handoff.verificationEvidence)}</p><p>Cel wdro\u017cenia: ${escapeHtml(handoff.serverTarget)}</p>`;
+      } else if (result) {
+        body = `<div class="detail-section"><h3>Wdro\u017cenie na naszej infrastrukturze</h3><p>Produkcja: <a href="${escapeHtml(result.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(result.url)} &nearr;</a></p><p>Commit: ${escapeHtml(result.commitSha)}</p><p>Obraz: ${escapeHtml(result.imageDigest)}</p></div>`;
+      } else if (job) {
+        body = `<p>Wdro\u017cenie na naszej infrastrukturze: ${escapeHtml(labels[data.status.release])}.</p>`;
+      } else if (!digest) {
+        body = "<p>Najpierw przygotuj aktualny podgl\u0105d dla klienta.</p>";
+      } else if (!accepted) {
+        body = "<p>Oczekujemy na pe\u0142n\u0105 akceptacj\u0119 klienta dla tej wersji podgl\u0105du. Po akceptacji wybierzesz spos\u00f3b publikacji.</p>";
+      } else if (openFeedback) {
+        body = "<p>Przed wyborem publikacji rozstrzygnij wszystkie uwagi klienta w etapie 13. Otwarta uwaga blokuje publikacje i przekazanie.</p>";
+      } else {
+        body = `<p>Klient zaakceptowa\u0142 t\u0119 wersj\u0119 ${date(data.case.previewAcceptedAt)}. Wybierz jedn\u0105 \u015bcie\u017ck\u0119 publikacji.</p>
+          <form class="form" data-action="approve_production"><h3>Wdro\u017cenie na naszej infrastrukturze</h3><label>Podstawa Twojej zgody na publikacj\u0119<textarea name="evidence" rows="3" minlength="8" maxlength="1000" required></textarea></label><button class="primary">Zatwierd\u017a publikacj\u0119 na naszej infrastrukturze</button></form>
+          <div class="detail-section wide"><h3>Klient publikuje na w\u0142asnym serwerze i domenie</h3><p>Ta \u015bcie\u017cka zamyka etap publikacji jako przygotowany do przekazania. Nie wdra\u017ca aplikacji na serwer klienta. Nie wpisuj hase\u0142, token\u00f3w ani kluczy SSH.</p>
+          <form class="form" data-action="prepare_client_handover">
+            <label>Domena klienta<input name="domain" type="text" placeholder="np. klient.pl" maxlength="253" required></label>
+            <label>Rejestrator lub operator DNS<input name="registrar" type="text" minlength="3" maxlength="200" required></label>
+            <label>Jak zweryfikowano kontrol\u0119 klienta nad domen\u0105? (np. rekord TXT i wynik)<textarea name="verificationEvidence" rows="2" minlength="8" maxlength="500" required></textarea></label>
+            <label>Dostawca serwera / hostingu<input name="hostingProvider" type="text" minlength="3" maxlength="200" required></label>
+            <label>Ustalony serwer i docelowy katalog / spos\u00f3b uruchomienia<textarea name="serverTarget" rows="3" minlength="15" maxlength="1000" required></textarea></label>
+            <label>Plan kopii bezpiecze\u0144stwa i odtworzenia<textarea name="backupPlan" rows="2" minlength="15" maxlength="1000" required></textarea></label>
+            <label>Plan DNS i HTTPS / TLS<textarea name="dnsTlsPlan" rows="2" minlength="15" maxlength="1000" required></textarea></label>
+            <label>Co dok\u0142adnie przeka\u017cemy? Repozytorium, kod, konfiguracj\u0119 bez sekret\u00f3w i instrukcje<textarea name="deliverables" rows="3" minlength="15" maxlength="1500" required></textarea></label>
+            <label>Odpowiedzialno\u015b\u0107 klienta i wykonawcy po przekazaniu<textarea name="responsibilities" rows="2" minlength="15" maxlength="1000" required></textarea></label>
+            <label>Uzgodnione wsparcie, koszty i dalsze aktualizacje<textarea name="supportPlan" rows="2" minlength="15" maxlength="1000" required></textarea></label>
+            <label><input name="domainControlVerified" type="checkbox" required> Potwierdzi\u0142em kontrol\u0119 klienta nad t\u0105 domen\u0105 na podstawie powy\u017cszego dowodu.</label>
+            <label><input name="hostingAccessConfirmed" type="checkbox" required> Uzgodniono dost\u0119p do hostingu albo klient sam wykona wdro\u017cenie; dane dost\u0119powe nie s\u0105 wpisane w panelu.</label>
+            <label><input name="clientConfirmed" type="checkbox" required> Klient potwierdzi\u0142 domen\u0119, hosting, zakres przekazania, odpowiedzialno\u015b\u0107 i wsparcie.</label>
+            <button class="primary">Zamknij publikacj\u0119 i przejd\u017a do przekazania</button>
+          </form></div>`;
+      }
       if (job?.error) body += `<p class="error-text">${escapeHtml(job.error)}</p><form class="form" data-action="retry_job"><input type="hidden" name="kind" value="publish_production"><button class="primary">Pon\u00f3w wdro\u017cenie produkcyjne</button></form>`;
       return section("Publikacja produkcyjna", body, true);
     }
-    if (stageId === "handover") return section("Przekazanie i wsparcie", data.case.handoverAt ? `<p>Przekazano ${date(data.case.handoverAt)} wersję ${escapeHtml(data.case.handoverDigest)}.</p><p>${escapeHtml(data.case.handoverNote)}</p>` : data.status.handover === "needs_you" ? `<form class="form" data-action="complete_handover"><label>Jak przekazano dostęp, dokumentację i zasady wsparcia?<textarea name="note" rows="4" minlength="15" maxlength="2000" required></textarea></label><button class="primary">Zapisz przekazanie projektu</button></form>` : "<p>Najpierw opublikuj zatwierdzoną wersję produkcyjną.</p>", true);
+    if (stageId === "handover") {
+      const handoff = data.case.clientHandoff || {};
+      const clientRoute = data.case.publicationDestination === "client_handoff";
+      const details = clientRoute ? `<div class="detail-section wide"><h3>Uzgodniona publikacja klienta</h3><p>Domena: ${escapeHtml(handoff.domain)} &middot; ${escapeHtml(handoff.registrar)}</p><p>Hosting: ${escapeHtml(handoff.hostingProvider)}</p><p>Serwer i uruchomienie: ${escapeHtml(handoff.serverTarget)}</p><p>DNS i TLS: ${escapeHtml(handoff.dnsTlsPlan)}</p><p>Kopie bezpiecze\u0144stwa: ${escapeHtml(handoff.backupPlan)}</p><p>Przekazywane materia\u0142y: ${escapeHtml(handoff.deliverables)}</p><p>Odpowiedzialno\u015b\u0107: ${escapeHtml(handoff.responsibilities)}</p><p>Wsparcie: ${escapeHtml(handoff.supportPlan)}</p></div>` : "";
+      const content = data.case.handoverAt ? `<p>${clientRoute ? "Przekazanie przygotowanego pakietu zapisano" : "Przekazano wersj\u0119"} ${date(data.case.handoverAt)} &middot; ${escapeHtml(data.case.handoverDigest)}.</p><p>${escapeHtml(data.case.handoverNote)}</p>${details}` : data.status.handover === "needs_you" ? `${details}<form class="form" data-action="complete_handover"><label>${clientRoute ? "Potwierdzenie przekazania uzgodnionych materia\u0142\u00f3w klientowi (bez hase\u0142 i kluczy)" : "Jak przekazano dost\u0119p, dokumentacj\u0119 i zasady wsparcia?"}<textarea name="note" rows="4" minlength="15" maxlength="2000" required></textarea></label><button class="primary">${clientRoute ? "Zapisz kompletne przekazanie klientowi" : "Zapisz przekazanie projektu"}</button></form>` : "<p>Najpierw zako\u0144cz publikacj\u0119. Dla serwera klienta trzeba potwierdzi\u0107 domen\u0119, hosting, dost\u0119p, zakres przekazania i wsparcie.</p>";
+      return section("Przekazanie i wsparcie", content, true);
+    }
     return section("Wynik etapu", `<p>${data.status[stageId] === "locked" ? "Ten etap nie został jeszcze uruchomiony. Jego zadania i artefakty pojawią się tutaj po spełnieniu zależności." : "Etap jest gotowy. Koordynator utworzy zadania i przypisze je właściwym agentom."}</p>`, true);
   }
 

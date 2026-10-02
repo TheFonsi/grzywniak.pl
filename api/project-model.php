@@ -111,6 +111,20 @@ function projectPreviewUsernameOrLegacy(array $session): string {
     catch (DomainException) { return 'client'; }
 }
 
+function projectClientHandoffIsReady(array $case): bool {
+    if(($case['publicationDestination']??'')!=='client_handoff' || empty($case['clientHandoffPreparedAt'])) return false;
+    $handoff=is_array($case['clientHandoff']??null)?$case['clientHandoff']:[];
+    $domain=strtolower(trim((string)($handoff['domain']??'')));
+    $validDomain=strlen($domain)<=253 && preg_match('/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$/D',$domain)===1;
+    if(!$validDomain || empty($handoff['domainControlVerified']) || empty($handoff['hostingAccessConfirmed']) || empty($handoff['clientConfirmed'])) return false;
+    foreach(['registrar','verificationEvidence','hostingProvider','serverTarget','backupPlan','dnsTlsPlan','deliverables','responsibilities','supportPlan'] as $field) {
+        $value=trim((string)($handoff[$field]??''));
+        $minimum=in_array($field,['serverTarget','backupPlan','dnsTlsPlan','deliverables','responsibilities','supportPlan'],true)?15:3;
+        if(mb_strlen($value)<$minimum || mb_strlen($value)>2000) return false;
+    }
+    return true;
+}
+
 function projectSave(string $id, array $data): void {
     $stmt = projectDb()->prepare('INSERT INTO project_cases(session_id,data,updated_at) VALUES(?,?,?) ON CONFLICT(session_id) DO UPDATE SET data=excluded.data,updated_at=excluded.updated_at');
     $stmt->execute([$id,json_encode($data,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),time()]);
@@ -290,7 +304,8 @@ function projectSnapshot(array $session): array {
     elseif(is_array($latestPreviewResult) && ($case['feedbackClosedDigest']??'')===($latestPreviewResult['imageDigest']??null)) $status['feedback']='done';
     $previewAccepted=is_array($latestPreviewResult) && ($case['previewAcceptedDigest']??'')===($latestPreviewResult['imageDigest']??null) && !empty($case['previewAcceptedAt']);
     $releaseJob=$jobByKind['publish_production']??null;
-    $status['release']=(!$previewAccepted && !$releaseJob && is_array($latestPreviewResult))?'waiting_client':projectJobStatus($releaseJob,$previewAccepted);
+    $clientHandoffReady=projectClientHandoffIsReady($case);
+    $status['release']=$clientHandoffReady?'done':((!$previewAccepted && !$releaseJob && is_array($latestPreviewResult))?'waiting_client':projectJobStatus($releaseJob,$previewAccepted));
     if($status['release']==='ready') $status['release']='needs_you';
     $status['handover']=!empty($case['handoverAt'])?'done':($status['release']==='done'?'needs_you':'locked');
     $name=trim((string)($session['projectState']['businessProblem']??''));
