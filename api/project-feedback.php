@@ -29,6 +29,7 @@ if($jsonRequest) {
     header('Access-Control-Allow-Origin: '.$expected); header('Vary: Origin'); header('Access-Control-Allow-Methods: POST, OPTIONS'); header('Access-Control-Allow-Headers: Content-Type'); header('Access-Control-Max-Age: 600');
     if($_SERVER['REQUEST_METHOD']==='OPTIONS') { http_response_code(204); exit; }
     header('Content-Type: application/json; charset=utf-8');
+    if(!empty($case['closedAt'])) { http_response_code(409); echo json_encode(['message'=>'Projekt zostal zamkniety. Nie mozna dodawac uwag ani uruchamiac poprawek.'],JSON_UNESCAPED_UNICODE); exit; }
     if($_SERVER['REQUEST_METHOD']!=='POST') { http_response_code(405); echo json_encode(['message'=>'Niedozwolona metoda.']); exit; }
     if(($payload['action']??'')==='status') {
         $lookup=projectDb()->prepare('SELECT closed_at FROM project_feedback_closures WHERE session_id=? AND image_digest=?'); $lookup->execute([$id,$feedbackDigest]); $closedAt=(int)$lookup->fetchColumn();
@@ -105,6 +106,7 @@ if($jsonRequest) {
     }
     http_response_code(201); echo json_encode(['message'=>'Uwaga została zapisana przy właściwej wersji podglądu.'],JSON_UNESCAPED_UNICODE); exit;
 }
+if(!empty($case['closedAt'])) feedbackPage('Projekt zostal zamkniety. Zglaszanie uwag i poprawki zostaly wstrzymane.',410);
 if($_SERVER['REQUEST_METHOD']==='POST') {
     if($feedbackClosed) feedbackPage('Zgłaszanie uwag do tej wersji zostało już zakończone.',409);
     $message=trim((string)($_POST['message']??'')); $page=trim((string)($_POST['page_url']??''));

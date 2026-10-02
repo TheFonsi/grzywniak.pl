@@ -308,6 +308,8 @@ function projectSnapshot(array $session): array {
     $status['release']=$clientHandoffReady?'done':((!$previewAccepted && !$releaseJob && is_array($latestPreviewResult))?'waiting_client':projectJobStatus($releaseJob,$previewAccepted));
     if($status['release']==='ready') $status['release']='needs_you';
     $status['handover']=!empty($case['handoverAt'])?'done':($status['release']==='done'?'needs_you':'locked');
+    if(!empty($case['closedAt'])) foreach($status as &$stageStatus) if($stageStatus!=='done') $stageStatus='cancelled';
+    unset($stageStatus);
     $name=trim((string)($session['projectState']['businessProblem']??''));
     return ['id'=>$id,'name'=>$name?:'Projekt bez nazwy','client'=>(string)($session['projectState']['contactName']??'Klient'),'email'=>(string)($session['projectState']['contactEmail']??''),'status'=>$status,'stages'=>projectStages(),'case'=>$case,'jobs'=>$jobs,'agentTasks'=>$agentTasks,'aiCalls'=>projectAiCalls($id),'feedback'=>$feedback,'events'=>projectEvents($id),'brief'=>$session['summary']??null,'analysis'=>$session['internalAnalysis']??null,'offer'=>['status'=>$offer['status']??null,'version'=>$offer['version']??null,'project'=>$offer['project']??null],'contract'=>['status'=>$contract['status']??null,'version'=>$contract['version']??null,'number'=>$contract['number']??null,'hasPdf'=>!empty($contract['pdfBase64'])],'messages'=>$session['messages']??[],'updatedAt'=>$session['updatedAt']??null];
 }
@@ -315,5 +317,5 @@ function projectSnapshot(array $session): array {
 function projectJobStatus(?array $job,bool $unlocked): string {
     if(!$unlocked)return 'locked';
     if(!$job)return 'ready';
-    return match($job['state']) {'queued'=>'queued','running'=>'working','done'=>'done','failed'=>'error',default=>'ready'};
+    return match($job['state']) {'queued'=>'queued','running'=>'working','done'=>'done','failed'=>'error','cancelled'=>'cancelled',default=>'ready'};
 }

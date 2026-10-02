@@ -228,6 +228,12 @@ function runOneJob(): bool {
     projectEvent($id,$stage,'started',$actor,'Rozpoczęto zadanie '.$job['kind'].'.');
     try {
         $session=readSession($id); $case=projectCase($id);
+        if(!empty($case['closedAt'])) {
+            $db->exec('BEGIN IMMEDIATE');
+            $db->prepare("UPDATE project_jobs SET state='cancelled',error='Projekt zamkniety przez administratora.',updated_at=? WHERE id=? AND state='running'")->execute([time(),$job['id']]);
+            projectEvent($id,$stage,'cancelled','System','Zatrzymano zadanie przed rozpoceciem operacji zewnetrznej, bo projekt zostal zamkniety.');
+            $db->exec('COMMIT'); echo "Job {$job['id']} cancelled before execution\n"; return true;
+        }
         if(!$session || empty($case['startedAt']) || (int)($case['sourceContractVersion']??0)!==(int)($session['contract']['version']??0)) throw new RuntimeException('Projekt lub zatwierdzona umowa uległy zmianie.');
         $callKey='job:'.$job['id'].':'.((int)$job['attempts']+1);
         $result=$isFeedback?(static function() use ($db,$id,$case,$feedbackMatch,$callKey): array {
@@ -270,6 +276,11 @@ function runOneJob(): bool {
             default=>throw new RuntimeException('Wykonawca tego rodzaju zadania nie jest jeszcze skonfigurowany.'),
         });
         $db->exec('BEGIN IMMEDIATE');
+        if(!empty(projectCase($id)['closedAt'])) {
+            $db->prepare("UPDATE project_jobs SET state='cancelled',error='Projekt zamkniety przez administratora.',updated_at=? WHERE id=? AND state='running'")->execute([time(),$job['id']]);
+            projectEvent($id,$stage,'cancelled','System','Nie zapisano wyniku ani nie uruchomiono nastepnych zadan, bo projekt zostal zamkniety.');
+            $db->exec('COMMIT'); echo "Job {$job['id']} cancelled because project is closed\n"; return true;
+        }
         $stmt=$db->prepare("UPDATE project_jobs SET state='done',result=?,error=NULL,updated_at=? WHERE id=? AND state='running'");
         $stmt->execute([json_encode($result,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),time(),$job['id']]);
         if($stmt->rowCount()!==1) throw new RuntimeException('Stan zadania zmienił się podczas wykonania.');

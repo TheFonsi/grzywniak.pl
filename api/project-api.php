@@ -20,6 +20,19 @@ function projectVpsRequest(string $method,string $url,array $body,array $headers
     if(!is_array($decoded)) throw new RuntimeException('Nie udało się odczytać odpowiedzi prywatnego API VPS.'.($error!==''?' '.$error:''));
     return ['status'=>$status,'body'=>$decoded];
 }
+function projectCancelRunnerTask(string $runnerId): array {
+    $base=rtrim(trim(projectSetting('CODEX_RUNNER_URL')),'/'); $token=projectSetting('CODEX_RUNNER_TOKEN');
+    if(!str_starts_with($base,'https://') || $token==='') return ['status'=>0,'body'=>[]];
+    $curl=curl_init($base.'/v1/tasks/'.rawurlencode($runnerId).'/cancel');
+    curl_setopt_array($curl,[CURLOPT_POST=>true,CURLOPT_RETURNTRANSFER=>true,CURLOPT_TIMEOUT=>8,CURLOPT_CONNECTTIMEOUT=>3,CURLOPT_FOLLOWLOCATION=>false,CURLOPT_SSL_VERIFYPEER=>true,CURLOPT_SSL_VERIFYHOST=>2,CURLOPT_HTTPHEADER=>['Authorization: Bearer '.$token,'Content-Type: application/json','Accept: application/json'],CURLOPT_POSTFIELDS=>'{}']);
+    $raw=curl_exec($curl); $status=(int)curl_getinfo($curl,CURLINFO_HTTP_CODE); curl_close($curl);
+    return ['status'=>$status,'body'=>is_string($raw)?(json_decode($raw,true)?:[]):[]];
+}
+function projectValidDate(string $value,bool $optional=true): bool {
+    if($value==='' && $optional) return true;
+    if(!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/D',$value,$match)) return false;
+    return checkdate((int)$match[2],(int)$match[3],(int)$match[1]);
+}
 $id=(string)($_GET['session']??'');
 if(!preg_match('/^[a-f0-9]{32}$/',$id)) projectReply(['message'=>'Niepoprawny identyfikator rozmowy.'],400);
 importLegacySessions();
@@ -43,11 +56,42 @@ if(!is_array($body)) projectReply(['message'=>'Niepoprawne dane.'],400);
 if(!hash_equals($projectCsrf,(string)($_SERVER['HTTP_X_CSRF_TOKEN']??''))) projectReply(['message'=>'Odśwież panel i ponów działanie.'],403);
 $action=(string)($body['action']??'');
 $db=projectDb();
+$runnerTasksToCancel=[];
 try {
     $db->exec('BEGIN IMMEDIATE');
     $session=readSession($id);
     $case=projectCase($id);
-    if($action==='confirm_contract') {
+    if(!empty($case['closedAt']) && !in_array($action,['save_invoice_info'],true)) throw new DomainException('Projekt jest zamkniety. Agentow nie mozna wznowic.');
+    if($action==='close_project') {
+        if(!empty($case['closedAt'])) throw new DomainException('Projekt jest juz zamkniety.');
+        $reason=trim((string)($body['reason']??''));
+        if(mb_strlen($reason)<10 || mb_strlen($reason)>1000 || ($body['confirmStop']??'')!=='on') throw new DomainException('Podaj powod zamkniecia i potwierdz zatrzymanie wszystkich agentow.');
+        $find=$db->prepare("SELECT id,runner_id,session_id,task_key FROM project_agent_tasks WHERE session_id=? AND state='running'"); $find->execute([$id]);
+        $runnerTasksToCancel=$find->fetchAll(PDO::FETCH_ASSOC);
+        $db->prepare("UPDATE project_jobs SET state='cancelled',error='Projekt zamkniety przez administratora.',updated_at=? WHERE session_id=? AND state='queued'")->execute([time(),$id]);
+        $db->prepare("UPDATE project_agent_tasks SET state='cancelled',runner_phase='finished',error='Projekt zamkniety przez administratora.',updated_at=? WHERE session_id=? AND state='pending'")->execute([time(),$id]);
+        $db->prepare("UPDATE project_agent_tasks SET state='failed',runner_phase='finished',error='Projekt zamkniety. Trwa anulowanie runnera; rezerwacja kosztu pozostaje do potwierdzenia.',updated_at=? WHERE session_id=? AND state='running'")->execute([time(),$id]);
+        $case['closedAt']=time(); $case['closedBy']=$adminUser; $case['closeReason']=$reason;
+        projectSave($id,$case);
+        projectEvent($id,'handover','project_closed',$adminUser,'Zamknieto sprawe i zatrzymano kolejkowanie agentow. Powod: '.$reason);
+    } elseif($action==='save_invoice_info') {
+        $invoiceId=trim((string)($body['invoiceId']??''));
+        if($invoiceId!=='' && !preg_match('/^inv_[a-f0-9]{16}$/',$invoiceId)) throw new DomainException('Niepoprawny identyfikator wpisu faktury.');
+        $number=trim((string)($body['number']??'')); $issueDate=trim((string)($body['issueDate']??'')); $dueDate=trim((string)($body['dueDate']??'')); $paidDate=trim((string)($body['paidDate']??''));
+        $amount=$body['amountGross']??null; $invoiceStatus=(string)($body['status']??'planned'); $note=trim((string)($body['note']??''));
+        if(mb_strlen($number)>100 || mb_strlen($note)>1000 || !is_numeric($amount) || !is_finite((float)$amount) || (float)$amount<0 || (float)$amount>10000000) throw new DomainException('Sprawdz numer, opis i kwote brutto faktury.');
+        if(!in_array($invoiceStatus,['planned','issued','paid','cancelled'],true) || !projectValidDate($issueDate) || !projectValidDate($dueDate) || !projectValidDate($paidDate)) throw new DomainException('Sprawdz status i daty faktury.');
+        if(in_array($invoiceStatus,['issued','paid'],true) && ($number==='' || $issueDate==='')) throw new DomainException('Wpis wystawionej faktury wymaga numeru i daty wystawienia.');
+        if($invoiceStatus==='paid' && $paidDate==='') throw new DomainException('Uzupelnij date platnosci.');
+        if($issueDate!=='' && $dueDate!=='' && $dueDate<$issueDate) throw new DomainException('Termin platnosci nie moze byc wczesniejszy niz data wystawienia.');
+        $records=is_array($case['invoiceInfo']??null)?$case['invoiceInfo']:[]; $found=false;
+        if($invoiceId==='') $invoiceId='inv_'.bin2hex(random_bytes(8));
+        foreach($records as &$record) if(($record['id']??'')===$invoiceId) { $record=['id'=>$invoiceId,'number'=>$number,'issueDate'=>$issueDate,'dueDate'=>$dueDate,'paidDate'=>$paidDate,'amountGross'=>(float)$amount,'status'=>$invoiceStatus,'note'=>$note,'updatedAt'=>time()]; $found=true; break; }
+        unset($record);
+        if(!$found) $records[]=['id'=>$invoiceId,'number'=>$number,'issueDate'=>$issueDate,'dueDate'=>$dueDate,'paidDate'=>$paidDate,'amountGross'=>(float)$amount,'status'=>$invoiceStatus,'note'=>$note,'createdAt'=>time(),'updatedAt'=>time()];
+        $case['invoiceInfo']=$records; projectSave($id,$case);
+        projectEvent($id,'handover','invoice_info_saved',$adminUser,'Zapisano informacyjny wpis faktury '.($number!==''?$number:$invoiceId).'; status: '.$invoiceStatus.'; kwota brutto PLN: '.number_format((float)$amount,2,'.','').'.');
+    } elseif($action==='confirm_contract') {
         $contract=$session['contract']??[];
         $evidence=trim((string)($body['evidence']??''));
         if(!projectContractMatchesAcceptedOffer($session)) throw new DomainException('Umowa musi dotyczyć aktualnej, zaakceptowanej wersji oferty.');
@@ -273,6 +317,23 @@ try {
         projectEvent($id,'handover','completed',$adminUser,'Przekazano wersję '.$result['imageDigest'].'. '.$note);
     } else throw new DomainException('Nieznana operacja.');
     $db->exec('COMMIT');
+    if($action==='close_project') foreach($runnerTasksToCancel as $running) {
+        $cancel=projectCancelRunnerTask((string)$running['runner_id']);
+        $confirmed=$cancel['status']===200 && ($cancel['body']['state']??'')==='failed';
+        $cost=$cancel['body']['costPln']??null;
+        if($confirmed && is_numeric($cost) && is_finite((float)$cost) && (float)$cost>=0 && (float)$cost<=1000000) {
+            $actual=(float)$cost; $db->exec('BEGIN IMMEDIATE');
+            try {
+                $db->prepare("UPDATE project_agent_tasks SET state='cancelled',error='Runner potwierdzil anulowanie; koszt rozliczono.',spent_pln=spent_pln+?,reserved_pln=0,updated_at=? WHERE id=? AND runner_id=? AND state='failed'")->execute([$actual,time(),$running['id'],$running['runner_id']]);
+                $db->prepare('INSERT OR IGNORE INTO project_agent_costs(runner_id,session_id,task_key,amount_pln,incurred_at) VALUES(?,?,?,?,?)')->execute([$running['runner_id'],$id,$running['task_key'],$actual,time()]);
+                projectEvent($id,'handover','agent_cancelled','System','Runner potwierdzil zatrzymanie zadania '.$running['task_key'].'; koszt '.$actual.' PLN.'); $db->exec('COMMIT');
+            } catch(Throwable $cancelError) { try{$db->exec('ROLLBACK');}catch(Throwable){} }
+        } else {
+            $message=$confirmed?'Runner zatrzymany. Koszt nie zostal potwierdzony; rezerwacja wymaga rozliczenia.':'Projekt zamkniety, ale runner nie potwierdzil zatrzymania. Rezerwacja pozostaje do sprawdzenia.';
+            $db->prepare("UPDATE project_agent_tasks SET error=?,updated_at=? WHERE id=? AND runner_id=? AND state='failed'")->execute([$message,time(),$running['id'],$running['runner_id']]);
+            projectEvent($id,'handover','agent_cancel_check','System',$message.' Zadanie: '.$running['task_key'].'.');
+        }
+    }
     projectReply(['project'=>projectSnapshot(readSession($id))]);
 } catch(DomainException $error) { if($db->inTransaction())$db->exec('ROLLBACK'); projectReply(['message'=>$error->getMessage()],409); }
 catch(Throwable $error) { if($db->inTransaction())$db->exec('ROLLBACK'); error_log('Project API: '.$error->getMessage()); projectReply(['message'=>'Nie udało się zapisać działania.'],500); }

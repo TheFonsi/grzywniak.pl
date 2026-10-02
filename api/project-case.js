@@ -3,7 +3,7 @@
   const apiBase = location.pathname.startsWith("/api/") ? "/api" : "";
   const apiPath = (path) => `${apiBase}/${String(path).replace(/^\/+/, "")}`;
   const endpoint = `${apiPath("project-api.php")}?session=${encodeURIComponent(id)}`;
-  const labels = { locked: "Niedostępny", ready: "Gotowy do startu", queued: "W kolejce", working: "Pracuje", needs_you: "Twoja decyzja", waiting_client: "Czeka na klienta", review: "Do przeglądu", done: "Zakończony", error: "Błąd" };
+  const labels = { cancelled: "Anulowano", locked: "Niedostępny", ready: "Gotowy do startu", queued: "W kolejce", working: "Pracuje", needs_you: "Twoja decyzja", waiting_client: "Czeka na klienta", review: "Do przeglądu", done: "Zakończony", error: "Błąd" };
   const $ = (selector) => document.querySelector(selector);
   const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]);
   const date = (seconds) => seconds ? new Date(Number(seconds) * 1000).toLocaleString("pl-PL") : "—";
@@ -40,6 +40,7 @@
   mapWrap.append(minimap);
   const miniStyle = document.createElement("style");
   miniStyle.textContent = '.map-wrap{position:relative}.node.review{border-color:#c7a477;background:#3d322b}.map-hint{position:absolute;top:12px;right:13px;z-index:2;padding:6px 9px;border:1px solid #354969;border-radius:8px;background:#0b1524df;color:#aebfda;font-size:11px;pointer-events:none}.minimap{position:absolute;right:13px;bottom:13px;width:235px;height:72px;padding:5px;border:1px solid #52709d;border-radius:10px;background:#0b1524ed;box-shadow:0 8px 26px #0009;cursor:crosshair}.minimap svg{width:100%;height:100%}.minimap:hover,.minimap:focus-visible{border-color:#afc7ff;outline:0}.feedback-image-open{display:block;max-width:100%;padding:0;border:0;background:transparent;color:#abc1e7;text-align:left}.feedback-image-open:focus-visible{outline:2px solid #86a9ff;outline-offset:3px;border-radius:8px}.feedback-image-hint{font-size:11px}.feedback-dispatch{margin:14px 0;padding:14px;border:1px solid #526b99;border-radius:12px;background:#14243a}.feedback-dispatch p{color:#b8c9e4;font-size:12px}.feedback-dispatch button:disabled{background:#39465a!important;color:#a5afbf;cursor:not-allowed;opacity:.8}.feedback-closed,.feedback-approved{padding:10px;border:1px solid #287e57;border-radius:9px;background:#123d32;color:#b7f0d2}.feedback-open{padding:10px;border:1px solid #927039;border-radius:9px;background:#40331b;color:#f4d391}.feedback-accept{background:#168455!important}.feedback-reject{background:#9e343e!important;color:#fff;border:0;border-radius:8px;padding:10px 14px;font:600 14px system-ui;cursor:pointer}.feedback-rejected-card{border:1px solid #963d47!important;background:#351c27!important}.feedback-accepted-card{border:1px solid #287e57!important;background:#142d2b!important}.feedback-number{display:block;margin-bottom:6px;color:#c8d8f3;font-size:14px}.feedback-review{display:grid;gap:10px;margin:14px 0;padding:14px;border:1px solid #526b99;border-radius:12px;background:#182640}.feedback-review>strong{font-size:14px}.feedback-review>p{margin:0;color:#b8c9e4;font-size:12px;line-height:1.5}.feedback-lightbox{position:fixed;inset:0;z-index:100;background:#030711ed;display:flex;align-items:center;justify-content:center;padding:60px 24px 24px}.feedback-lightbox[hidden]{display:none}.feedback-lightbox-image-wrap{position:relative;max-width:min(96vw,1800px);max-height:calc(100vh - 90px)}.feedback-lightbox img{display:block;max-width:100%;max-height:calc(100vh - 90px);object-fit:contain;border:1px solid #53698c;border-radius:8px;background:#fff;box-shadow:0 22px 80px #000b}.feedback-lightbox-selection{position:absolute;background:#3284df55;border:3px solid #1670ce;box-sizing:border-box;pointer-events:none}.feedback-lightbox button{position:absolute;top:16px;right:20px;padding:9px 14px;border:1px solid #60749a;border-radius:10px;background:#17233a;color:#fff;font:inherit;cursor:pointer}@media(max-width:600px){.minimap{width:160px;height:53px}.map-hint{font-size:10px;right:9px;top:9px}}';
+  miniStyle.textContent += ".toolbar #close-project{border-color:#85404a;color:#ffb6bd}.toolbar #close-project:hover{background:#45212a}.node.cancelled{border-color:#64748b;background:#202938;color:#b5c0ce}.dot.cancelled{background:#64748b}.invoice-register{margin-top:16px}.invoice-entry{margin:12px 0;padding:12px;border:1px solid #334665;border-radius:10px;background:#101827}.invoice-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}.invoice-form .wide{grid-column:1/-1}.invoice-register h4{margin:18px 0 8px}.invoice-form button{grid-column:1/-1}@media(max-width:700px){.invoice-form{grid-template-columns:1fr}.invoice-form .wide{grid-column:auto}}";
   document.head.append(miniStyle);
 
   function modalFormKey(form) {
@@ -124,6 +125,7 @@
     return task?.error || "Sprawdź szczegóły tego etapu.";
   }
   function overallStatus() {
+    if (project.case.closedAt) return { stage: project.stages.at(-1), state: "closed", title: "Projekt zamkni\u0119ty - agenci zatrzymani", detail: `${project.case.closeReason || "Zako\u0144czono dzia\u0142ania."}\nData: ${date(project.case.closedAt)}` };
     const order = ["error", "needs_you", "working", "queued", "review", "ready", "waiting_client", "done"];
     let stage = null;
     let state = "locked";
@@ -144,7 +146,7 @@
     else if (state === "review") detail = "Wynik czeka na sprawdzenie.";
     else if (state === "ready") detail = "Wszystkie zależności są gotowe. Etap może się rozpocząć.";
     else if (state === "done") detail = "Wszystkie widoczne etapy projektu są zakończone.";
-    const titles = { error: "Praca zatrzymana · błąd", needs_you: "Oczekuje na Twoją decyzję", working: "Projekt jest realizowany", queued: "Następny etap czeka w kolejce", review: "Wynik wymaga przeglądu", ready: "Gotowy do rozpoczęcia", waiting_client: "Oczekuje na klienta", done: "Projekt zakończony", locked: "Projekt jeszcze się nie rozpoczął" };
+    const titles = { closed: "Projekt zamkni\u0119ty - agenci zatrzymani", error: "Praca zatrzymana · błąd", needs_you: "Oczekuje na Twoją decyzję", working: "Projekt jest realizowany", queued: "Następny etap czeka w kolejce", review: "Wynik wymaga przeglądu", ready: "Gotowy do rozpoczęcia", waiting_client: "Oczekuje na klienta", done: "Projekt zakończony", locked: "Projekt jeszcze się nie rozpoczął" };
     return { stage, state, title: titles[state] || "Projekt oczekuje", detail };
   }
   function phaseLabel(phase) {
@@ -155,6 +157,7 @@
     $("#side-name").textContent = project.name;
     $("#side-client").textContent = project.client;
     $("#summary").textContent = `${project.client} · aktualizacja ${date(project.updatedAt)}`;
+    $("#close-project").hidden = Boolean(project.case.closedAt);
     const stageList = $("#side-stages");
     stageList.innerHTML = "";
     const nodes = $("#nodes");
@@ -403,11 +406,27 @@
     if (stageId === "handover") {
       const handoff = data.case.clientHandoff || {};
       const clientRoute = data.case.publicationDestination === "client_handoff";
-      const details = clientRoute ? `<div class="detail-section wide"><h3>Uzgodniona publikacja klienta</h3><p>Domena: ${escapeHtml(handoff.domain)} &middot; ${escapeHtml(handoff.registrar)}</p><p>Hosting: ${escapeHtml(handoff.hostingProvider)}</p><p>Serwer i uruchomienie: ${escapeHtml(handoff.serverTarget)}</p><p>DNS i TLS: ${escapeHtml(handoff.dnsTlsPlan)}</p><p>Kopie bezpiecze\u0144stwa: ${escapeHtml(handoff.backupPlan)}</p><p>Przekazywane materia\u0142y: ${escapeHtml(handoff.deliverables)}</p><p>Odpowiedzialno\u015b\u0107: ${escapeHtml(handoff.responsibilities)}</p><p>Wsparcie: ${escapeHtml(handoff.supportPlan)}</p></div>` : "";
-      const content = data.case.handoverAt ? `<p>${clientRoute ? "Przekazanie przygotowanego pakietu zapisano" : "Przekazano wersj\u0119"} ${date(data.case.handoverAt)} &middot; ${escapeHtml(data.case.handoverDigest)}.</p><p>${escapeHtml(data.case.handoverNote)}</p>${details}` : data.status.handover === "needs_you" ? `${details}<form class="form" data-action="complete_handover"><label>${clientRoute ? "Potwierdzenie przekazania uzgodnionych materia\u0142\u00f3w klientowi (bez hase\u0142 i kluczy)" : "Jak przekazano dost\u0119p, dokumentacj\u0119 i zasady wsparcia?"}<textarea name="note" rows="4" minlength="15" maxlength="2000" required></textarea></label><button class="primary">${clientRoute ? "Zapisz kompletne przekazanie klientowi" : "Zapisz przekazanie projektu"}</button></form>` : "<p>Najpierw zako\u0144cz publikacj\u0119. Dla serwera klienta trzeba potwierdzi\u0107 domen\u0119, hosting, dost\u0119p, zakres przekazania i wsparcie.</p>";
-      return section("Przekazanie i wsparcie", content, true);
+      const details = clientRoute ? `<div class="detail-section wide"><h3>Uzgodniona publikacja klienta</h3><p>Domena: ${escapeHtml(handoff.domain)} &middot; ${escapeHtml(handoff.registrar)}</p><p>Hosting: ${escapeHtml(handoff.hostingProvider)}</p><p>Serwer i uruchomienie: ${escapeHtml(handoff.serverTarget)}</p><p>DNS i TLS: ${escapeHtml(handoff.dnsTlsPlan)}</p><p>Kopie bezpieczeństwa: ${escapeHtml(handoff.backupPlan)}</p><p>Przekazywane materiały: ${escapeHtml(handoff.deliverables)}</p><p>Odpowiedzialność: ${escapeHtml(handoff.responsibilities)}</p><p>Wsparcie: ${escapeHtml(handoff.supportPlan)}</p></div>` : "";
+      const content = data.case.handoverAt ? `<p>${clientRoute ? "Przekazanie przygotowanego pakietu zapisano" : "Przekazano wersję"} ${date(data.case.handoverAt)} &middot; ${escapeHtml(data.case.handoverDigest)}.</p><p>${escapeHtml(data.case.handoverNote)}</p>${details}` : data.status.handover === "needs_you" ? `${details}<form class="form" data-action="complete_handover"><label>${clientRoute ? "Potwierdzenie przekazania uzgodnionych materiałów klientowi (bez haseł i kluczy)" : "Jak przekazano dostęp, dokumentację i zasady wsparcia?"}<textarea name="note" rows="4" minlength="15" maxlength="2000" required></textarea></label><button class="primary">${clientRoute ? "Zapisz kompletne przekazanie klientowi" : "Zapisz przekazanie projektu"}</button></form>` : "<p>Najpierw zakończ publikację. Dla serwera klienta trzeba potwierdzić domenę, hosting, dostęp, zakres przekazania i wsparcie.</p>";
+      const invoices = Array.isArray(data.case.invoiceInfo) ? data.case.invoiceInfo : [];
+      const statuses = [["planned", "Planowana"], ["issued", "Wystawiona"], ["paid", "Opłacona"], ["cancelled", "Anulowana"]];
+      const invoiceForm = (invoice = {}) => `<form class="form invoice-form" data-action="save_invoice_info"><input type="hidden" name="invoiceId" value="${escapeHtml(invoice.id || "")}"><label>Numer faktury<input name="number" maxlength="100" value="${escapeHtml(invoice.number || "")}"></label><label>Kwota brutto (PLN)<input name="amountGross" type="number" min="0" max="10000000" step="0.01" value="${escapeHtml(invoice.amountGross ?? "0.00")}" required></label><label>Data wystawienia<input name="issueDate" type="date" value="${escapeHtml(invoice.issueDate || "")}"></label><label>Termin p\u0142atno\u015bci<input name="dueDate" type="date" value="${escapeHtml(invoice.dueDate || "")}"></label><label>Data zap\u0142aty<input name="paidDate" type="date" value="${escapeHtml(invoice.paidDate || "")}"></label><label>Status<select name="status">${statuses.map(([value, title]) => `<option value="${value}"${(invoice.status || "planned") === value ? " selected" : ""}>${title}</option>`).join("")}</select></label><label class="wide">Notatka<textarea name="note" rows="2" maxlength="1000">${escapeHtml(invoice.note || "")}</textarea></label><button class="primary">${invoice.id ? "Zapisz zmiany" : "Dodaj wpis faktury"}</button></form>`;
+      const invoiceContent = `<div class="detail-section wide invoice-register"><h3>Faktury - ewidencja informacyjna</h3><p>Panel zapisuje wyłącznie informacje. Nie tworzy faktury, nie wysyła jej klientowi i nie łączy się z księgowością.</p>${invoices.length ? invoices.map((invoice, index) => `<div class="invoice-entry"><strong>Wpis ${index + 1}${invoice.number ? ` - ${escapeHtml(invoice.number)}` : ""}</strong>${invoiceForm(invoice)}</div>`).join("") : "<p>Brak zapisanych wpisów.</p>"}<h4>Nowy wpis</h4>${invoiceForm()}</div>`;
+      return section("Przekazanie i wsparcie", `${content}${invoiceContent}`, true);
     }
     return section("Wynik etapu", `<p>${data.status[stageId] === "locked" ? "Ten etap nie został jeszcze uruchomiony. Jego zadania i artefakty pojawią się tutaj po spełnieniu zależności." : "Etap jest gotowy. Koordynator utworzy zadania i przypisze je właściwym agentom."}</p>`, true);
+  }
+
+  function openCloseProjectDialog() {
+    if (!project || project.case.closedAt) return;
+    currentStage = null;
+    previousFocus = document.activeElement;
+    $("#dialog-agent").textContent = "ZAKO\u0143CZENIE PROJEKTU";
+    $("#dialog-title").textContent = "Zatrzymaj wszystkie dzia\u0142ania";
+    $("#dialog-content").innerHTML = `<div class="detail-grid"><section class="detail-section wide"><h3>Co zostanie zatrzymane</h3><p>Projekt zostanie trwale zamkni\u0119ty. Oczekuj\u0105ce zadania zostan\u0105 anulowane, system spr\u00f3buje zatrzyma\u0107 aktywne zadania runnera i zablokuje uruchamianie kolejnych agent\u00f3w oraz przyjmowanie uwag do tego projektu.</p><p>Je\u015bli runner nie potwierdzi zatrzymania lub kosztu, panel zachowa rezerwacj\u0119 do r\u0119cznego rozliczenia.</p><form class="form" data-action="close_project"><label>Pow\u00f3d zako\u0144czenia<textarea name="reason" rows="4" minlength="10" maxlength="1000" required></textarea></label><label><input name="confirmStop" type="checkbox" required> Potwierdzam trwa\u0142e zako\u0144czenie projektu i zatrzymanie pracy agent\u00f3w.</label><button class="primary">Zako\u0144cz projekt i zatrzymaj agent\u00f3w</button></form></section></div>`;
+    $("#overlay").hidden = false;
+    document.body.style.overflow = "hidden";
+    $("#dialog-content").querySelector("textarea")?.focus();
   }
 
   function openStage(stageId, moveFocus = true) {
@@ -443,7 +462,9 @@
       const response = await fetch(endpoint, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf }, body: JSON.stringify(data) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message || "Nie udało się zapisać.");
-      await load(true);
+      if (data.action === "close_project") { closeStage(); await load(false); }
+      else if (data.action === "save_invoice_info") { const stage = currentStage; await load(false); if (stage) openStage(stage, false); }
+      else await load(true);
     } catch (error) {
       const message = document.createElement("p");
       message.className = "error-text";
@@ -503,6 +524,7 @@
     close.focus();
   });
   $("#close").addEventListener("click", closeStage);
+  $("#close-project").addEventListener("click", openCloseProjectDialog);
   $("#overlay").addEventListener("click", (event) => { if (event.target.id === "overlay") closeStage(); });
   document.addEventListener("keydown", (event) => { if (event.key === "Escape" && $(".feedback-lightbox")) { closeFeedbackLightbox(); return; } if (event.key === "Escape" && !$("#overlay").hidden) closeStage(); });
   $("#refresh").addEventListener("click", () => load(Boolean(currentStage)).catch(showError));

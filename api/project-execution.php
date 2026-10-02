@@ -112,7 +112,7 @@ function projectDispatchAgentTask(): bool {
         foreach($tasks as $task) {
             $id=(string)$task['session_id'];
             $session=readSession($id); $case=projectCase($id);
-            if(!$session || (int)($case['sourceContractVersion']??0)!==(int)($session['contract']['version']??0)) continue;
+            if(!$session || !empty($case['closedAt']) || (int)($case['sourceContractVersion']??0)!==(int)($session['contract']['version']??0)) continue;
             $repoStmt=$db->prepare("SELECT result FROM project_jobs WHERE session_id=? AND kind='create_repository' AND state='done'");
             $repoStmt->execute([$id]); $repo=json_decode((string)$repoStmt->fetchColumn(),true);
             if(!is_array($repo) || empty($repo['url'])) continue;
@@ -150,6 +150,23 @@ function projectDispatchAgentTask(): bool {
         $body=['id'=>$key,'projectId'=>$id,'taskId'=>$selected['task_key'],'role'=>$selected['role'],'title'=>$selected['title'],'dependencies'=>json_decode((string)$selected['dependencies'],true)?:[],'dependencyResults'=>$dependencyResults,'acceptance'=>json_decode((string)$selected['acceptance'],true)?:[],'repository'=>$repo['url'],'approvedScope'=>$case['scope']??'','maxCostPln'=>$reserve,'timeoutMinutes'=>(int)projectSetting('AGENT_TASK_TIMEOUT_MIN')];
         $response=workerRequest('POST',$url.'/v1/tasks',$body,['Authorization: Bearer '.$token,'Idempotency-Key: '.$key,'Content-Type: application/json','Accept: application/json']);
         if(!in_array($response['status'],[200,201,202],true) || ($response['body']['id']??'')!==$key) throw new RuntimeException('Runner nie potwierdził identyfikatora zadania.');
+        if(!empty(projectCase($id)['closedAt'])) {
+            $cancel=workerRequest('POST',$url.'/v1/tasks/'.rawurlencode($key).'/cancel',[],['Authorization: Bearer '.$token,'Content-Type: application/json','Accept: application/json'],10);
+            $confirmed=$cancel['status']===200 && ($cancel['body']['state']??'')==='failed';
+            $cost=$cancel['body']['costPln']??null;
+            $costKnown=$confirmed && is_numeric($cost) && is_finite((float)$cost) && (float)$cost>=0 && (float)$cost<=1000000;
+            $db->exec('BEGIN IMMEDIATE');
+            try {
+                if($costKnown) {
+                    $changed=$db->prepare("UPDATE project_agent_tasks SET state='cancelled',runner_phase='finished',error='Projekt zamkniety; runner zatrzymany i koszt rozliczony.',spent_pln=spent_pln+?,reserved_pln=0,updated_at=? WHERE id=? AND runner_id=? AND state IN ('running','failed')");
+                    $changed->execute([(float)$cost,time(),$selected['id'],$key]);
+                    if($changed->rowCount()===1) $db->prepare('INSERT OR IGNORE INTO project_agent_costs(runner_id,session_id,task_key,amount_pln,incurred_at) VALUES(?,?,?,?,?)')->execute([$key,$id,$selected['task_key'],(float)$cost,time()]);
+                } else $db->prepare("UPDATE project_agent_tasks SET state='failed',runner_phase='finished',error=?,updated_at=? WHERE id=? AND runner_id=? AND state IN ('running','failed')")->execute([$confirmed?'Runner zatrzymany, ale koszt niepotwierdzony; rezerwacja pozostaje do rozliczenia.':'Projekt zamkniety, ale runner nie potwierdzil zatrzymania; sprawdz zadanie i rezerwacje.',time(),$selected['id'],$key]);
+                projectEvent($id,projectTaskStage((string)$selected['role']),$costKnown?'agent_cancelled':'agent_cancel_check','System',$costKnown?'Runner zatrzymal zadanie uruchomione podczas zamykania projektu; koszt '.$cost.' PLN.':'Runnera sprawdzono po zamknieciu projektu; wymagane rozliczenie lub potwierdzenie zatrzymania.');
+                $db->exec('COMMIT');
+            } catch(Throwable $cancelError) { try{$db->exec('ROLLBACK');}catch(Throwable){} throw $cancelError; }
+            return true;
+        }
         return true;
     } catch(Throwable $error) {
         try { $db->exec('ROLLBACK'); } catch(Throwable) {}
@@ -287,6 +304,7 @@ function projectQueueReadyPreviews(): void {
     $db=projectDb();
     $ids=$db->query("SELECT DISTINCT session_id FROM project_agent_tasks WHERE role='qa'")->fetchAll(PDO::FETCH_COLUMN);
     foreach($ids as $id) {
+        if(!empty(projectCase((string)$id)['closedAt'])) continue;
         $tasks=projectAgentTasks((string)$id);
         if(!projectAgentTasksCompleteForPreview($tasks)) continue;
         $jobs=projectJobs((string)$id); $states=[];
@@ -322,6 +340,7 @@ function projectQueueScaffoldConfiguration(): void {
     $db=projectDb();
     $rows=$db->query("SELECT r.session_id,r.result FROM project_jobs r JOIN project_agent_tasks t ON t.session_id=r.session_id AND t.task_key='scaffold' AND t.state='done' WHERE r.kind='create_repository' AND r.state='done'")->fetchAll(PDO::FETCH_ASSOC);
     foreach($rows as $row) {
+        if(!empty(projectCase((string)$row['session_id'])['closedAt'])) continue;
         $repo=json_decode((string)$row['result'],true);
         if(($repo['ci']??'')!=='awaiting_project_scaffold') continue;
         $exists=$db->prepare("SELECT 1 FROM project_jobs WHERE session_id=? AND kind='configure_scaffold'");
@@ -337,7 +356,7 @@ function projectBackfillAgentTasks(): void {
     $rows=$db->query("SELECT c.session_id,c.data,j.result FROM project_cases c JOIN project_jobs j ON j.session_id=c.session_id AND j.kind='create_repository' AND j.state='done'")->fetchAll(PDO::FETCH_ASSOC);
     foreach($rows as $row) {
         $case=json_decode((string)$row['data'],true);
-        if(!is_array($case) || !is_array($case['plan']['tasks']??null)) continue;
+        if(!is_array($case) || !empty($case['closedAt']) || !is_array($case['plan']['tasks']??null)) continue;
         $repo=json_decode((string)$row['result'],true)?:[];
         $newStack=($repo['ci']??'')==='awaiting_project_scaffold';
         $tasks=$newStack?projectTasksWithScaffold($case['plan']['tasks']):$case['plan']['tasks'];
