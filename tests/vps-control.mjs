@@ -73,7 +73,8 @@ try {
   assert.match(scriptText, /screenshot: image/);
   assert.match(scriptText, /gw-accept-button/);
   assert.match(scriptText, /gw-closed \.gw-primary\{display:none\}/, 'Po zamknięciu listy ukryj nieaktywny przycisk wysyłki uwagi.');
-  assert.match(scriptText, /button:disabled\{opacity:\.55;cursor:not-allowed!important\}/, "Disabled feedback buttons use an explicit blocked cursor.");
+  assert.match(scriptText, /\.gw-primary\{[^}]*cursor:pointer!important\}/, "The feedback submit button keeps a clear clickable cursor.");
+  assert.match(scriptText, /button:disabled\{opacity:\.55;cursor:default!important\}/, "Disabled feedback buttons do not show a loading cursor.");
   assert.doesNotMatch(scriptText, /cursor:\s*wait/, 'Panel uwag nie pokazuje obracającego się kursora oczekiwania.');
   assert.match(scriptText, /aria-busy/, "Submission exposes a clear busy state.");
   assert.match(scriptText, /submit\.disabled = Boolean/, "A closed feedback list stays locked when a pending request completes.");
