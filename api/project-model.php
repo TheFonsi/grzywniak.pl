@@ -65,6 +65,31 @@ function projectContractMatchesAcceptedOffer(array $session): bool {
         && (int)$contract['offerVersion']===$offerVersion;
 }
 
+function projectSignedPublicationPlan(array $session,array $case): ?array {
+    $contract=is_array($session['contract']??null)?$session['contract']:[];
+    if(!projectContractMatchesAcceptedOffer($session) || empty($contract['pdfBase64']) || (int)($case['contractSignedVersion']??0)<1 || (int)$case['contractSignedVersion']!==(int)($contract['version']??0)) return null;
+    $facts=is_array($contract['facts']??null)?$contract['facts']:[];
+    $destination=(string)($facts['publicationDestination']??'');
+    if(!in_array($destination,['agency','client_handoff'],true)) return null;
+    if($destination==='client_handoff') {
+        foreach(['productionDomain','domainOwnershipTerms','productionHosting','backupResponsibility','dnsTlsResponsibility'] as $field) if(trim((string)($facts[$field]??''))==='') return null;
+    }
+    return [
+        'destination'=>$destination,
+        'domain'=>strtolower(trim((string)($facts['productionDomain']??''))),
+        'registrar'=>trim((string)($facts['domainRegistrar']??'')),
+        'verificationEvidence'=>trim((string)($facts['domainOwnershipTerms']??'')),
+        'hostingProvider'=>trim((string)($facts['productionHosting']??'')),
+        'serverTarget'=>trim((string)($facts['serverTarget']??'')),
+        'backupPlan'=>trim((string)($facts['backupResponsibility']??'')),
+        'dnsTlsPlan'=>trim((string)($facts['dnsTlsResponsibility']??'')),
+        'deliverables'=>trim((string)($contract['acceptance']??'')),
+        'responsibilities'=>trim((string)($contract['deploymentTerms']??'')),
+        'supportPlan'=>trim((string)($contract['support']??'')),
+        'contractVersion'=>(int)$contract['version'],
+    ];
+}
+
 function projectCase(string $id): array {
     $stmt = projectDb()->prepare('SELECT data FROM project_cases WHERE session_id = ?');
     $stmt->execute([$id]);
@@ -115,12 +140,18 @@ function projectClientHandoffIsReady(array $case): bool {
     if(($case['publicationDestination']??'')!=='client_handoff' || empty($case['clientHandoffPreparedAt'])) return false;
     $handoff=is_array($case['clientHandoff']??null)?$case['clientHandoff']:[];
     $domain=strtolower(trim((string)($handoff['domain']??'')));
-    $validDomain=strlen($domain)<=253 && preg_match('/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$/D',$domain)===1;
-    if(!$validDomain || empty($handoff['domainControlVerified']) || empty($handoff['hostingAccessConfirmed']) || empty($handoff['clientConfirmed'])) return false;
-    foreach(['registrar','verificationEvidence','hostingProvider','serverTarget','backupPlan','dnsTlsPlan','deliverables','responsibilities','supportPlan'] as $field) {
-        $value=trim((string)($handoff[$field]??''));
-        $minimum=in_array($field,['serverTarget','backupPlan','dnsTlsPlan','deliverables','responsibilities','supportPlan'],true)?15:3;
-        if(mb_strlen($value)<$minimum || mb_strlen($value)>2000) return false;
+    $validDomain=strlen($domain)<=253 && preg_match('/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/D',$domain)===1;
+    if(!$validDomain || empty($handoff['domainControlVerified']) || empty($handoff['hostingAccessConfirmed']) || empty($handoff['clientConfirmed']) || (int)($handoff['contractVersion']??0)<1) return false;
+    foreach(['verificationEvidence','hostingProvider','backupPlan','dnsTlsPlan','deliverables','responsibilities','supportPlan'] as $field) if(mb_strlen(trim((string)($handoff[$field]??'')))<3) return false;
+    return true;
+}
+
+function projectClientHandoffMatchesSignedContract(array $session,array $case): bool {
+    $plan=projectSignedPublicationPlan($session,$case);
+    if($plan===null || $plan['destination']!=='client_handoff' || !projectClientHandoffIsReady($case)) return false;
+    $handoff=$case['clientHandoff'];
+    foreach(['domain','registrar','verificationEvidence','hostingProvider','serverTarget','backupPlan','dnsTlsPlan','deliverables','responsibilities','supportPlan','contractVersion'] as $field) {
+        if(trim((string)($handoff[$field]??''))!==trim((string)($plan[$field]??''))) return false;
     }
     return true;
 }
@@ -304,14 +335,14 @@ function projectSnapshot(array $session): array {
     elseif(is_array($latestPreviewResult) && ($case['feedbackClosedDigest']??'')===($latestPreviewResult['imageDigest']??null)) $status['feedback']='done';
     $previewAccepted=is_array($latestPreviewResult) && ($case['previewAcceptedDigest']??'')===($latestPreviewResult['imageDigest']??null) && !empty($case['previewAcceptedAt']);
     $releaseJob=$jobByKind['publish_production']??null;
-    $clientHandoffReady=projectClientHandoffIsReady($case);
+    $clientHandoffReady=projectClientHandoffMatchesSignedContract($session,$case);
     $status['release']=$clientHandoffReady?'done':((!$previewAccepted && !$releaseJob && is_array($latestPreviewResult))?'waiting_client':projectJobStatus($releaseJob,$previewAccepted));
     if($status['release']==='ready') $status['release']='needs_you';
     $status['handover']=!empty($case['handoverAt'])?'done':($status['release']==='done'?'needs_you':'locked');
     if(!empty($case['closedAt'])) foreach($status as &$stageStatus) if($stageStatus!=='done') $stageStatus='cancelled';
     unset($stageStatus);
     $name=trim((string)($session['projectState']['businessProblem']??''));
-    return ['id'=>$id,'name'=>$name?:'Projekt bez nazwy','client'=>(string)($session['projectState']['contactName']??'Klient'),'email'=>(string)($session['projectState']['contactEmail']??''),'status'=>$status,'stages'=>projectStages(),'case'=>$case,'jobs'=>$jobs,'agentTasks'=>$agentTasks,'aiCalls'=>projectAiCalls($id),'feedback'=>$feedback,'events'=>projectEvents($id),'brief'=>$session['summary']??null,'analysis'=>$session['internalAnalysis']??null,'offer'=>['status'=>$offer['status']??null,'version'=>$offer['version']??null,'project'=>$offer['project']??null],'contract'=>['status'=>$contract['status']??null,'version'=>$contract['version']??null,'number'=>$contract['number']??null,'hasPdf'=>!empty($contract['pdfBase64'])],'messages'=>$session['messages']??[],'updatedAt'=>$session['updatedAt']??null];
+    return ['id'=>$id,'name'=>$name?:'Projekt bez nazwy','client'=>(string)($session['projectState']['contactName']??'Klient'),'email'=>(string)($session['projectState']['contactEmail']??''),'status'=>$status,'stages'=>projectStages(),'case'=>$case,'jobs'=>$jobs,'agentTasks'=>$agentTasks,'aiCalls'=>projectAiCalls($id),'feedback'=>$feedback,'events'=>projectEvents($id),'brief'=>$session['summary']??null,'analysis'=>$session['internalAnalysis']??null,'offer'=>['status'=>$offer['status']??null,'version'=>$offer['version']??null,'project'=>$offer['project']??null],'contract'=>['status'=>$contract['status']??null,'version'=>$contract['version']??null,'number'=>$contract['number']??null,'hasPdf'=>!empty($contract['pdfBase64']),'publicationPlan'=>projectSignedPublicationPlan($session,$case)],'messages'=>$session['messages']??[],'updatedAt'=>$session['updatedAt']??null];
 }
 
 function projectJobStatus(?array $job,bool $unlocked): string {

@@ -44,6 +44,12 @@ register_shutdown_function(static function(): void {
     if (sessionId) row.href = '/api/project-case.php?session=' + encodeURIComponent(sessionId);
   });
   document.addEventListener('change', event => {
+    if (event.target.name === 'publicationDestination') {
+      const form = event.target.form;
+      const clientRoute = event.target.value === 'client_handoff';
+      form?.querySelectorAll('[data-client-publication-field]').forEach(label => { label.hidden = !clientRoute; });
+      return;
+    }
     if (event.target.name !== 'ipMode') return;
     const field = event.target.form?.querySelector('[data-license-terms]');
     if (field) field.hidden = !['exclusive','nonexclusive'].includes(event.target.value);
@@ -70,6 +76,7 @@ register_shutdown_function(static function(): void {
         const changed = [...form.querySelectorAll('textarea,input,select')].some(input => input.value !== previous[input.name]);
         if (changed) throw new Error('Formularz zmienił się podczas pracy AI. Zachowano Twoje zmiany. Uruchom AI ponownie, aby je uwzględnić.');
         window.contractReview.apply(form, result);
+        form.querySelector('[name=publicationDestination]')?.dispatchEvent(new Event('change', {bubbles:true}));
         const notes = form.querySelector('[data-ai-feedback]'); notes.replaceChildren();
         const title = document.createElement('p'); title.textContent = 'AI przygotowało propozycje. Przy każdym polu wybierz Akceptuj lub Zmień. Brakujące dane faktyczne uzupełnij ręcznie.'; notes.append(title);
         if (result.missing?.length) { const list = document.createElement('ul'); for (const text of result.missing) { const item=document.createElement('li'); item.textContent=text; list.append(item); } notes.append(list); }

@@ -88,7 +88,7 @@ if($action==='ai-fill') {
         $result['fields']['paymentDetails']=trim($draft['paymentDetails'])!==''?$draft['paymentDetails']:'Płatność przelewem na rachunek wskazany na fakturze.';
         foreach(['price','deposit','deadline'] as $key) if(trim($draft[$key])!=='') $result['fields'][$key]=$draft[$key];
         if(trim($draft['price'])==='') $result['fields']['price']='[DO UZUPEŁNIENIA: wynagrodzenie zgodne z ofertą]';
-        foreach(['clientAddress','clientTaxId','clientRepresentative','clientType','dataRole'] as $key) $result['facts'][$key]=$facts[$key];
+        foreach(['clientAddress','clientTaxId','clientRepresentative','clientType','dataRole','publicationDestination','productionDomain','domainRegistrar','domainOwnershipTerms','productionHosting','serverTarget','backupResponsibility','dnsTlsResponsibility'] as $key) $result['facts'][$key]=$facts[$key];
         foreach($facts as $key=>$value) if($value!=='' && !($key==='rightsTerms'&&$facts['ipMode']==='')) $result['facts'][$key]=$value;
         $result['facts']=contractReadFacts($result['facts'],$s['contract']['facts']??[],$template);
         foreach($accepted as $key=>$value) { if(array_key_exists($key,$result['fields'])) $result['fields'][$key]=$value; elseif(array_key_exists($key,$result['facts'])) $result['facts'][$key]=$value; }

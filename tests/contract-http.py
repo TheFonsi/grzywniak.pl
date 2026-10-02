@@ -44,11 +44,12 @@ try:
     assert b'VAT 8%' in html
     fields=re.findall(rb'<textarea name="([^"]+)"',html)
     body={k.decode():'Example text' for k in fields}
-    body.update(csrf=token,contract_session=sid,expectedVersion=0,templateVersion=0,profileVersion=1,action='generate',clientType='business',ipMode='transfer',signing='qualified',dataRole='none',clientAddress='Testowa 2, Warszawa',clientTaxId='',clientRepresentative='Jan Test',contractDate='2026-09-15')
+    body.update(csrf=token,contract_session=sid,expectedVersion=0,templateVersion=0,profileVersion=1,action='generate',clientType='business',ipMode='transfer',signing='qualified',dataRole='none',clientAddress='Testowa 2, Warszawa',clientTaxId='',clientRepresentative='Jan Test',contractDate='2026-09-15',publicationDestination='agency')
     assert b'name="ipPayment"' not in html and b'data-license-terms hidden' in html
     assert request('/api/contract.php',dict(body,ipMode='exclusive',rightsTerms=''))[0]==422
     code,data=request('/api/contract.php',dict(body,action='ai-fill'));assert code==200,(code,data)
     ai=json.loads(data);assert 'scope' in ai['fields'] and ai['fields']['price']==body['price'] and ai['fields']['provider']==body['provider'] and ai['facts']['clientAddress']==body['clientAddress']
+    assert ai['facts']['publicationDestination']=='agency' and ai['facts']['productionDomain']==''
     assert json.loads(request('/api/contract.php?session='+sid)[1])['contract'] is None, 'AI must not persist or send'
     assert request('/api/contract.php',dict(body,clientType='invented',action='ai-fill'))[0]==422
     assert request('/api/contract.php',dict(body,scope='[DO UZUPEŁNIENIA: brak danych]'))[0]==422

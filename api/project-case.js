@@ -365,6 +365,7 @@
       const accepted = Boolean(digest && data.case.previewAcceptedDigest === digest && data.case.previewAcceptedAt);
       const openFeedback = data.feedback.some((note) => note.state !== "resolved");
       const handoff = data.case.clientHandoff || {};
+      const publicationPlan = data.contract.publicationPlan;
       const prepared = Boolean(data.case.clientHandoffPreparedAt);
       let body;
       if (prepared) {
@@ -379,26 +380,15 @@
         body = "<p>Oczekujemy na pe\u0142n\u0105 akceptacj\u0119 klienta dla tej wersji podgl\u0105du. Po akceptacji wybierzesz spos\u00f3b publikacji.</p>";
       } else if (openFeedback) {
         body = "<p>Przed wyborem publikacji rozstrzygnij wszystkie uwagi klienta w etapie 13. Otwarta uwaga blokuje publikacje i przekazanie.</p>";
+      } else if (!publicationPlan) {
+        body = `<p>Aktualna podpisana umowa nie zawiera wybranej ścieżki publikacji. Uzupełnij w umowie sposób publikacji i warunki domeny oraz hostingu, przygotuj nową wersję do podpisu i potwierdź jej zawarcie.</p>${adminLink("#contract-panel")}`;
+      } else if (publicationPlan.destination === "client_handoff") {
+        body = `<p>Podgląd zaakceptowano ${date(data.case.previewAcceptedAt)}. Ustalenia pobrano z podpisanej umowy ${escapeHtml(data.contract.number || "")} v${escapeHtml(publicationPlan.contractVersion)}.</p>
+          ${section("Dane z umowy", `<p>Domena: <code>${escapeHtml(publicationPlan.domain)}</code></p><p>Rejestrator / DNS: ${escapeHtml(publicationPlan.registrar || "Nie wskazano w umowie")}</p><p>Hosting: ${escapeHtml(publicationPlan.hostingProvider)}</p><p>Sposób uruchomienia: ${escapeHtml(publicationPlan.serverTarget || "Klient uruchamia przekazany pakiet samodzielnie")}</p><p>Prawo do domeny: ${escapeHtml(publicationPlan.verificationEvidence)}</p><p>DNS i TLS: ${escapeHtml(publicationPlan.dnsTlsPlan)}</p><p>Kopie zapasowe: ${escapeHtml(publicationPlan.backupPlan)}</p><p>Przekazanie: ${escapeHtml(publicationPlan.deliverables)}</p><p>Odpowiedzialność: ${escapeHtml(publicationPlan.responsibilities)}</p><p>Wsparcie: ${escapeHtml(publicationPlan.supportPlan)}</p><p>Ustalenia z umowy v${escapeHtml(publicationPlan.contractVersion)}</p>`, true)}
+          <div class="detail-section wide"><h3>Potwierdzenie gotowości</h3><p>Nie przepisujesz ponownie danych z umowy. Sprawdź, że domena istnieje i klient kontroluje jej DNS. Potem zamknij publikację i przejdź do przekazania pakietu.</p><form class="form" data-action="prepare_client_handover"><label><input name="confirmContractPlan" type="checkbox" required> Potwierdzam, że domena z umowy istnieje, a klient kontroluje jej DNS.</label><button class="primary">Zamknij publikację i przejdź do przekazania</button></form></div>`;
       } else {
-        body = `<p>Klient zaakceptowa\u0142 t\u0119 wersj\u0119 ${date(data.case.previewAcceptedAt)}. Wybierz jedn\u0105 \u015bcie\u017ck\u0119 publikacji.</p>
-          <form class="form" data-action="approve_production"><h3>Wdro\u017cenie na naszej infrastrukturze</h3><label>Podstawa Twojej zgody na publikacj\u0119<textarea name="evidence" rows="3" minlength="8" maxlength="1000" required></textarea></label><button class="primary">Zatwierd\u017a publikacj\u0119 na naszej infrastrukturze</button></form>
-          <div class="detail-section wide"><h3>Klient publikuje na w\u0142asnym serwerze i domenie</h3><p>Ta \u015bcie\u017cka zamyka etap publikacji jako przygotowany do przekazania. Nie wdra\u017ca aplikacji na serwer klienta. Nie wpisuj hase\u0142, token\u00f3w ani kluczy SSH.</p>
-          <form class="form" data-action="prepare_client_handover">
-            <label>Domena klienta<input name="domain" type="text" placeholder="np. klient.pl" maxlength="253" required></label>
-            <label>Rejestrator lub operator DNS<input name="registrar" type="text" minlength="3" maxlength="200" required></label>
-            <label>Jak zweryfikowano kontrol\u0119 klienta nad domen\u0105? (np. rekord TXT i wynik)<textarea name="verificationEvidence" rows="2" minlength="8" maxlength="500" required></textarea></label>
-            <label>Dostawca serwera / hostingu<input name="hostingProvider" type="text" minlength="3" maxlength="200" required></label>
-            <label>Ustalony serwer i docelowy katalog / spos\u00f3b uruchomienia<textarea name="serverTarget" rows="3" minlength="15" maxlength="1000" required></textarea></label>
-            <label>Plan kopii bezpiecze\u0144stwa i odtworzenia<textarea name="backupPlan" rows="2" minlength="15" maxlength="1000" required></textarea></label>
-            <label>Plan DNS i HTTPS / TLS<textarea name="dnsTlsPlan" rows="2" minlength="15" maxlength="1000" required></textarea></label>
-            <label>Co dok\u0142adnie przeka\u017cemy? Repozytorium, kod, konfiguracj\u0119 bez sekret\u00f3w i instrukcje<textarea name="deliverables" rows="3" minlength="15" maxlength="1500" required></textarea></label>
-            <label>Odpowiedzialno\u015b\u0107 klienta i wykonawcy po przekazaniu<textarea name="responsibilities" rows="2" minlength="15" maxlength="1000" required></textarea></label>
-            <label>Uzgodnione wsparcie, koszty i dalsze aktualizacje<textarea name="supportPlan" rows="2" minlength="15" maxlength="1000" required></textarea></label>
-            <label><input name="domainControlVerified" type="checkbox" required> Potwierdzi\u0142em kontrol\u0119 klienta nad t\u0105 domen\u0105 na podstawie powy\u017cszego dowodu.</label>
-            <label><input name="hostingAccessConfirmed" type="checkbox" required> Uzgodniono dost\u0119p do hostingu albo klient sam wykona wdro\u017cenie; dane dost\u0119powe nie s\u0105 wpisane w panelu.</label>
-            <label><input name="clientConfirmed" type="checkbox" required> Klient potwierdzi\u0142 domen\u0119, hosting, zakres przekazania, odpowiedzialno\u015b\u0107 i wsparcie.</label>
-            <button class="primary">Zamknij publikacj\u0119 i przejd\u017a do przekazania</button>
-          </form></div>`;
+        body = `<p>Podgląd zaakceptowano ${date(data.case.previewAcceptedAt)}. Umowa ${escapeHtml(data.contract.number || "")} v${escapeHtml(publicationPlan.contractVersion)} określa publikację na infrastrukturze Grzywniak.</p>
+          <form class="form" data-action="approve_production"><label>Podstawa zgody na publikację<textarea name="evidence" rows="3" minlength="8" maxlength="1000" required></textarea></label><button class="primary">Zatwierdź publikację na naszej infrastrukturze</button></form>`;
       }
       if (job?.error) body += `<p class="error-text">${escapeHtml(job.error)}</p><form class="form" data-action="retry_job"><input type="hidden" name="kind" value="publish_production"><button class="primary">Pon\u00f3w wdro\u017cenie produkcyjne</button></form>`;
       return section("Publikacja produkcyjna", body, true);

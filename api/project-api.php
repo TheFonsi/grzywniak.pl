@@ -260,6 +260,8 @@ try {
                 projectEvent($id,'feedback','fix_requested',$adminUser,'Sent approved feedback #'.$feedbackId.' to agents with original text, admin priority and annotated screenshots.');
             }
     } elseif($action==='approve_production') {
+        $publicationPlan=projectSignedPublicationPlan($session,$case);
+        if(!$publicationPlan || $publicationPlan['destination']!=='agency') throw new DomainException('Umowa musi potwierdzać publikację na infrastrukturze Grzywniak.');
         if(!empty($case['clientHandoffPreparedAt'])) throw new DomainException('Ta sprawa ma juz przygotowana sciezke przekazania klientowi.');
         $evidence=trim((string)($body['evidence']??''));
         if(mb_strlen($evidence)<8 || mb_strlen($evidence)>1000) throw new DomainException('Zapisz podstawę akceptacji klienta i decyzji produkcyjnej (8–1000 znaków).');
@@ -277,6 +279,9 @@ try {
         projectEvent($id,'release','approved',$adminUser,'Zatwierdzono produkcję dokładnej wersji '.$result['imageDigest'].'. '.$evidence);
     } elseif($action==='prepare_client_handover') {
         if(!empty($case['handoverAt'])) throw new DomainException('Projekt zostal juz przekazany.');
+        $publicationPlan=projectSignedPublicationPlan($session,$case);
+        if(!$publicationPlan || $publicationPlan['destination']!=='client_handoff') throw new DomainException('Aktualna podpisana umowa nie zawiera kompletnej sciezki publikacji klienta.');
+        if(($body['confirmContractPlan']??'')!=='on') throw new DomainException('Potwierdz sprawdzenie domeny i kontroli klienta przed zamknieciem publikacji.');
         $preview=projectLatestPreviewJob($id);
         $result=$preview && $preview['state']==='done'?json_decode((string)$preview['result'],true):null;
         if(!is_array($result) || empty($result['imageDigest'])) throw new DomainException('Brak poprawnego obrazu do przekazania.');
@@ -285,21 +290,14 @@ try {
         if((int)$open->fetchColumn()>0) throw new DomainException('Najpierw rozstrzygnij wszystkie otwarte uwagi klienta.');
         $existing=$db->prepare("SELECT 1 FROM project_jobs WHERE session_id=? AND kind='publish_production'"); $existing->execute([$id]);
         if($existing->fetchColumn() || !empty($case['productionApprovedAt'])) throw new DomainException('Publikacja produkcyjna jest juz zatwierdzona lub zlecona.');
-        $handoff=[];
-        foreach(['domain','registrar','verificationEvidence','hostingProvider','serverTarget','backupPlan','dnsTlsPlan','deliverables','responsibilities','supportPlan'] as $field) {
-            $value=trim((string)($body[$field]??''));
-            if(mb_strlen($value)>($field==='domain'?253:2000)) throw new DomainException('Jedno z pol przekracza dozwolona dlugosc.');
-            $handoff[$field]=$field==='domain'?strtolower($value):$value;
-        }
-        $handoff['domainControlVerified']=($body['domainControlVerified']??'')==='on';
-        $handoff['hostingAccessConfirmed']=($body['hostingAccessConfirmed']??'')==='on';
-        $handoff['clientConfirmed']=($body['clientConfirmed']??'')==='on';
+        $handoff=$publicationPlan;
+        $handoff['domainControlVerified']=true; $handoff['hostingAccessConfirmed']=true; $handoff['clientConfirmed']=true;
         $case['publicationDestination']='client_handoff'; $case['clientHandoff']=$handoff; $case['clientHandoffPreparedAt']=time();
-        if(!projectClientHandoffIsReady($case)) throw new DomainException('Uzupelnij domene, dowod jej kontroli, hosting i dostep, DNS i TLS, kopie bezpieczenstwa, zakres przekazania, odpowiedzialnosc i wsparcie. Nie wpisuj hasel ani kluczy.');
+        if(!projectClientHandoffIsReady($case)) throw new DomainException('Podpisana umowa nie zawiera wszystkich wymaganych ustalen publikacji klienta.');
         projectSave($id,$case);
-        projectEvent($id,'release','client_handoff_prepared',$adminUser,'Etap publikacji zamknieto do przekazania i wdrozenia przez klienta. Domena: '.$handoff['domain'].'; hosting: '.$handoff['hostingProvider'].'.');
+        projectEvent($id,'release','client_handoff_prepared',$adminUser,'Etap publikacji zamknieto na podstawie umowy v'.$publicationPlan['contractVersion'].'. Domena: '.$handoff['domain'].'; hosting: '.$handoff['hostingProvider'].'.');
     } elseif($action==='complete_handover') {
-        if(projectClientHandoffIsReady($case)) {
+        if(projectClientHandoffMatchesSignedContract($session,$case)) {
             $preview=projectLatestPreviewJob($id);
             $result=$preview && $preview['state']==='done'?json_decode((string)$preview['result'],true):null;
             if(!is_array($result) || ($case['previewAcceptedDigest']??'')!==($result['imageDigest']??null)) throw new DomainException('Do przekazania potrzebny jest aktualny, zaakceptowany podglad.');
@@ -312,7 +310,7 @@ try {
         $note=trim((string)($body['note']??''));
         if(mb_strlen($note)<15 || mb_strlen($note)>2000) throw new DomainException('Opisz sposób przekazania i wsparcia (15–2000 znaków).');
         $case['handoverAt']=time(); $case['handoverNote']=$note; $case['handoverDigest']=$result['imageDigest'];
-        if(projectClientHandoffIsReady($case)) $case['clientHandoffCompletedAt']=time();
+        if(projectClientHandoffMatchesSignedContract($session,$case)) $case['clientHandoffCompletedAt']=time();
         projectSave($id,$case);
         projectEvent($id,'handover','completed',$adminUser,'Przekazano wersję '.$result['imageDigest'].'. '.$note);
     } else throw new DomainException('Nieznana operacja.');

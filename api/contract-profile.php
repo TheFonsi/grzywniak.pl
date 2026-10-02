@@ -21,6 +21,14 @@ function contractProviderText(array $profile): string {
 }
 function contractFacts(): array {
     return [
+        'publicationDestination'=>['label'=>'Sposób publikacji produkcyjnej','options'=>[''=>'Wybierz','agency'=>'Publikacja na infrastrukturze i domenie Grzywniak','client_handoff'=>'Przekazanie klientowi do publikacji na jego domenie i serwerze']],
+        'productionDomain'=>['label'=>'Domena produkcyjna klienta (wymagana przy publikacji klienta)'],
+        'domainRegistrar'=>['label'=>'Rejestrator lub operator DNS (opcjonalnie)'],
+        'domainOwnershipTerms'=>['label'=>'Ustalenie o prawie klienta do domeny i jej weryfikacji'],
+        'productionHosting'=>['label'=>"Dostawca hostingu klienta (je\u{015B}li ustalony)"],
+        'serverTarget'=>['label'=>"Serwer i spos\u{00F3}b uruchomienia (je\u{015B}li ustalone)"],
+        'backupResponsibility'=>['label'=>"Odpowiedzialno\u{015B}\u{0107} za kopie zapasowe"],
+        'dnsTlsResponsibility'=>['label'=>"Odpowiedzialno\u{015B}\u{0107} za DNS i HTTPS/TLS"],
         'clientType'=>['label'=>'Status klienta','options'=>[''=>'Wybierz','business'=>'Firma — umowa zawodowa B2B','consumer'=>'Konsument','protected'=>'Przedsiębiorca z ochroną konsumencką']],
         'ipMode'=>['label'=>'Prawa do projektu','options'=>[''=>'Wybierz','transfer'=>'Przeniesienie praw majątkowych','exclusive'=>'Licencja wyłączna','nonexclusive'=>'Licencja niewyłączna']],
         'rightsTerms'=>['label'=>'Moment przejścia praw lub czas, terytorium i zakres licencji'],
@@ -48,7 +56,16 @@ function contractReadFacts(array $body, array $saved = [], ?array $template = nu
 }
 function contractFactsMissing(array $facts): array {
     $missing=[];
-    foreach(contractFacts() as $key=>$field) if($key!=='clientTaxId' && trim((string)($facts[$key]??''))==='') $missing[]=$field['label'];
+    foreach(contractFacts() as $key=>$field) {
+        if(in_array($key,['clientTaxId','domainRegistrar','serverTarget'],true)) continue;
+        if(in_array($key,['domainOwnershipTerms','productionHosting','backupResponsibility','dnsTlsResponsibility'],true) && ($facts['publicationDestination']??'')!=='client_handoff') continue;
+        if(in_array($key,['productionDomain'],true) && ($facts['publicationDestination']??'')!=='client_handoff') continue;
+        if(trim((string)($facts[$key]??''))==='') $missing[]=$field['label'];
+    }
+    if(($facts['publicationDestination']??'')==='client_handoff') {
+        $domain=strtolower(trim((string)($facts['productionDomain']??'')));
+        if($domain!=='' && (strlen($domain)>253 || preg_match('/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$/D',$domain)!==1)) $missing[]='Poprawna domena produkcyjna klienta';
+    }
     return $missing;
 }
 function contractProfileForm(): string {
