@@ -1,5 +1,5 @@
 (() => {
-  const optional = new Set(['clientTaxId', 'paymentDetails']);
+  const optional = new Set(['clientTaxId', 'paymentDetails', 'domainRegistrar', 'serverTarget']);
   const unresolved = value => /\[DO (UZUPEŁNIENIA|UZGODNIENIA):/iu.test(value);
   const read = form => { try { return JSON.parse(form.elements.reviewState.value) || {}; } catch { return {}; } };
   const write = (form, state) => { form.elements.reviewState.value = JSON.stringify(state); };
@@ -37,8 +37,10 @@
     form.dataset.reviewReady='1';
     const summary=document.createElement('p'); summary.dataset.reviewSummary=''; summary.setAttribute('role','status'); form.prepend(summary);
     [...form.querySelectorAll('textarea,input:not([type="hidden"]),select')].forEach(input => {
-      const label=input.closest('label'); if(!label) return;
+      const label=input.closest('label'); if(!label || input.hasAttribute('data-template-selector')) return;
       const card=document.createElement('section'); card.dataset.reviewField=input.name;
+      const state=read(form);
+      if(!state[input.name]) { state[input.name]={value:input.value,accepted:optional.has(input.name)&&!input.value.trim()}; write(form,state); }
       label.before(card); card.append(label);
       const preview=document.createElement('p'); preview.dataset.reviewPreview=''; preview.style.whiteSpace='pre-wrap'; card.append(preview);
       const status=document.createElement('span'); status.dataset.reviewStatus=''; status.setAttribute('role','status'); card.append(status);
@@ -49,10 +51,21 @@
       card.append(accept,edit);
       const change=() => {
         const state=read(form); state[input.name]={value:input.value,accepted:false};
+        for(const [key,visible] of [['consumerDocuments',['consumer','protected'].includes(form.elements.clientType.value)],['dataProcessingTerms',form.elements.dataRole.value==='processor']]) {
+          const label=form.elements.namedItem(key)?.closest('label'); if(label) label.hidden=!visible;
+        }
         if(input.name==='ipMode') {
           const license=form.querySelector('[data-license-terms]'); if(license) license.hidden=!['exclusive','nonexclusive'].includes(input.value);
           for(const key of ['ip','terms']) if(state[key]) state[key].accepted=false;
         }
+        const dependencies = {
+          clientType:['terms'], dataRole:['terms'], rightsTerms:['ip'], signing:['ip'],
+          consumerDocuments:['terms'], dataProcessingTerms:['terms'],
+          publicationDestination:['deploymentTerms'], productionDomain:['deploymentTerms'],
+          productionHosting:['deploymentTerms'], domainOwnershipTerms:['deploymentTerms'],
+          backupResponsibility:['deploymentTerms'], dnsTlsResponsibility:['deploymentTerms']
+        };
+        for(const key of dependencies[input.name] || []) if(state[key]) state[key].accepted=false;
         write(form,state); refresh(form);
       };
       input.addEventListener('input',change); input.addEventListener('change',change);
@@ -73,10 +86,19 @@
     for(const [name,value] of Object.entries({...result.fields,...result.facts})) {
       const input=form.elements.namedItem(name); if(!input || typeof value!=='string') continue;
       // Re-running AI never overwrites an accepted value.
-      if(state[name]?.accepted && state[name].value.trim()===input.value.trim()) continue;
-      input.value=value; state[name]={value,accepted:false};
+      if(!result.replaceTemplate && state[name]?.accepted && state[name].value.trim()===input.value.trim()) continue;
+      input.value=value; state[name]={value,accepted:optional.has(name)&&!value.trim()};
+    }
+    if(result.template) {
+      form.elements.templateId.value=result.template.id;
+      form.elements.templateVersion.value=result.template.version;
+      form.elements.templateRevision.value=result.template.revision;
+      form.querySelector('[data-template-current]').textContent='Aktualny: '+result.template.title;
     }
     const license=form.querySelector('[data-license-terms]'); if(license) license.hidden=!['exclusive','nonexclusive'].includes(form.elements.ipMode.value);
+    for(const [key,visible] of [['consumerDocuments',['consumer','protected'].includes(form.elements.clientType.value)],['dataProcessingTerms',form.elements.dataRole.value==='processor']]) {
+      const label=form.elements.namedItem(key)?.closest('label'); if(label) label.hidden=!visible;
+    }
     write(form,state); refresh(form);
   }
   window.contractReview={init,apply,refresh};

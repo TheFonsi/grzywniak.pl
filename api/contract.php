@@ -23,7 +23,7 @@ if($method==='POST') {
     $body=array_replace($body,$_POST);
     if(!hash_equals(contractToken(),(string)($body['csrf']??''))) contractError(403,'Sesja formularza wygasła. Odśwież panel.');
     // AI only fills the browser form; do not hold a SQLite write lock during HTTP.
-    if(($body['action']??$body['contract_action']??'')!=='ai-fill') sessionDb()->exec('BEGIN IMMEDIATE');
+    if(!in_array($body['action']??$body['contract_action']??'',['ai-fill','apply-template'],true)) sessionDb()->exec('BEGIN IMMEDIATE');
 }
 $action=(string)($body['action']??$body['contract_action']??'');
 if($action==='save-profile') {
@@ -42,7 +42,9 @@ if($action==='save-profile') {
     contractReply(['profileVersion'=>$profile['version']],apiPath('admin.php').'?view=contract-settings&profileSaved=1');
 }
 if($action==='save-template') {
-    $template=contractTemplate();
+    $templateId=(string)($body['templateId']??'legacy');
+    try { $template=$templateId==='legacy'?contractTemplate():contractCatalogTemplate($templateId); }
+    catch(InvalidArgumentException $error) { contractError(422,$error->getMessage()); }
     if((int)($body['expectedVersion']??-1)!==(int)$template['version']) contractError(409,'Wzór został zmieniony. Odśwież ustawienia.');
     foreach(contractFields() as $key=>$label) if($key!=='provider' && array_key_exists($key,contractTemplateDefaults())) { if(!is_string($body[$key]??null)||mb_strlen($body[$key])>20000) contractError(422,'Niepoprawna treść pola: '.$label); $template[$key]=trim($body[$key]); }
     foreach(['defaultTransferTerms','defaultIpPayment'] as $key) {
@@ -50,9 +52,21 @@ if($action==='save-template') {
         $template[$key]=trim($body[$key]);
     }
     $template['version']++; $template['updatedAt']=time();
-    $stmt=sessionDb()->prepare('INSERT INTO contract_templates(id,data) VALUES(1,:data) ON CONFLICT(id) DO UPDATE SET data=excluded.data');
-    $stmt->execute([':data'=>json_encode($template,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR)]);
+    if($templateId==='legacy') {
+        $stmt=sessionDb()->prepare('INSERT INTO contract_templates(id,data) VALUES(1,:data) ON CONFLICT(id) DO UPDATE SET data=excluded.data');
+        $stmt->execute([':data'=>json_encode($template,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR)]);
+    } else {
+        $stmt=sessionDb()->prepare('INSERT INTO contract_template_catalog(id,data) VALUES(:id,:data) ON CONFLICT(id) DO UPDATE SET data=excluded.data');
+        $stmt->execute([':id'=>$templateId, ':data'=>json_encode($template,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR)]);
+    }
     contractReply(['template'=>$template],apiPath('admin.php').'?view=contract-settings&saved=1');
+}
+if($method==='GET' && isset($_GET['templatePreview'])) {
+    $id=(string)$_GET['templatePreview'];
+    try { $pdf=contractPdf(contractSampleContract($id,contractCatalogTemplate($id))); }
+    catch(InvalidArgumentException $error) { contractError(422,$error->getMessage()); }
+    header('Content-Type: application/pdf'); header('Content-Disposition: attachment; filename="wzor-'.$id.'.pdf"');
+    header('Content-Length: '.strlen($pdf)); echo $pdf; exit;
 }
 $id=(string)($_GET['session']??$body['contract_session']??'');
 if(!preg_match('/^[a-f0-9]{32}$/',$id)) contractError(400,'Niepoprawny identyfikator rozmowy.');
@@ -71,24 +85,38 @@ if($method==='GET') {
 }
 if(($s['offer']['status']??'')!=='ACCEPTED') contractError(409,'Najpierw zaakceptuj ofertę.');
 if((int)($body['expectedVersion']??-1)!==(int)($s['contract']['version']??0)) contractError(409,'Umowa została zmieniona. Odśwież panel przed zapisem.');
+$templateId=(string)($body['templateId']??$s['contract']['templateId']??(isset($s['contract'])?'legacy':contractSelectTemplate($s['offer'])['id']));
+try { $activeTemplate=$templateId==='legacy'?contractTemplate():contractCatalogTemplate($templateId); }
+catch(InvalidArgumentException $error) { contractError(422,$error->getMessage()); }
+if($action==='apply-template') {
+    try {
+        $template=contractCatalogTemplate((string)($body['requestedTemplateId']??''));
+        $facts=contractReadFacts($body,$s['contract']['facts']??[],$template);
+        echo json_encode(['fields'=>contractTemplateProposal($template,$facts),'facts'=>[], 'replaceTemplate'=>true,'template'=>['id'=>$template['id'],'title'=>$template['title'],'revision'=>$template['revision'],'version'=>$template['version']], 'missing'=>contractFactsMissing($facts)],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR); exit;
+    } catch(InvalidArgumentException $error) { contractError(422,$error->getMessage()); }
+}
 if($action==='ai-fill') {
     $profile=contractProfile();
     if(!isset($s['contract']) && (int)($body['profileVersion']??-1)!==(int)$profile['version']) contractError(409,'Dane wykonawcy zmieniły się. Odśwież formularz, aby pobrać aktualne dane.');
     try {
-        $facts=contractReadFacts($body,$s['contract']['facts']??[],contractTemplate()); $draft=[];
+        $facts=contractReadFacts($body,$s['contract']['facts']??[],$activeTemplate); $draft=[];
         foreach(contractFields() as $key=>$label) { if(!is_string($body[$key]??null)||mb_strlen($body[$key])>20000) throw new InvalidArgumentException('Niepoprawne pole: '.$label); $draft[$key]=$body[$key]; }
-        $template=contractTemplate();
+        $template=$activeTemplate;
         $review=contractReviewState($body['reviewState']??null,$draft,$facts,$s['contract']['review']??[]);
         $accepted=[]; foreach($review as $key=>$entry) if($entry['accepted']) $accepted[$key]=$entry['value'];
         session_write_close();
         $result=contractAiDraft($s['offer'],$draft,$facts,$template,$accepted);
+        // The model fills project particulars; legal clauses are controlled by the
+        // selected template or manual edits, never replaced by generated boilerplate.
+        $standard=contractTemplateProposal($template,$facts);
+        foreach(contractTemplateFields() as $key) $result['fields'][$key]=trim($draft[$key])!==''?$draft[$key]:$standard[$key];
         // Factual identifiers never originate from model guesses. Existing commercial
         // terms are copied exactly; only absent negotiable terms can be proposed.
         foreach(['provider','party'] as $key) $result['fields'][$key]=trim($draft[$key])!==''?$draft[$key]:'[DO UZUPEŁNIENIA: '.contractFields()[$key].']';
         $result['fields']['paymentDetails']=trim($draft['paymentDetails'])!==''?$draft['paymentDetails']:'Płatność przelewem na rachunek wskazany na fakturze.';
         foreach(['price','deposit','deadline'] as $key) if(trim($draft[$key])!=='') $result['fields'][$key]=$draft[$key];
         if(trim($draft['price'])==='') $result['fields']['price']='[DO UZUPEŁNIENIA: wynagrodzenie zgodne z ofertą]';
-        foreach(['clientAddress','clientTaxId','clientRepresentative','clientType','dataRole','publicationDestination','productionDomain','domainRegistrar','domainOwnershipTerms','productionHosting','serverTarget','backupResponsibility','dnsTlsResponsibility'] as $key) $result['facts'][$key]=$facts[$key];
+        foreach(['clientAddress','clientTaxId','clientRepresentative','clientType','dataRole','publicationDestination','productionDomain','domainRegistrar','domainOwnershipTerms','productionHosting','serverTarget','backupResponsibility','dnsTlsResponsibility','consumerDocuments','dataProcessingTerms','ipMode','signing','contractDate'] as $key) $result['facts'][$key]=$facts[$key];
         foreach($facts as $key=>$value) if($value!=='' && !($key==='rightsTerms'&&$facts['ipMode']==='')) $result['facts'][$key]=$value;
         $result['facts']=contractReadFacts($result['facts'],$s['contract']['facts']??[],$template);
         foreach($accepted as $key=>$value) { if(array_key_exists($key,$result['fields'])) $result['fields'][$key]=$value; elseif(array_key_exists($key,$result['facts'])) $result['facts'][$key]=$value; }
@@ -105,12 +133,15 @@ if(in_array($action,['save','generate'],true)) {
         if((int)($body['profileVersion']??0)!==(int)$profile['version']) contractError(409,'Dane wykonawcy zmieniły się. Odśwież formularz przed zapisem.');
         if($action==='generate' && contractProfileMissing($profile)) contractError(422,'Najpierw uzupełnij „Moje dane do umów” w ustawieniach.');
     }
-    try { $facts=contractReadFacts($body,$s['contract']['facts']??[],contractTemplate()); } catch(InvalidArgumentException $error) { contractError(422,$error->getMessage()); }
+    try { $facts=contractReadFacts($body,$s['contract']['facts']??[],$activeTemplate); } catch(InvalidArgumentException $error) { contractError(422,$error->getMessage()); }
     $c=[];
     foreach(contractFields() as $key=>$label) { if(!is_string($body[$key]??null)||mb_strlen($body[$key])>20000) contractError(422,'Niepoprawna treść pola: '.$label); $c[$key]=trim($body[$key]); }
     try { $review=contractReviewState($body['reviewState']??null,$c,$facts,$s['contract']['review']??[]); } catch(InvalidArgumentException $error) { contractError(422,$error->getMessage()); }
     if($action==='generate') foreach(['provider','party','scope','price','deadline','ip'] as $key) if($c[$key]==='') contractError(422,'Uzupełnij: '.contractFields()[$key]);
     if($action==='generate') {
+        if($templateId!=='legacy') foreach(contractRequiredReview($c,$facts) as $key) {
+            if(!isset($review[$key])) $review[$key]=['value'=>(string)($c[$key]??$facts[$key]??''),'accepted'=>false];
+        }
         $pending=contractPendingReview($review);
         if($pending) contractError(422,'Zaakceptuj lub zmień propozycje przed PDF: '.implode(', ',$pending));
         $missing=contractFactsMissing($facts);
@@ -119,6 +150,13 @@ if(in_array($action,['save','generate'],true)) {
     }
     $c+=['number'=>$s['contract']['number']??'UM-'.date('Y').'-'.strtoupper(substr(hash('sha256',$id),0,8)), 'version'=>(int)($s['contract']['version']??0)+1, 'createdAt'=>time(), 'templateVersion'=>(int)($s['contract']['templateVersion']??$body['templateVersion']??0), 'offerVersion'=>(int)($s['offer']['version']??1), 'status'=>'DRAFT'];
     $c['facts']=$facts;
+    $sameTemplate=isset($s['contract']) && ($s['contract']['templateId']??'legacy')===$templateId && (int)($body['templateVersion']??$s['contract']['templateVersion']??0)===(int)($s['contract']['templateVersion']??0) && (int)($body['templateRevision']??$s['contract']['templateRevision']??0)===(int)($s['contract']['templateRevision']??0);
+    if(!$sameTemplate && ((int)($body['templateVersion']??0)!==(int)$activeTemplate['version'] || (isset($body['templateRevision']) && (int)$body['templateRevision']!==(int)($activeTemplate['revision']??0)))) contractError(409,'Wybrany wzór zmienił się. Wczytaj go ponownie przed zapisem.');
+    $c['templateId']=$templateId;
+    $c['templateName']=$sameTemplate?($s['contract']['templateName']??'Umowa o realizację projektu cyfrowego'):($activeTemplate['title']??'Umowa o realizację projektu cyfrowego');
+    $c['templateRevision']=$sameTemplate?($s['contract']['templateRevision']??0):($activeTemplate['revision']??0);
+    $c['templateVersion']=$sameTemplate?($s['contract']['templateVersion']??0):$activeTemplate['version'];
+    $c['templateSnapshot']=$sameTemplate?($s['contract']['templateSnapshot']??[]):array_intersect_key($activeTemplate,array_flip(contractTemplateFields()));
     $c['review']=$review;
     $c['profileVersion']=(int)($s['contract']['profileVersion']??$body['profileVersion']??0);
     if($action==='generate') $c['pdfBase64']=base64_encode(contractPdf($c));

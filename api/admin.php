@@ -59,15 +59,16 @@ register_shutdown_function(static function(): void {
     if (!form.matches('.contract-form,.contract-send')) return;
     event.preventDefault();
     if (form.dataset.saving) return;
+    if(event.submitter?.value==='apply-template' && !confirm('Wczytać wybrany wzór? Zastąpi to klauzule prawne i cofnie ich akceptację. Dane stron, zakres, cena i terminy zostaną zachowane.')) return;
     form.dataset.saving = '1';
     const data = Object.fromEntries(new FormData(form));
     if (event.submitter?.name) data[event.submitter.name] = event.submitter.value;
     const buttons = [...form.querySelectorAll('button')]; buttons.forEach(button => button.disabled = true);
     let feedback = form.querySelector('[role="alert"]');
     if (!feedback) { feedback = document.createElement('p'); feedback.setAttribute('role','alert'); form.append(feedback); }
-    const aiFill = data.contract_action === 'ai-fill';
+    const aiFill = ['ai-fill','apply-template'].includes(data.contract_action);
     const previous = aiFill ? Object.fromEntries([...form.querySelectorAll('textarea,input,select')].map(input => [input.name,input.value])) : null;
-    feedback.textContent = aiFill ? 'AI przygotowuje projekt umowy. Może to potrwać około minuty…' : 'Zapisywanie…';
+    feedback.textContent = data.contract_action==='apply-template' ? 'Wczytywanie wzoru…' : aiFill ? 'AI uzupełnia dane projektu. Może to potrwać około minuty…' : 'Zapisywanie…';
     try {
       const response = await fetch('/api/contract.php', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
       const result = await response.json();
@@ -78,13 +79,13 @@ register_shutdown_function(static function(): void {
         window.contractReview.apply(form, result);
         form.querySelector('[name=publicationDestination]')?.dispatchEvent(new Event('change', {bubbles:true}));
         const notes = form.querySelector('[data-ai-feedback]'); notes.replaceChildren();
-        const title = document.createElement('p'); title.textContent = 'AI przygotowało propozycje. Przy każdym polu wybierz Akceptuj lub Zmień. Brakujące dane faktyczne uzupełnij ręcznie.'; notes.append(title);
+        const title = document.createElement('p'); title.textContent = result.replaceTemplate ? 'Wczytano wzór. Sprawdź i zaakceptuj klauzule; dokument nie został jeszcze zapisany.' : 'Uzupełniono dane projektu, zachowując klauzule wzoru. Sprawdź propozycje i uzupełnij brakujące dane.'; notes.append(title);
         if (result.missing?.length) { const list = document.createElement('ul'); for (const text of result.missing) { const item=document.createElement('li'); item.textContent=text; list.append(item); } notes.append(list); }
         feedback.textContent = 'Formularz uzupełniony. Dane nie zostały jeszcze zapisane.';
         buttons.forEach(button => button.disabled=false); delete form.dataset.saving; window.contractReview.refresh(form); return;
       }
       if (data.action === 'save-profile') location.href = '?view=contract-settings&profileSaved=1';
-      else if (data.action === 'save-template') location.href = '?view=contract-settings&saved=1';
+      else if (data.action === 'save-template') location.href = '?view=contract-settings&saved=1&template=' + encodeURIComponent(data.templateId || 'legacy');
       else location.href = '?view=all&session=' + encodeURIComponent(data.contract_session) + '&saved=1#contract-panel';
     } catch(error) { feedback.textContent = error.message || 'Nie udało się połączyć z serwerem.'; buttons.forEach(button => button.disabled = false); delete form.dataset.saving; if(form.elements.reviewState) window.contractReview.refresh(form); }
   });
@@ -720,16 +721,7 @@ HTML;
     $html = str_replace('</nav>', '<a'.($contractSettingsActive ? ' class="active" aria-current="page"' : '').' href="?view=contract-settings">Ustawienia wzorów umów</a></nav>', $html);
     $html = str_replace('<nav class="nav">', $analyticsHtml.'<nav class="nav">', $html);
     if (($_GET['view'] ?? '') === 'contract-settings') {
-        $template = contractTemplate();
-        $settings = '<section class="panel"><h2>Ustawienia wzorów umów</h2><p class="muted">Baza do przygotowania umów aplikacji i stron. Wersja '.(int)$template['version'].'. Zmiany dotyczą nowych projektów umów; zapisane dokumenty zachowują swoją treść. Treść startowa wymaga uzupełnienia i oceny prawnej dla konkretnej transakcji.</p><form class="contract-form" method="post" action="/api/contract.php"><input type="hidden" name="action" value="save-template"><input type="hidden" name="csrf" value="'.contractEscape(contractToken()).'"><input type="hidden" name="expectedVersion" value="'.(int)$template['version'].'">';
-        foreach (contractFields() as $key=>$label) {
-            if ($key==='provider' || !array_key_exists($key, contractTemplateDefaults())) continue;
-            $settings .= '<label>'.contractEscape($label).'<textarea rows="5" maxlength="20000" name="'.$key.'">'.contractEscape($template[$key]).'</textarea></label>';
-        }
-        foreach (['defaultTransferTerms'=>'Domyślny moment przeniesienia praw', 'defaultIpPayment'=>'Domyślne wynagrodzenie za prawa IP — w cenie oferty'] as $key=>$label) {
-            $settings .= '<label>'.contractEscape($label).'<textarea rows="3" maxlength="2000" required name="'.$key.'">'.contractEscape($template[$key]).'</textarea></label>';
-        }
-        $settings .= (isset($_GET['saved']) ? '<p role="status">Wzór został zapisany.</p>' : '').'<button class="button">Zapisz wzór</button></form></section>';
+        $settings=contractCatalogSettings();
         $html = preg_replace('~<div class="layout">.*</main>~s', contractProfileForm().$settings.'</main>', $html);
     }
     $html = str_replace('</head>', '<style>.conversation-contract{margin:22px 0;padding:18px;border:1px solid #5368c7;border-radius:12px;background:#111831}.contract-form{display:grid;gap:14px;margin-top:16px}.contract-form label{display:grid;gap:6px}.contract-form textarea,.contract-form input:not([type="hidden"]),.contract-form select{box-sizing:border-box;width:100%;min-width:0;background:#0d1220;color:#e1e7fa;border:1px solid #465474;border-radius:7px;padding:10px;font:inherit;resize:vertical}.conversation-contract details{margin-top:12px}.conversation-contract summary{cursor:pointer}.contract-form button{margin-top:6px}</style></head>', $html);

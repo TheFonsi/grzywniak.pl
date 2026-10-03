@@ -37,4 +37,5 @@ $RECYCLE.BIN/
 # Runtime-only AI discovery sessions (contain client conversation data)
 /api/storage/
 /services/vps-control/data/
+/output/pdf/
 .local-dev.pids.json

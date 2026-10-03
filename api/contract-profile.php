@@ -16,7 +16,8 @@ function contractProfileMissing(array $profile): array {
 }
 function contractProviderText(array $profile): string {
     $lines=[];
-    foreach(['legalName','address','taxId','representative','email','phone','complaintsAddress'] as $key) if(!empty($profile[$key])) $lines[]=contractProfileFields()[$key].': '.$profile[$key];
+    $labels=['legalName'=>'Nazwa','address'=>'Adres','taxId'=>'NIP','representative'=>'Reprezentacja','email'=>'E-mail','phone'=>'Telefon','complaintsAddress'=>'Adres reklamacji'];
+    foreach($labels as $key=>$label) if(!empty($profile[$key])) $lines[]=$label.': '.$profile[$key];
     return implode("\n",$lines);
 }
 function contractFacts(): array {
@@ -39,6 +40,8 @@ function contractFacts(): array {
         'clientTaxId'=>['label'=>'NIP / identyfikator i rejestr klienta (jeśli dotyczy)'],
         'clientRepresentative'=>['label'=>'Osoba podpisująca po stronie klienta / podstawa umocowania'],
         'contractDate'=>['label'=>'Planowana data zawarcia umowy (RRRR-MM-DD)'],
+        'consumerDocuments'=>['label'=>'Załączniki konsumenckie — informacje przedumowne, pouczenie i formularz odstąpienia'],
+        'dataProcessingTerms'=>['label'=>'Załącznik powierzenia danych — identyfikator, zakres i uzgodniona wersja'],
     ];
 }
 function contractReadFacts(array $body, array $saved = [], ?array $template = null): array {
@@ -57,6 +60,8 @@ function contractReadFacts(array $body, array $saved = [], ?array $template = nu
 function contractFactsMissing(array $facts): array {
     $missing=[];
     foreach(contractFacts() as $key=>$field) {
+        if($key==='consumerDocuments' && !in_array($facts['clientType']??'',['consumer','protected'],true)) continue;
+        if($key==='dataProcessingTerms' && ($facts['dataRole']??'')!=='processor') continue;
         if(in_array($key,['clientTaxId','domainRegistrar','serverTarget'],true)) continue;
         if(in_array($key,['domainOwnershipTerms','productionHosting','backupResponsibility','dnsTlsResponsibility'],true) && ($facts['publicationDestination']??'')!=='client_handoff') continue;
         if(in_array($key,['productionDomain'],true) && ($facts['publicationDestination']??'')!=='client_handoff') continue;

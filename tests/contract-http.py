@@ -17,9 +17,14 @@ log=open(work/'server.log','w')
 server=subprocess.Popen(['php','-S',f'127.0.0.1:{port}','-t',str(work)],cwd=work,env=env,stdout=log,stderr=log)
 opener=urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
 auth='Basic '+base64.b64encode(b'contract-test:test-password').decode()
+review_keys=[]
 def request(path,body=None,authorized=True):
     headers={'Authorization':auth} if authorized else {}
-    if body is not None:headers['Content-Type']='application/json'
+    if body is not None:
+        headers['Content-Type']='application/json'
+        if body.get('action')=='generate' and 'reviewState' not in body:
+            # Emulate explicit admin acceptance; the endpoint rejects unreviewed clauses.
+            body=dict(body,reviewState=json.dumps({key:{'value':body.get(key,''),'accepted':True} for key in review_keys}))
     req=urllib.request.Request(f'http://127.0.0.1:{port}'+path,data=json.dumps(body).encode() if body is not None else None,headers=headers)
     try:
         with opener.open(req) as r:return r.status,r.read()
@@ -43,12 +48,14 @@ try:
     (work/'contract-editor.html').write_bytes(html)
     assert b'VAT 8%' in html
     fields=re.findall(rb'<textarea name="([^"]+)"',html)
+    review_keys=[key.decode() for key in re.findall(rb'<(?:textarea|input|select)[^>]*name="([^"]+)"',html)]
     body={k.decode():'Example text' for k in fields}
     body.update(csrf=token,contract_session=sid,expectedVersion=0,templateVersion=0,profileVersion=1,action='generate',clientType='business',ipMode='transfer',signing='qualified',dataRole='none',clientAddress='Testowa 2, Warszawa',clientTaxId='',clientRepresentative='Jan Test',contractDate='2026-09-15',publicationDestination='agency')
     assert b'name="ipPayment"' not in html and b'data-license-terms hidden' in html
     assert request('/api/contract.php',dict(body,ipMode='exclusive',rightsTerms=''))[0]==422
     code,data=request('/api/contract.php',dict(body,action='ai-fill'));assert code==200,(code,data)
     ai=json.loads(data);assert 'scope' in ai['fields'] and ai['fields']['price']==body['price'] and ai['fields']['provider']==body['provider'] and ai['facts']['clientAddress']==body['clientAddress']
+    assert all(ai['fields'][k]==body[k] for k in ['terms','ip','acceptance','deploymentTerms','support','extras','exclusions']), 'AI must retain unaccepted manual legal clauses too'
     assert ai['facts']['publicationDestination']=='agency' and ai['facts']['productionDomain']==''
     assert json.loads(request('/api/contract.php?session='+sid)[1])['contract'] is None, 'AI must not persist or send'
     assert request('/api/contract.php',dict(body,clientType='invented',action='ai-fill'))[0]==422
@@ -109,6 +116,30 @@ try:
     assert code==200,(code,data)
     assert json.loads(data)['facts']['clientAddress']=='', 'Never invent an address'
     subprocess.run(['node','--check',str(root/'api'/'contract-review.js')],check=True)
+    assert request('/api/contract.php?templatePreview=website',authorized=False)[0]==401
+    assert request('/api/contract.php?templatePreview=unknown')[0]==422
+    assert request('/api/contract.php?templatePreview=ecommerce')[1].startswith(b'%PDF-1.4')
+    assert request('/api/contract.php',dict(body,action='save',expectedVersion=5,templateId='unknown'))[0]==422
+    assert request('/api/contract.php',dict(body,action='generate',expectedVersion=5,reviewState='{}'))[0]==422, 'Every catalog contract must be manually reviewed'
+    code,data=request('/api/contract.php',dict(body,action='apply-template',expectedVersion=5,requestedTemplateId='ecommerce'))
+    assert code==200,(code,data)
+    applied=json.loads(data)
+    assert applied['replaceTemplate'] is True and applied['template']['id']=='ecommerce'
+    assert 'price' not in applied['fields'] and applied['facts']==[], 'Applying a template must not change factual/commercial particulars'
+    assert json.loads(request('/api/contract.php?session='+sid)[1])['contract']['version']==5, 'Applying a template must only fill the form'
+    changed=dict(body,**applied['fields'],action='save',expectedVersion=5,templateId='ecommerce',templateRevision=1,templateVersion=0)
+    code,data=request('/api/contract.php',changed); assert code==200,(code,data)
+    saved=json.loads(data)['contract']
+    assert saved['templateId']=='ecommerce' and saved['templateRevision']==1 and saved['templateSnapshot']['ip']==applied['fields']['ip']
+    old_snapshot=saved['templateSnapshot']
+    catalog_update=dict(applied['fields'],defaultTransferTerms='Payment first',defaultIpPayment='Included',action='save-template',templateId='ecommerce',csrf=token,expectedVersion=0)
+    code,data=request('/api/contract.php',catalog_update);assert code==200,(code,data)
+    assert json.loads(data)['template']['version']==1
+    assert request('/api/contract.php',catalog_update)[0]==409
+    code,data=request('/api/contract.php',dict(changed,expectedVersion=6));assert code==200,(code,data)
+    assert json.loads(data)['contract']['templateVersion']==0 and json.loads(data)['contract']['templateSnapshot']==old_snapshot, 'Library edits must not rewrite a saved contract snapshot'
+    assert request('/api/contract.php',dict(changed,expectedVersion=7,action='generate',clientType='protected',consumerDocuments='',reviewState='{}'))[0]==422
+    assert request('/api/contract.php',dict(changed,expectedVersion=7,action='generate',dataRole='processor',dataProcessingTerms='',reviewState='{}'))[0]==422
     print('HTTP checks passed: profile, AI fill (mock), protected fields, no AI persistence, required facts, markers, snapshots, auth, CSRF, PDF, version conflict, mock send, history, templates, admin JavaScript.')
 finally:
     server.terminate();server.wait(timeout=10);log.close()

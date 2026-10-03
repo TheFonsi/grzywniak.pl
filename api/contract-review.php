@@ -9,6 +9,9 @@ function contractReviewState(mixed $raw, array $fields, array $facts, array $pre
     if($raw!==null && !is_array($raw)) throw new InvalidArgumentException('Niepoprawny stan akceptacji umowy.');
     $submitted=$raw??[]; $review=[];
     foreach(array_replace($previous,$submitted) as $key=>$entry) {
+        if(in_array($key,['productionDomain','domainRegistrar','domainOwnershipTerms','productionHosting','serverTarget','backupResponsibility','dnsTlsResponsibility'],true) && ($facts['publicationDestination']??'')!=='client_handoff') continue;
+        if($key==='consumerDocuments' && !in_array($facts['clientType']??'',['consumer','protected'],true)) continue;
+        if($key==='dataProcessingTerms' && ($facts['dataRole']??'')!=='processor') continue;
         if(!array_key_exists($key,contractFields())&&!array_key_exists($key,contractFacts())) continue;
         if($key==='ipPayment'||($key==='rightsTerms'&&($facts['ipMode']??'')!=='exclusive'&&($facts['ipMode']??'')!=='nonexclusive')) continue;
         if(!is_array($entry)||!is_string($entry['value']??null)) throw new InvalidArgumentException('Niepoprawny stan pola umowy.');
@@ -17,6 +20,19 @@ function contractReviewState(mixed $raw, array $fields, array $facts, array $pre
         $review[$key]=['value'=>$value,'accepted'=>$accepted];
     }
     return $review;
+}
+function contractRequiredReview(array $fields,array $facts): array {
+    $required=array_keys($fields);
+    if(trim($fields['paymentDetails']??'')==='') $required=array_values(array_diff($required,['paymentDetails']));
+    foreach(contractFacts() as $key=>$field) {
+        if($key==='ipPayment' || ($key==='rightsTerms' && ($facts['ipMode']??'')==='transfer')) continue;
+        if(in_array($key,['clientTaxId','domainRegistrar','serverTarget'],true) && trim($facts[$key]??'')==='') continue;
+        if(in_array($key,['productionDomain','domainRegistrar','domainOwnershipTerms','productionHosting','serverTarget','backupResponsibility','dnsTlsResponsibility'],true) && ($facts['publicationDestination']??'')!=='client_handoff') continue;
+        if($key==='consumerDocuments' && !in_array($facts['clientType']??'',['consumer','protected'],true)) continue;
+        if($key==='dataProcessingTerms' && ($facts['dataRole']??'')!=='processor') continue;
+        $required[]=$key;
+    }
+    return $required;
 }
 function contractPendingReview(array $review): array {
     $pending=[];
