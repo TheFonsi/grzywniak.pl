@@ -3,6 +3,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/bootstrap.php';
 require_once __DIR__ . '/internal-analysis.php';
 require_once __DIR__ . '/offer-changes.php';
+require_once __DIR__ . '/offer-readiness.php';
 
 $user = getenv('ADMIN_USERNAME') ?: '';
 $pass = getenv('ADMIN_PASSWORD') ?: '';
@@ -172,10 +173,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (in_array($action, ['generate', 'review', 'send', 'confirmChange'], true)) {
         if (!$analysisReady) { http_response_code(409); echo json_encode(['message' => 'Analiza nie jest ukończona. Kliknij „Przeanalizuj brief od nowa” i poczekaj na zakończenie.']); exit; }
         if (($session['internalAnalysis']['readiness'] ?? '') === 'NOT_A_FIT') { http_response_code(409); echo json_encode(['message' => 'Analiza oznacza projekt jako poza zakresem usług. Po potwierdzeniu ustaleń ponów analizę przed przygotowaniem oferty.']); exit; }
-        foreach (($session['internalAnalysis']['missingInformation'] ?? []) as $question) {
-            $decision = $session['adminDecisions'][trim($question)] ?? $session['adminDecisions'][$question] ?? [];
-            if (($decision['source'] ?? '') !== 'HUMAN' || trim((string) ($decision['answer'] ?? '')) === '') { http_response_code(409); echo json_encode(['message' => 'Brakuje zapisanej akceptacji odpowiedzi: ' . trim($question) . '. Zatwierdź ją w analizie i spróbuj ponownie.']); exit; }
-        }
+        if (!missingInformationManuallyConfirmed($session)) { http_response_code(409); echo json_encode(['message' => 'Brakuje ręcznie zatwierdzonej odpowiedzi na co najmniej jedno pytanie analizy. Otwórz analizę, zapisz odpowiedź administratora i spróbuj ponownie.'], JSON_UNESCAPED_UNICODE); exit; }
     }
     if ($action !== 'generate' && ($session['offer']['status'] ?? '') === 'OUTDATED') { http_response_code(409); echo json_encode(['message' => 'Oferta jest nieaktualna. Przygotuj nową wersję z aktualnej analizy.']); exit; }
 }
@@ -214,8 +212,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($body['action'] ?? '') === 'confir
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($body['action'] ?? '') === 'review') {
     $offer = is_array($session['offer'] ?? null) ? $session['offer'] : null;
     if ($offer === null) { http_response_code(404); echo json_encode(['message' => 'Najpierw przygotuj ofertę.']); exit; }
-    $missing = is_array($session['internalAnalysis']['missingInformation'] ?? null) ? $session['internalAnalysis']['missingInformation'] : [];
-    foreach ($missing as $question) if (!is_array($session['adminDecisions'][$question] ?? null) || ($session['adminDecisions'][$question]['source'] ?? '') !== 'HUMAN') { http_response_code(409); echo json_encode(['message' => 'Najpierw ręcznie potwierdź wszystkie brakujące informacje.'], JSON_UNESCAPED_UNICODE); exit; }
+    if (!missingInformationManuallyConfirmed($session)) { http_response_code(409); echo json_encode(['message' => 'Brakuje ręcznie zatwierdzonej odpowiedzi na co najmniej jedno pytanie analizy. Otwórz analizę, zapisz odpowiedź administratora i spróbuj ponownie.'], JSON_UNESCAPED_UNICODE); exit; }
     $offer['status'] = 'REVIEWED';
     $offer['reviewedAt'] = time();
     $offer['verification'] = 'HUMAN_REVIEWED';

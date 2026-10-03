@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require_once __DIR__.'/project-model.php';
 require_once __DIR__.'/project-settings-model.php';
+require_once __DIR__.'/project-assets-lib.php';
 require_once __DIR__.'/project-provision.php';
 
 function projectRunnerConfig(): array {
@@ -147,7 +148,15 @@ function projectDispatchAgentTask(): bool {
             $dependencyRow=$dependencyStmt->fetch(PDO::FETCH_ASSOC);
             if($dependencyRow) $dependencyResults[]=['taskId'=>$dependency,'title'=>$dependencyRow['title'],'role'=>$dependencyRow['role'],'result'=>json_decode((string)$dependencyRow['result'],true)?:[]];
         }
-        $body=['id'=>$key,'projectId'=>$id,'taskId'=>$selected['task_key'],'role'=>$selected['role'],'title'=>$selected['title'],'dependencies'=>json_decode((string)$selected['dependencies'],true)?:[],'dependencyResults'=>$dependencyResults,'acceptance'=>json_decode((string)$selected['acceptance'],true)?:[],'repository'=>$repo['url'],'approvedScope'=>$case['scope']??'','maxCostPln'=>$reserve,'timeoutMinutes'=>(int)projectSetting('AGENT_TASK_TIMEOUT_MIN')];
+        $acceptance=json_decode((string)$selected['acceptance'],true)?:[];
+        if(in_array((string)$selected['role'],['ux','ui','frontend','backend','integration'],true)) {
+            $assetsStmt=$db->prepare("SELECT * FROM project_assets WHERE session_id=? AND status='approved' ORDER BY id"); $assetsStmt->execute([$id]); $approvedAssets=$assetsStmt->fetchAll(PDO::FETCH_ASSOC);
+            if($approvedAssets) {
+                $materialList=array_map(static fn($asset)=>['name'=>$asset['filename'],'category'=>$asset['category'],'sourceNote'=>$asset['source_note'],'sha256'=>$asset['sha256'],'downloadUrl'=>projectAssetSignedUrl($id,$asset)],$approvedAssets);
+                $acceptance[]='Zatwierdzone materiały klienta (pobierz wyłącznie te pliki, nie zgaduj brakujących assetów): '.json_encode($materialList,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES|JSON_THROW_ON_ERROR);
+            }
+        }
+        $body=['id'=>$key,'projectId'=>$id,'taskId'=>$selected['task_key'],'role'=>$selected['role'],'title'=>$selected['title'],'dependencies'=>json_decode((string)$selected['dependencies'],true)?:[],'dependencyResults'=>$dependencyResults,'acceptance'=>$acceptance,'repository'=>$repo['url'],'approvedScope'=>$case['scope']??'','maxCostPln'=>$reserve,'timeoutMinutes'=>(int)projectSetting('AGENT_TASK_TIMEOUT_MIN')];
         $response=workerRequest('POST',$url.'/v1/tasks',$body,['Authorization: Bearer '.$token,'Idempotency-Key: '.$key,'Content-Type: application/json','Accept: application/json']);
         if(!in_array($response['status'],[200,201,202],true) || ($response['body']['id']??'')!==$key) throw new RuntimeException('Runner nie potwierdził identyfikatora zadania.');
         if(!empty(projectCase($id)['closedAt'])) {

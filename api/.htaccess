@@ -1,4 +1,8 @@
 Options -Indexes
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^storage(?:/|$) - [F,L,NC]
+</IfModule>
 <FilesMatch "^\.env($|\.)">
   Require all denied
 </FilesMatch>

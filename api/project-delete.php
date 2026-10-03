@@ -24,10 +24,15 @@ function deleteProjectSession(string $id): bool {
         if(!$found) { $db->exec('ROLLBACK'); return false; }
         $db->prepare("DELETE FROM project_templates WHERE source_session=? AND status='proposed'")->execute([$id]);
         $db->prepare("UPDATE project_templates SET source_session=NULL WHERE source_session=? AND status='active'")->execute([$id]);
+        $assetStmt=$db->prepare('SELECT asset_key FROM project_assets WHERE session_id=?'); $assetStmt->execute([$id]); $assetKeys=$assetStmt->fetchAll(PDO::FETCH_COLUMN);
+        $db->prepare('DELETE FROM project_assets WHERE session_id=?')->execute([$id]);
         foreach(['project_jobs','project_events','project_cases'] as $table) $db->prepare('DELETE FROM '.$table.' WHERE session_id=?')->execute([$id]);
         $db->prepare('DELETE FROM sessions WHERE id=?')->execute([$id]);
         if(is_file($file) && !unlink($file)) throw new RuntimeException('Nie udało się usunąć starego pliku rozmowy.');
         $db->exec('COMMIT');
+        $assetDir=$directory.'/project-assets/'.$id;
+        foreach($assetKeys as $assetKey) if(preg_match('/^[a-f0-9]{48}$/',(string)$assetKey)) { $assetPath=$assetDir.'/'.$assetKey.'.bin'; if(is_file($assetPath)) @unlink($assetPath); }
+        if(is_dir($assetDir)) @rmdir($assetDir);
         return true;
     } catch(Throwable $error) { if($db->inTransaction()) $db->exec('ROLLBACK'); throw $error; }
     finally { flock($lock,LOCK_UN); fclose($lock); }

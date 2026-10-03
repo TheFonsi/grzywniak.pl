@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/bootstrap.php';
+require_once __DIR__ . '/offer-readiness.php';
 
 function projectDb(): PDO {
     $db = sessionDb();
@@ -19,6 +20,7 @@ function projectDb(): PDO {
     $db->exec("INSERT OR IGNORE INTO project_agent_costs(runner_id,session_id,task_key,amount_pln,incurred_at) SELECT 'legacy:'||id,session_id,task_key,spent_pln,updated_at FROM project_agent_tasks t WHERE spent_pln>0 AND NOT EXISTS (SELECT 1 FROM project_agent_costs c WHERE c.session_id=t.session_id AND c.task_key=t.task_key)");
     $db->exec('CREATE TABLE IF NOT EXISTS project_feedback (id INTEGER PRIMARY KEY AUTOINCREMENT, session_id TEXT NOT NULL, image_digest TEXT NOT NULL, message TEXT NOT NULL, page_url TEXT NOT NULL, state TEXT NOT NULL DEFAULT \'new\', created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)');
     $db->exec('CREATE TABLE IF NOT EXISTS project_feedback_closures (session_id TEXT NOT NULL, image_digest TEXT NOT NULL, closed_at INTEGER NOT NULL, PRIMARY KEY(session_id,image_digest))');
+    $db->exec("CREATE TABLE IF NOT EXISTS project_assets (id INTEGER PRIMARY KEY AUTOINCREMENT, session_id TEXT NOT NULL, asset_key TEXT NOT NULL UNIQUE, category TEXT NOT NULL, filename TEXT NOT NULL, mime TEXT NOT NULL, size INTEGER NOT NULL, sha256 TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'received', source_note TEXT NOT NULL DEFAULT '', admin_note TEXT NOT NULL DEFAULT '', uploaded_by TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)");
     $feedbackColumns=$db->query('PRAGMA table_info(project_feedback)')->fetchAll(PDO::FETCH_ASSOC);
     if(!in_array('category',array_column($feedbackColumns,'name'),true)) $db->exec('ALTER TABLE project_feedback ADD COLUMN category TEXT');
     if(!in_array('analysis',array_column($feedbackColumns,'name'),true)) $db->exec('ALTER TABLE project_feedback ADD COLUMN analysis TEXT');
@@ -208,6 +210,12 @@ function projectFeedback(string $id): array {
     return $rows;
 }
 
+function projectAssets(string $id): array {
+    $stmt=projectDb()->prepare('SELECT id,asset_key,category,filename,mime,size,sha256,status,source_note,admin_note,uploaded_by,created_at,updated_at FROM project_assets WHERE session_id=? ORDER BY id DESC');
+    $stmt->execute([$id]); return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+
 function projectFeedbackDigest(array $case): ?string {
     foreach (['feedbackEnabledDigest','previewSentDigest'] as $field) {
         $digest=(string)($case[$field]??'');
@@ -296,10 +304,7 @@ function projectSnapshot(array $session): array {
     $status['analysis']=$analysisDone?'done':($briefDone?'ready':'locked');
     $offerStatus=(string)($offer['status']??'');
     // Review or delivery is not acceptance: keep the stage open until an admin accepts it.
-    $missingOfferAnswers=array_filter(is_array($session['internalAnalysis']['missingInformation']??null)?$session['internalAnalysis']['missingInformation']:[],static function($question) use ($session): bool {
-        $decision=$session['adminDecisions'][trim((string)$question)]??null;
-        return !is_array($decision)||($decision['source']??'')!=='HUMAN'||trim((string)($decision['answer']??''))==='';
-    });
+    $missingOfferAnswers=!missingInformationManuallyConfirmed($session);
     $status['offer']=$offerStatus==='ACCEPTED'?'done':(in_array($offerStatus,['REVIEWED','SENT'],true)?'needs_you':(!$analysisDone?'locked':($missingOfferAnswers?'needs_you':'ready')));
     $status['contract']=$signed?'done':(($offer['status']??'')==='ACCEPTED'?'needs_you':'locked');
     $status['kickoff']=$started?($sourceCurrent?'done':'review'):($signed?'needs_you':'locked');
@@ -342,7 +347,7 @@ function projectSnapshot(array $session): array {
     if(!empty($case['closedAt'])) foreach($status as &$stageStatus) if($stageStatus!=='done') $stageStatus='cancelled';
     unset($stageStatus);
     $name=trim((string)($session['projectState']['businessProblem']??''));
-    return ['id'=>$id,'name'=>$name?:'Projekt bez nazwy','client'=>(string)($session['projectState']['contactName']??'Klient'),'email'=>(string)($session['projectState']['contactEmail']??''),'status'=>$status,'stages'=>projectStages(),'case'=>$case,'jobs'=>$jobs,'agentTasks'=>$agentTasks,'aiCalls'=>projectAiCalls($id),'feedback'=>$feedback,'events'=>projectEvents($id),'brief'=>$session['summary']??null,'analysis'=>$session['internalAnalysis']??null,'offer'=>['status'=>$offer['status']??null,'version'=>$offer['version']??null,'project'=>$offer['project']??null],'contract'=>['status'=>$contract['status']??null,'version'=>$contract['version']??null,'number'=>$contract['number']??null,'hasPdf'=>!empty($contract['pdfBase64']),'publicationPlan'=>projectSignedPublicationPlan($session,$case)],'messages'=>$session['messages']??[],'updatedAt'=>$session['updatedAt']??null];
+    return ['id'=>$id,'name'=>$name?:'Projekt bez nazwy','client'=>(string)($session['projectState']['contactName']??'Klient'),'email'=>(string)($session['projectState']['contactEmail']??''),'status'=>$status,'stages'=>projectStages(),'case'=>$case,'jobs'=>$jobs,'agentTasks'=>$agentTasks,'aiCalls'=>projectAiCalls($id),'feedback'=>$feedback,'assets'=>projectAssets($id),'events'=>projectEvents($id),'brief'=>$session['summary']??null,'analysis'=>$session['internalAnalysis']??null,'offer'=>['status'=>$offer['status']??null,'version'=>$offer['version']??null,'project'=>$offer['project']??null],'contract'=>['status'=>$contract['status']??null,'version'=>$contract['version']??null,'number'=>$contract['number']??null,'hasPdf'=>!empty($contract['pdfBase64']),'publicationPlan'=>projectSignedPublicationPlan($session,$case)],'messages'=>$session['messages']??[],'updatedAt'=>$session['updatedAt']??null];
 }
 
 function projectJobStatus(?array $job,bool $unlocked): string {

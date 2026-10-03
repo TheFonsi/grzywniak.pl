@@ -238,7 +238,18 @@
     if (stageId === "brief") {
       const blocks = (data.brief?.sections || []).map((entry) => `<h4>${escapeHtml(entry.title)}</h4>${lines(entry.content)}`).join("");
       const chat = (data.messages || []).map((message) => `<div class="event"><strong>${message.role === "user" ? "Klient" : "Agent rozmowy"}</strong><p>${escapeHtml(message.content)}</p></div>`).join("");
-      return section("Przekazany brief", blocks || "<p>Brak sekcji briefu.</p>", true) + section("Rozmowa", chat || "<p>Brak wiadomości.</p>", true);
+      const assets = data.assets || [];
+      const assetCards = assets.map((asset) => {
+        const url = `${apiPath("project-assets.php")}?session=${encodeURIComponent(id)}&asset=${encodeURIComponent(asset.asset_key)}`;
+        const isImage = ["image/jpeg", "image/png", "image/webp", "image/gif"].includes(asset.mime);
+        const image = isImage ? `<a href="${url}&inline=1" target="_blank" rel="noopener"><img class="project-asset-thumb" src="${url}&inline=1" alt="Podgl\u0105d ${escapeHtml(asset.filename)}"></a>` : "";
+        const labels = { logo: "Logo / identyfikacja", photo: "Zdj\u0119cia realizacji", text: "Teksty / dokumenty", other: "Inne materia\u0142y" };
+        const statuses = [["received", "Do sprawdzenia"], ["approved", "Zatwierdzony"], ["needs_changes", "Potrzebna informacja"], ["rejected", "Odrzucony"]].map(([value, label]) => `<option value="${value}"${asset.status === value ? " selected" : ""}>${label}</option>`).join("");
+        return `<article class="project-asset-card">${image}<div class="project-asset-info"><strong>${escapeHtml(asset.filename)}</strong><small>${labels[asset.category] || "Materia\u0142"} · ${(asset.size / 1048576).toFixed(2)} MB · dodano ${date(asset.created_at)}</small><p>Pochodzenie / zgoda: ${escapeHtml(asset.source_note || "do potwierdzenia")}</p>${asset.admin_note ? `<p>Notatka zespo\u0142u: ${escapeHtml(asset.admin_note)}</p>` : ""}<form class="form project-asset-review" data-action="asset_review"><input type="hidden" name="asset_id" value="${asset.id}"><label>Ocena<select name="status">${statuses}</select></label><label>Notatka zespo\u0142u / pytanie do klienta<textarea name="admin_note" rows="2" maxlength="1000">${escapeHtml(asset.admin_note || "")}</textarea></label><button class="tool">Zapisz ocen\u0119</button></form><a href="${url}">Pobierz plik</a></div></article>`;
+      }).join("");
+      const upload = data.case.closedAt ? "<p>Sprawa jest zamkni\u0119ta · dodawanie materia\u0142\u00f3w wy\u0142\u0105czone.</p>" : `<form class="form" data-action="asset_upload" enctype="multipart/form-data"><label>Pliki klienta<input type="file" name="files[]" accept=".jpg,.jpeg,.png,.webp,.gif,.pdf,.txt,.md,.docx" multiple required></label><label>Rodzaj materia\u0142u<select name="category"><option value="logo">Logo / identyfikacja</option><option value="photo">Zdj\u0119cia realizacji</option><option value="text">Teksty / dokumenty</option><option value="other">Inne materia\u0142y</option></select></label><label>Pochodzenie i zgoda na wykorzystanie<textarea name="source_note" rows="2" maxlength="1000" placeholder="Np. zdj\u0119cia przekazane przez klienta; zgoda na u\u017cycie na stronie"></textarea></label><small>JPG, PNG, WebP, GIF, PDF, TXT, MD, DOCX. Maks. 12 MB na plik, 100 MB na spraw\u0119.</small><button class="primary">Dodaj materia\u0142y do sprawy</button></form>`;
+      const assetSection = section("Materia\u0142y od klienta", `<p>Pliki s\u0105 prywatne. Agenci dostaj\u0105 wy\u0142\u0105cznie materia\u0142y oznaczone jako zatwierdzone; pliki dodane w trakcie zadania trafi\u0105 do agent\u00f3w przy nast\u0119pnym zadaniu.</p>${upload}${assetCards || "<p>Klient nie przekaza\u0142 jeszcze plik\u00f3w.</p>"}`, true);
+      return section("Przekazany brief", blocks || "<p>Brak sekcji briefu.</p>", true) + section("Rozmowa", chat || "<p>Brak wiadomo\u015bci.</p>", true) + assetSection;
     }
     if (stageId === "analysis") {
       const a = data.analysis || {};
@@ -445,6 +456,16 @@
 
   async function submitAction(form, submitter) {
     const button = submitter || form.querySelector("button");
+    if (form.dataset.action === "asset_upload" || form.dataset.action === "asset_review") {
+      button.disabled = true;
+      try {
+        const body = new FormData(form); body.set("action", form.dataset.action === "asset_upload" ? "upload" : "review");
+        const response = await fetch(`${apiPath("project-assets.php")}?session=${encodeURIComponent(id)}`, { method: "POST", credentials: "same-origin", headers: { "X-CSRF-Token": csrf }, body });
+        const result = await response.json(); if (!response.ok) throw new Error(result.message || "Nie uda\u0142o si\u0119 zapisa\u0107 materia\u0142u.");
+        await load(false); if (currentStage) openStage(currentStage, false);
+      } catch (error) { const message = document.createElement("p"); message.className = "error-text"; message.setAttribute("role", "alert"); message.textContent = error.message; form.append(message); button.disabled = false; }
+      return;
+    }
     const data = Object.fromEntries(new FormData(form).entries());
     data.action = submitter?.dataset.action || form.dataset.action;
     button.disabled = true;
