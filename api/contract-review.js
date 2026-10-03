@@ -56,6 +56,15 @@
         write(form,state); refresh(form);
       };
       input.addEventListener('input',change); input.addEventListener('change',change);
+      input.addEventListener('keydown',event=>{
+        if(event.key!=='Enter'||input.tagName==='TEXTAREA'||event.isComposing) return;
+        const accept=card.querySelector('[data-review-accept]');
+        if(!accept) return;
+        // Enter in a single-line review field confirms that field, rather than
+        // implicitly submitting the whole contract form (usually AI fill).
+        event.preventDefault();
+        if(!accept.disabled) accept.click();
+      });
     });
     refresh(form);
   }
