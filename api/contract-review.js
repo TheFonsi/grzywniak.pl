@@ -32,6 +32,7 @@
       });
     };
     const add=document.createElement('button');add.type='button';add.className='button';add.textContent=rights?'Dodaj składnik':'Dodaj podwykonawcę';add.onclick=()=>{items.push(Object.fromEntries(Object.keys(labels).map(key=>[key,''])));render();sync();};editor.append(add);
+    input.addEventListener('contract-inventory-refresh',()=>{try { const value=JSON.parse(input.value); if(Array.isArray(value)) {items=value;render();} }catch{} });
     if(!rights) {const none=document.createElement('button');none.type='button';none.className='button';none.textContent='Potwierdź brak podwykonawców';none.onclick=()=>{items=[];render();sync();};editor.append(none);}
     render();
   }
@@ -67,6 +68,7 @@
       input.hidden = !!accepted || !!input.dataset.inventoryReady;
       const inventory=card.querySelector('[data-inventory-editor]'); if(inventory) inventory.hidden=!!accepted;
       const choices=card.querySelector('[data-day-choices]'); if(choices) { choices.hidden=!!accepted; choices.querySelectorAll('button').forEach(button=>{button.disabled=!!form.dataset.saving;button.setAttribute('aria-pressed',String(button.dataset.days===input.value));}); }
+      const suggestions=card.querySelector('[data-field-suggestions]'); if(suggestions) { suggestions.hidden=!!accepted; suggestions.querySelectorAll('select,button').forEach(control=>{control.disabled=!!form.dataset.saving;}); }
       const preview = card.querySelector('[data-review-preview]');
       preview.hidden = !accepted;
       preview.textContent = input.tagName === 'SELECT' ? input.selectedOptions[0]?.textContent || input.value : input.value || 'Nie dotyczy';
@@ -127,6 +129,32 @@
         label.after(choices);
       }
       if(input.hasAttribute('data-contract-inventory')) inventoryEditor(input,card);
+      if(input.dataset.contractSuggestions) {
+        let examples={};try {examples=JSON.parse(input.dataset.contractSuggestions);}catch{}
+        if(Object.keys(examples).length) {
+          const box=document.createElement('details');box.dataset.fieldSuggestions='';box.style.cssText='margin:12px 0;padding:12px;border:1px solid #40516b;border-radius:8px';
+          const heading=document.createElement('summary');heading.textContent='Gotowe propozycje';heading.style.cursor='pointer';box.append(heading);
+          const note=document.createElement('p');note.textContent='Wybierz wariant, dopasuj treść i uzupełnij oznaczone miejsca. Propozycja wymaga osobnej akceptacji.';box.append(note);
+          const select=document.createElement('select');select.setAttribute('aria-label','Propozycja: '+label.firstChild.textContent);select.style.cssText='width:100%;margin-bottom:10px';
+          for(const [title,value] of Object.entries(examples)) {const option=document.createElement('option');option.value=title;option.textContent=title;select.append(option);}
+          const preview=document.createElement('p');preview.style.cssText='white-space:pre-wrap;max-height:180px;overflow:auto;font-size:13px';
+          const show=()=>{preview.textContent=input.hasAttribute('data-contract-inventory')?'Doda pola wykazu z oznaczeniami do uzupełnienia.':examples[select.value];};select.onchange=show;show();
+          const use=document.createElement('button');use.type='button';use.className='button';use.textContent=input.hasAttribute('data-contract-inventory')?'Dodaj przykładową pozycję':'Wstaw propozycję';
+          use.onclick=()=>{
+            const value=examples[select.value];
+            if(input.hasAttribute('data-contract-inventory')) {
+              let rows=[];try {rows=input.value?JSON.parse(input.value):[];if(!Array.isArray(rows)) throw new Error();}catch {window.alert('Popraw format istniejącego wykazu przed dodaniem propozycji.');return;}
+              input.value=JSON.stringify([...rows,...JSON.parse(value)]);input.dispatchEvent(new Event('contract-inventory-refresh'));
+            } else {
+              if(input.value.trim() && !window.confirm('Zastąpić obecną treść pola wybraną propozycją?')) return;
+              input.value=value;
+            }
+            change();box.open=false;
+            if(!input.dataset.inventoryReady) input.focus();
+          };
+          box.append(select,preview,use);card.append(box);
+        }
+      }
       input.addEventListener('keydown',event=>{
         if(event.key!=='Enter'||input.tagName==='TEXTAREA'||event.isComposing) return;
         const accept=card.querySelector('[data-review-accept]');
@@ -146,6 +174,7 @@
       // Re-running AI never overwrites an accepted value.
       if(!result.replaceTemplate && state[name]?.accepted && state[name].value.trim()===input.value.trim()) continue;
       input.value=value; state[name]={value,accepted:optional.has(name)&&!value.trim()};
+      if(input.dataset.inventoryReady) input.dispatchEvent(new Event('contract-inventory-refresh'));
     }
     if(result.template) {
       form.elements.templateId.value=result.template.id;

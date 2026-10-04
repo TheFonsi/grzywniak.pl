@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__.'/contract-suggestions.php';
 
 // Original clauses. A package is a draft until its exact bytes are reviewed.
 const CONTRACT_PACKAGE_POLICY = '2026-10-04.1';
@@ -203,7 +204,7 @@ function contractPackageEditor(array $c,string $id): string {
             if($value!==''&&!$numeric) $html.='<small>Poprzedni zapis: '.$e($value).'. Wskaż samą liczbę dni.</small>';
         }
         elseif(isset($field['options'])) { $html.='<select name="'.$key.'">'; foreach($field['options'] as $option=>$label) $html.='<option value="'.$e($option).'"'.($value===$option?' selected':'').'>'.$e($label).'</option>'; $html.='</select>'; }
-        else $html.='<textarea name="'.$key.'"'.(in_array($key,['rightsInventory','processingSubprocessors'],true)?' data-contract-inventory':'').' rows="'.(!empty($field['long'])?5:2).'" maxlength="20000">'.$e($value).'</textarea>';
+        else $html.='<textarea name="'.$key.'" data-contract-suggestions="'.$e(json_encode(contractFieldSuggestions($key),JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR)).'"'.(in_array($key,['rightsInventory','processingSubprocessors'],true)?' data-contract-inventory':'').' rows="'.(!empty($field['long'])?5:2).'" maxlength="20000">'.$e($value).'</textarea>';
         $html.='</label>';
     }
     return $html.'</fieldset><p class="muted">W wykazie praw uwzględnij również biblioteki, wcześniejsze komponenty, materiały klienta i elementy AI. Sprawdź prawo użycia i modyfikacji przez przyszły zespół utrzymania. W wykazie powierzenia wpisz faktycznych dostawców mających dostęp do danych.</p>';

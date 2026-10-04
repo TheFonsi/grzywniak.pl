@@ -6,6 +6,12 @@ require_once __DIR__.'/../api/contract-pdf.php';
 require_once __DIR__.'/../api/contract-review.php';
 function packageAssert(bool $ok,string $message): void { if(!$ok) throw new RuntimeException($message); }
 $site=contractSampleContract('website'); $app=contractSampleContract('webapp'); $shop=contractSampleContract('ecommerce');
+foreach(contractPackageFields() as $key=>$field) {
+    if(isset($field['options'])||$key==='acceptanceDays') continue;
+    $examples=contractFieldSuggestions($key);
+    packageAssert(count($examples)>0,'Every package text/inventory field has ready-made proposals: '.$key);
+    if(in_array($key,['rightsInventory','processingSubprocessors'],true)) foreach($examples as $raw) contractPackageJson($raw,$key==='rightsInventory'?'rights':'subprocessors');
+}
 packageAssert(count($site['package']['documents'])===4,'Site needs specification, rights, privacy and hosting');
 packageAssert(count($app['package']['documents'])===5,'Application needs a real DPA');
 packageAssert(count($shop['package']['documents'])===6,'Protected customer needs notices and withdrawal form');
