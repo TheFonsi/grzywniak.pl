@@ -24,7 +24,7 @@ if($method==='POST') {
     $body=array_replace($body,$_POST);
     if(!hash_equals(contractToken(),(string)($body['csrf']??''))) contractError(403,'Sesja formularza wygasła. Odśwież panel.');
     // AI only fills the browser form; do not hold a SQLite write lock during HTTP.
-    if(!in_array($body['action']??$body['contract_action']??'',['ai-fill','apply-template'],true)) sessionDb()->exec('BEGIN IMMEDIATE');
+    if(!in_array($body['action']??$body['contract_action']??'',['ai-fill','apply-template','brief-fill'],true)) sessionDb()->exec('BEGIN IMMEDIATE');
 }
 $action=(string)($body['action']??$body['contract_action']??'');
 if($action==='save-profile') {
@@ -102,11 +102,19 @@ if($action==='apply-template') {
         echo json_encode(['fields'=>contractTemplateProposal($template,$facts),'facts'=>[], 'replaceTemplate'=>true,'template'=>['id'=>$template['id'],'title'=>$template['title'],'revision'=>$template['revision'],'version'=>$template['version']], 'missing'=>contractFactsMissing($facts)],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR); exit;
     } catch(InvalidArgumentException $error) { contractError(422,$error->getMessage()); }
 }
+if($action==='brief-fill') {
+    try {
+        $facts=contractReadFacts($body,$s['contract']['facts']??[],$activeTemplate);
+        $proposal=contractBriefProposal($s,$facts);
+        echo json_encode(['fields'=>[], 'facts'=>$proposal['facts'],'sources'=>$proposal['sources'],'missing'=>contractFactsMissing(array_replace($facts,$proposal['facts']))],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR); exit;
+    } catch(InvalidArgumentException $error) { contractError(422,$error->getMessage()); }
+}
 if($action==='ai-fill') {
     $profile=contractProfile();
     if(!isset($s['contract']) && (int)($body['profileVersion']??-1)!==(int)$profile['version']) contractError(409,'Dane wykonawcy zmieniły się. Odśwież formularz, aby pobrać aktualne dane.');
     try {
         $facts=contractReadFacts($body,$s['contract']['facts']??[],$activeTemplate); $draft=[];
+        $facts=array_replace($facts,contractBriefProposal($s,$facts)['facts']);
         foreach(contractFields() as $key=>$label) { if(!is_string($body[$key]??null)||mb_strlen($body[$key])>20000) throw new InvalidArgumentException('Niepoprawne pole: '.$label); $draft[$key]=$body[$key]; }
         $template=$activeTemplate;
         $review=contractReviewState($body['reviewState']??null,$draft,$facts,$s['contract']['review']??[]);

@@ -3,6 +3,7 @@ declare(strict_types=1);
 require_once __DIR__.'/contract-profile.php';
 require_once __DIR__.'/contract-catalog.php';
 require_once __DIR__.'/contract-package.php';
+require_once __DIR__.'/contract-brief.php';
 
 function contractFields(): array {
     return ['deploymentTerms'=>'Domena, hosting, publikacja i przekazanie', 'provider'=>'Wykonawca — dane i reprezentacja', 'party'=>'Klient — dane i reprezentacja', 'paymentDetails'=>'Rachunek i zasady płatności', 'scope'=>'Przedmiot i zakres (aplikacja, strona, materiały)', 'price'=>'Wynagrodzenie, VAT i część za prawa IP', 'deposit'=>'Zaliczka i harmonogram płatności', 'deadline'=>'Termin i etapy', 'acceptance'=>'Odbiór i przekazanie kodu / dostępów', 'ip'=>'Prawa autorskie — zakres, pola eksploatacji i moment przejścia', 'exclusions'=>'Komponenty zewnętrzne, licencje i wyłączenia', 'support'=>'Usuwanie wad i wsparcie — okres, zakres, czasy reakcji', 'extras'=>'Dodatkowe płatne prace i koszty usług zewnętrznych', 'terms'=>'Pozostałe warunki, odpowiedzialność, rozwiązanie, dane osobowe'];
@@ -42,6 +43,8 @@ function contractEditor(array $session): string {
     if($profile['version']>0) $defaults['provider']=contractProviderText($profile);
     $defaults['paymentDetails']=implode("\n",array_filter([$profile['bankAccount']!==''?'Rachunek: '.$profile['bankAccount']:'',$profile['paymentTerms']]));
     $values = is_array($saved) ? $saved : $defaults;
+    $briefProposal=contractBriefProposal($session,is_array($saved)?($saved['facts']??[]):[]);
+    $editorFacts=is_array($saved)?($saved['facts']??[]):$briefProposal['facts'];
     $e = 'contractEscape'; $id=$e($session['id']);
     $contractUrl=apiPath('contract.php');
     $html='<section id="contract-panel" class="conversation-contract"><h3>Umowa</h3><p class="muted">'.($saved ? $e($saved['number']).' · wersja '.(int)$saved['version'].' · '.$e($saved['status']??'DRAFT') : 'Przygotuj projekt na podstawie zaakceptowanej oferty.').'</p><p class="muted">Przeniesienie praw wymaga podpisania w odpowiedniej formie. Akceptacja oferty i wysłanie PDF nie oznaczają podpisania umowy.</p><a class="button" href="?view=contract-settings">Ustawienia wzorów umów</a> <details'.(!$saved?' open':'').'><summary class="button">'.($saved?'Edytuj umowę':'Przygotuj umowę').'</summary><form method="post" action="'.$contractUrl.'" class="contract-form"><input type="hidden" name="csrf" value="'.$e(contractToken()).'"><input type="hidden" name="contract_session" value="'.$id.'"><input type="hidden" name="expectedVersion" value="'.(int)($saved['version']??0).'"><input type="hidden" name="templateVersion" value="'.(int)($saved['templateVersion']??$template['version']).'">';
@@ -53,22 +56,28 @@ function contractEditor(array $session): string {
     foreach(contractFacts() as $key=>$field) {
         if($key==='ipPayment') continue;
         if(isset($field['module'])) continue;
-        $value=$saved['facts'][$key]??'';
-        if($key==='rightsTerms' && !in_array($saved['facts']['ipMode']??'',['exclusive','nonexclusive'],true)) $value='';
+        $value=$editorFacts[$key]??'';
+        if($key==='rightsTerms' && !in_array($editorFacts['ipMode']??'',['exclusive','nonexclusive'],true)) $value='';
         if($key==='publicationDestination') $html.='<h4>Publikacja i przekazanie ustalone z klientem</h4><p class="muted">Te ustalenia trafią do umowy i po jej potwierdzeniu zostaną automatycznie przeniesione do etapu publikacji.</p>' ;
         $clientOnly=in_array($key,['productionDomain','domainRegistrar','domainOwnershipTerms','productionHosting','serverTarget','backupResponsibility','dnsTlsResponsibility'],true);
-        $hidden=!contractPublicationFieldApplicable($key,$saved['facts']??[]);
-        if($key==='consumerDocuments') $hidden=!in_array($saved['facts']['clientType']??'',['consumer','protected'],true);
-        if($key==='dataProcessingTerms') $hidden=($saved['facts']['dataRole']??'')!=='processor';
-        $html.='<label'.($clientOnly?' data-client-publication-field data-publication-key="'.$key.'"':'').($key==='rightsTerms'?' data-license-terms'.(!in_array($saved['facts']['ipMode']??'',['exclusive','nonexclusive'],true)?' hidden':''):'').($hidden?' hidden':'').'>'.$e($field['label']);
+        $hidden=!contractPublicationFieldApplicable($key,$editorFacts??[]);
+        if($key==='consumerDocuments') $hidden=!in_array($editorFacts['clientType']??'',['consumer','protected'],true);
+        if($key==='dataProcessingTerms') $hidden=($editorFacts['dataRole']??'')!=='processor';
+        $html.='<label'.($clientOnly?' data-client-publication-field data-publication-key="'.$key.'"':'').($key==='rightsTerms'?' data-license-terms'.(!in_array($editorFacts['ipMode']??'',['exclusive','nonexclusive'],true)?' hidden':''):'').($hidden?' hidden':'').'>'.$e($field['label']);
         if(isset($field['options'])) { $html.='<select name="'.$key.'"'.($key==='publicationDestination'?' required':'').'><option value="">Wybierz</option>'; foreach($field['options'] as $option=>$label) { if($option==='') continue; $html.='<option value="'.$e($option).'"'.($value===$option?' selected':'').'>'.$e($label).'</option>'; } $html.='</select>'; }
         else $html.='<input name="'.$key.'" maxlength="2000" value="'.$e($value).'"'.($key==='contractDate'?' type="date"':'').'>';
         $html.='</label>';
     }
-    $html.=contractPackageEditor($saved??[],$session['id']);
+    $html.=contractPackageEditor(['facts'=>$editorFacts],$session['id']);
     $html.='<p class="muted">Moment przeniesienia praw i wynagrodzenie za IP są pobierane z ustawień wzoru. Zapisana umowa zachowuje własne warunki.</p>';
     $html.='<div><button class="button" name="contract_action" value="ai-fill" formnovalidate>Uzupełnij dane projektu AI</button></div><div data-ai-feedback role="status"></div>';
     foreach(contractFields() as $key=>$label) $html.='<label>'.$e($label).'<textarea name="'.$key.'" rows="'.(in_array($key,['ip','terms','scope'],true)?5:3).'" maxlength="20000">'.$e($values[$key]??'').'</textarea></label>';
+    $html.='<p class="muted">Puste ustalenia można uzupełnić z briefu i potwierdzonych odpowiedzi analizy. Zakres oferty daje propozycję kryteriów odbioru. Każdą propozycję sprawdź i zaakceptuj; ceny hostingu, licencje, dane dostawców i zabezpieczenia wymagają rzeczywistych ustaleń.</p><button class="button" name="contract_action" value="brief-fill" formnovalidate>Uzupełnij puste ustalenia z briefu</button>';
+    if($briefProposal['sources']) $html.='<p class="muted">Źródła propozycji: '.$e(implode(' · ',$briefProposal['sources'])).'</p>';
+    foreach(['hostingExpectations'=>'Oczekiwania klienta dotyczące hostingu','supportExpectations'=>'Oczekiwania klienta dotyczące wsparcia'] as $key=>$label) {
+        $reference=$session['projectState'][$key]??'';
+        if(is_string($reference)&&trim($reference)!=='') $html.='<p class="muted"><strong>'.$e($label).' (brief):</strong> '.$e($reference).'. Uzgodnij konkretne warunki przed akceptacją pakietu.</p>';
+    }
     $html.='<div><button class="button" name="contract_action" value="save">Zapisz projekt umowy</button> <button class="button" name="contract_action" value="generate">Zapisz i przygotuj PDF</button></div></form></details>';
     if (!empty($saved['pdfBase64'])) $html.='<p><a class="button" href="'.$contractUrl.'?session='.$id.'&amp;format=pdf">Pobierz PDF</a></p><form method="post" action="'.$contractUrl.'" class="contract-send"><input type="hidden" name="contract_session" value="'.$id.'"><input type="hidden" name="csrf" value="'.$e(contractToken()).'"><input type="hidden" name="expectedVersion" value="'.(int)$saved['version'].'"><button class="button" name="action" value="send"'.(contractPackageApproved($saved)?'':' disabled').'>Wyślij PDF klientowi</button></form>';
     $html.=contractPackageControls($saved??[],$session['id']);

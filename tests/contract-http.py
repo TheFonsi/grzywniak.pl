@@ -60,6 +60,15 @@ try:
     assert all(ai['fields'][k]==body[k] for k in ['terms','ip','acceptance','deploymentTerms','support','extras','exclusions']), 'AI must retain unaccepted manual legal clauses too'
     assert ai['facts']['publicationDestination']=='agency' and ai['facts']['productionDomain']==''
     assert json.loads(request('/api/contract.php?session='+sid)[1])['contract'] is None, 'AI must not persist or send'
+    # Brief fill is a read-only draft operation; populated facts must survive.
+    seed_brief="require 'api/bootstrap.php'; $s=readSession('"+sid+"'); $s['projectState']['materialsTerms']='Client supplies logo by agreed date.'; writeSession($s);"
+    subprocess.run(['php','-r',seed_brief],cwd=work,env=env,check=True)
+    code,data=request('/api/contract.php',dict(body,action='brief-fill',cooperationTerms=''))
+    assert code==200,(code,data)
+    assert json.loads(data)['facts']['cooperationTerms']=='Client supplies logo by agreed date.'
+    code,data=request('/api/contract.php',dict(body,action='brief-fill',cooperationTerms='Admin edit'))
+    assert code==200 and 'cooperationTerms' not in json.loads(data)['facts']
+    assert json.loads(request('/api/contract.php?session='+sid)[1])['contract'] is None,'Brief fill must not persist a contract'
     assert request('/api/contract.php',dict(body,clientType='invented',action='ai-fill'))[0]==422
     assert request('/api/contract.php',dict(body,scope='[DO UZUPEŁNIENIA: brak danych]'))[0]==422
     assert request('/api/contract.php',dict(body,clientType=''))[0]==422

@@ -66,9 +66,9 @@ register_shutdown_function(static function(): void {
     const buttons = [...form.querySelectorAll('button')]; buttons.forEach(button => button.disabled = true);
     let feedback = form.querySelector('[role="alert"]');
     if (!feedback) { feedback = document.createElement('p'); feedback.setAttribute('role','alert'); form.append(feedback); }
-    const aiFill = ['ai-fill','apply-template'].includes(data.contract_action);
+    const aiFill = ['ai-fill','apply-template','brief-fill'].includes(data.contract_action);
     const previous = aiFill ? Object.fromEntries([...form.querySelectorAll('textarea,input,select')].map(input => [input.name,input.value])) : null;
-    feedback.textContent = data.contract_action==='apply-template' ? 'Wczytywanie wzoru…' : aiFill ? 'AI uzupełnia dane projektu. Może to potrwać około minuty…' : 'Zapisywanie…';
+    feedback.textContent = data.contract_action==='brief-fill' ? 'Uzupełnianie ustaleń z briefu…' : data.contract_action==='apply-template' ? 'Wczytywanie wzoru…' : aiFill ? 'AI uzupełnia dane projektu. Może to potrwać około minuty…' : 'Zapisywanie…';
     try {
       const response = await fetch('/api/contract.php', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
       const result = await response.json();
@@ -81,6 +81,7 @@ register_shutdown_function(static function(): void {
         const notes = form.querySelector('[data-ai-feedback]'); notes.replaceChildren();
         const title = document.createElement('p'); title.textContent = result.replaceTemplate ? 'Wczytano wzór. Sprawdź i zaakceptuj klauzule; dokument nie został jeszcze zapisany.' : 'Uzupełniono dane projektu, zachowując klauzule wzoru. Sprawdź propozycje i uzupełnij brakujące dane.'; notes.append(title);
         if (result.missing?.length) { const list = document.createElement('ul'); for (const text of result.missing) { const item=document.createElement('li'); item.textContent=text; list.append(item); } notes.append(list); }
+        if(result.sources) for(const [field,source] of Object.entries(result.sources)) { const p=document.createElement('p');p.textContent=`Źródło (${field}): ${source}`;notes.append(p); }
         feedback.textContent = 'Formularz uzupełniony. Dane nie zostały jeszcze zapisane.';
         buttons.forEach(button => button.disabled=false); delete form.dataset.saving; window.contractReview.refresh(form); return;
       }

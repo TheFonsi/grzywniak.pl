@@ -18,6 +18,11 @@ function buildSummary(array $state): array {
         'mustHaveFeatures'=>'Najważniejszy zakres pierwszej wersji',
         'niceToHaveFeatures'=>'Dodatkowe potrzeby i założenia',
         'integrations'=>'Integracje',
+        'materialsTerms'=>'Materiały do projektu',
+        'publicationPreference'=>'Preferowany sposób publikacji',
+        'domainName'=>'Proponowana domena',
+        'hostingExpectations'=>'Ustalenia dotyczące hostingu',
+        'supportExpectations'=>'Oczekiwania dotyczące wsparcia',
         'budget'=>'Podany budżet',
         'deadline'=>'Oczekiwany termin',
     ];
@@ -27,6 +32,7 @@ function buildSummary(array $state): array {
             $content=array_values(array_filter(array_map(static fn($item)=>trim((string)$item),$value),static fn($item)=>$item!==''&&!discoverySummaryValueIsUnknown($item)));
         } else {
             $text=trim((string)$value);
+            if($key==='publicationPreference') $text=['agency'=>'Nasza infrastruktura i domena','agency_purchase'=>'Zakup domeny dla klienta i hosting u nas','client_handoff'=>'Publikacja na domenie i serwerze klienta'][$text]??$text;
             $content=$text!==''&&!discoverySummaryValueIsUnknown($text)?[$text]:[];
         }
         if(!$content) continue;

@@ -2,6 +2,12 @@
 
 ## Domena kupowana dla klienta i hosting agencji
 
+### Podpowiedzi z briefu
+
+Nowy formularz umowy podpowiada materiały i współpracę, podaną domenę i jednoznacznie wybraną ścieżkę publikacji z zapisanych wypowiedzi klienta. Kryteria odbioru są propozycją z zakresu zaakceptowanej oferty, wymagającą doprecyzowania i ręcznej akceptacji. Dla starszych spraw warunki materiałów można pobrać z ręcznie potwierdzonej odpowiedzi analizy. Przycisk „Uzupełnij puste ustalenia z briefu” działa także w zapisanych projektach umowy: nie nadpisuje wpisanych pól, nie zapisuje dokumentu i nie zatwierdza propozycji. AI-uzupełnianie korzysta z tych samych podpowiedzi. Źródła są opisane przy formularzu.
+
+Rozmowa zapisuje `materialsTerms`, `publicationPreference`, `domainName`, `hostingExpectations` i `supportExpectations`. Instrukcja rozmowy dopuszcza najwyżej dwa dodatkowe pytania organizacyjne po ustaleniu celu i zakresu, po jednym na turę. Dalsze szczegóły zbierane są dobrowolnie lub gdy klient rozpocznie temat. Brak wiedzy nie blokuje briefu. Preferencje nie stanowią potwierdzenia zakupu ani kontroli domeny. Lista dostawców, licencje, status prawny, zabezpieczenia oraz ceny usług nie są wymyślane z briefu.
+
 Wariant `agency_purchase` oznacza zakup domeny dla klienta oraz hosting u Grzywniak. Wymaga nazwy domeny, ustaleń o abonencie i upoważnieniu, kosztach zakupu, niedostępności nazwy, odnowieniach i przekazaniu kontroli. Rejestrator może być jeszcze nieustalony; trzeba go uzgodnić przed zakupem. Dochodzą wszystkie warunki hostingu agencji. Pola serwera klienta są ukryte i nie blokują tego wariantu. Ustalenia tworzą osobny załącznik do PDF i podlegają ręcznej akceptacji oraz weryfikacji całego pakietu.
 
 Mapa pobiera warunki z aktualnej podpisanej umowy. Podgląd nie zmienia adresu ani zabezpieczeń. Integracja zakupu u rejestratora i podłączenia zewnętrznych domen do VPS nie jest jeszcze wdrożona: panel pokazuje wymagane działania i blokuje automatyczną publikację zastępczą w domenie agencji. Zmiana ścieżki wymaga nowej wersji umowy; zapisanych podpisanych dokumentów system nie aktualizuje automatycznie.
