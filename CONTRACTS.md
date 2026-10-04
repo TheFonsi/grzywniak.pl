@@ -8,6 +8,14 @@ Nieudana próba zapisuje `analysisLastAttempt` z numerem błędu i zachowuje ost
 „Wczytaj wybrany wzór” podmienia klauzule w formularzu; „Uzupełnij puste ustalenia z briefu” uzupełnia puste pola z zaakceptowanej oferty i briefu. Nowy PDF powstaje dopiero przez „Zapisz i przygotuj PDF”.
 Test ponownej analizy: `python tests/analysis-retry-http.py`, wyłącznie izolowana baza i atrapa AI.
 
+### Powiązania wersji i archiwum źródeł
+
+Nowe analizy zapisują dokładny brief źródłowy. Nowe oferty zapisują brief, analizę z ustaleniami administratora i opracowanie zakresu / zmian oferty; nowe umowy zapisują zaakceptowaną ofertę oraz jej utrwalone źródła. `sourceRefs` wskazuje identyfikatory treści w `documentArchive`, nie bieżące dokumenty. Zmiany i kolejne wersje nie nadpisują tych zapisów. Zapisy archiwalne nie powielają binarnych PDF-ów; dotychczasowa historia umów zachowuje PDF-y.
+
+Przy analizie, ofercie i umowie znajduje się „Na podstawie” oraz link do `document-history.php`. Archiwum jest uwierzytelnione tak jak panel, wyłącznie do odczytu i pokazuje wersje oraz połączenia między nimi. Starsze dokumenty są dostępne z istniejących historii, ale brak dawnych źródeł jest jawnie oznaczony. Nie przypisujemy im obecnego briefu jako historycznego wejścia. Numer wersji i krótki identyfikator rozróżniają również zapisy tej samej wersji przed i po akceptacji.
+
+Testy: `php tests/document-history.php` i `python tests/analysis-retry-http.py` (niezmienność źródeł, brak domniemanych powiązań dla starych dokumentów, autoryzacja, brak zapisu przy podglądzie).
+
 ## Oferta jako źródło uzgodnionych warunków
 
 Nowe oferty przechowują osobną sekcję `agreement`: kryteria i termin odbioru, współpracę przy materiałach, harmonogram prac i płatności, sposób publikacji, wymagane warunki domeny/hostingu, wsparcie, prawa i licencje, koszty dodatkowe oraz plan danych aplikacji. Brief i potwierdzone odpowiedzi analizy podpowiadają znane wartości. Nieznane ceny, terminy i uprawnienia nie są wymyślane. Szczegóły można wpisać oraz wykorzystać propozycje w rozwijanym formularzu „Warunki realizacji i dane do umowy” przy ofercie.

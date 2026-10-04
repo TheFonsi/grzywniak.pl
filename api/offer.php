@@ -252,9 +252,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($body['action'] ?? '') === 'genera
     if (is_array($session['offer'] ?? null) && ($session['offer']['sourceHash'] ?? '') === offerSourceHash($session) && ($session['offer']['status'] ?? '') !== 'OUTDATED') { echo json_encode(['offer' => $session['offer']], JSON_UNESCAPED_UNICODE); exit; }
     $updatedOffer = null;
     try {
-        if (is_array($session['offer'] ?? null)) $updatedOffer = applyOfferUpdate($session['offer'], internalAnalysis($session, true));
+        if (is_array($session['offer'] ?? null)) {
+            $preparation=internalAnalysis($session,true);
+            $updatedOffer=applyOfferUpdate($session['offer'],$preparation);
+        }
         else {
             $session['offerAnalysis'] = internalAnalysis($session);
+            $preparation=$session['offerAnalysis'];
             if (empty($session['offerAnalysis']['recommendedScope'])) throw new RuntimeException('Brak wygenerowanego zakresu.');
         }
     } catch (Throwable $error) {
@@ -287,6 +291,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($body['action'] ?? '') === 'genera
     $offer['updatedAt'] = time();
     $offer['sourceHash'] = offerSourceHash($session);
     $offer['sourceSnapshot'] = ['projectState' => $session['projectState'] ?? [], 'adminDecisions' => $session['adminDecisions'] ?? []];
+    $offer['sourceRefs']=documentOfferSources($session);
+    $offer['sourceRefs']['preparation']=documentArchivePut($session,'analysis',$preparation,$offer['sourceRefs'],(int)$offer['version']);
     unset($offer['reviewedAt'], $offer['verification'], $offer['sentAt'], $offer['sentTo']);
     if ($previousOutdated) {
         $offer['changeLog'] = offerChangeLog($previous, $offer);

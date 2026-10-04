@@ -233,6 +233,13 @@
     return `<p><a href="${apiPath("admin.php")}?view=all&amp;session=${encodeURIComponent(id)}${anchor}">Otwórz dokument i edytor w panelu ↗</a></p>`;
   }
 
+  function documentSources(doc = {}) {
+    const names = { brief: "Brief", analysis: "Analiza", offer: "Oferta", preparation: "Opracowanie oferty" };
+    const base = `${apiPath("document-history.php")}?session=${encodeURIComponent(id)}`;
+    const links = Object.entries(doc.sourceRefs || {}).filter(([kind]) => names[kind]).map(([kind, ref]) => `<a target="_blank" rel="noopener" href="${base}&ref=${encodeURIComponent(ref)}">${names[kind]} — zapisana wersja ↗</a>`);
+    return section("Na podstawie", `<p>${links.length ? links.join(" · ") : "Brak zapisanych powiązań dla tej historycznej wersji."}</p><p><a target="_blank" rel="noopener" href="${base}">Archiwum dokumentów i wersji ↗</a></p>`, true);
+  }
+
   function stageOutput(stageId) {
     const data = project;
     if (stageId === "brief") {
@@ -253,13 +260,13 @@
     }
     if (stageId === "analysis") {
       const a = data.analysis || {};
-      return section("Podsumowanie", `<p>${escapeHtml(a.summary || a.message || "Analiza jeszcze nie powstała.")}</p>`, true) + section("Brakujące informacje", lines(a.missingInformation)) + section("Ryzyka", lines(a.risks)) + section("Zalecany zakres", lines(a.recommendedScope)) + section("Pytania do klienta", lines(a.questionsForClient)) + section("Pełna analiza", adminLink(), true);
+      return documentSources(a) + section("Podsumowanie", `<p>${escapeHtml(a.summary || a.message || "Analiza jeszcze nie powstała.")}</p>`, true) + section("Brakujące informacje", lines(a.missingInformation)) + section("Ryzyka", lines(a.risks)) + section("Zalecany zakres", lines(a.recommendedScope)) + section("Pytania do klienta", lines(a.questionsForClient)) + section("Pełna analiza", adminLink(), true);
     }
-    if (stageId === "offer") return section("Oferta", `<p>Stan: ${escapeHtml(data.offer.status || "brak")} · wersja ${escapeHtml(data.offer.version || "—")}</p>${adminLink("#offer-panel")}`, true);
+    if (stageId === "offer") return documentSources(data.offer) + section("Oferta", `<p>Stan: ${escapeHtml(data.offer.status || "brak")} · wersja ${escapeHtml(data.offer.version || "—")}</p>${adminLink("#offer-panel")}`, true);
     if (stageId === "contract") {
       const c = data.contract;
       const signed = Number(data.case.contractSignedVersion || 0) === Number(c.version || 0) && Number(c.version || 0) > 0;
-      let html = section("Dokument", `<p>Numer: ${escapeHtml(c.number || "—")}; wersja: ${escapeHtml(c.version || "—")}; stan wysyłki: ${escapeHtml(c.status || "brak")}.</p><p>Potwierdzenie zawarcia: ${signed ? "tak" : "nie"}. Wysłanie dokumentu nie potwierdza zawarcia umowy.</p>${adminLink("#contract-panel")}`, true);
+      let html = documentSources(c) + section("Dokument", `<p>Numer: ${escapeHtml(c.number || "—")}; wersja: ${escapeHtml(c.version || "—")}; stan wysyłki: ${escapeHtml(c.status || "brak")}.</p><p>Potwierdzenie zawarcia: ${signed ? "tak" : "nie"}. Wysłanie dokumentu nie potwierdza zawarcia umowy.</p>${adminLink("#contract-panel")}`, true);
       if(c.package) html += section("Pakiet umowny", `<p>Weryfikacja prawna: ${c.package.approved ? "potwierdzona dla tej wersji" : "wymagana przed wysyłką i potwierdzeniem umowy"}.</p><p>Dowód otrzymania przez klienta: ${c.package.hasReceipt ? "zapisany" : "brak"}.</p>${lines(c.package.documents)}${c.package.earliestStart ? `<p>Najwcześniejszy start według zapisanych potwierdzeń: ${escapeHtml(c.package.earliestStart)}.</p>` : ""}${adminLink("#contract-panel")}`, true);
       if (c.hasPdf && !signed && (!c.package || c.package.approved)) html += section("Potwierdź zawarcie", `<form class="form" data-action="confirm_contract"><label>Podstawa potwierdzenia, data i sposób podpisania<textarea name="evidence" rows="3" required minlength="8" maxlength="500" placeholder="Np. podpisana umowa v2 z dnia …, dokument sprawdzony …"></textarea></label><button class="primary">Potwierdź aktualną wersję</button></form>`, true);
       if (signed) html += section("Zapisane potwierdzenie", `<p>${escapeHtml(data.case.contractEvidence || "")}</p><p>${date(data.case.contractConfirmedAt)}</p>`, true);

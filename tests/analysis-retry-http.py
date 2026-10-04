@@ -57,6 +57,20 @@ try:
     assert after['offerVersions']==[dict(before['offer'],archivedAt=after['offerVersions'][0]['archivedAt'])]
     assert after['summary']==before['summary'] and after['contract']==before['contract']
     assert request()[0]==200 and read()['internalAnalysis']['version']==9
+    saved=read()
+    brief_ref=saved['internalAnalysis']['sourceRefs']['brief']
+    def history_request(ref='', authorized=True, method='GET'):
+        headers={'Authorization':'Basic '+base64.b64encode(b'retry-test:test-password').decode()} if authorized else {}
+        req=urllib.request.Request(f'http://127.0.0.1:{port}/api/document-history.php?session={sid}&ref={ref}',headers=headers,method=method)
+        try:
+            with urllib.request.urlopen(req) as res: return res.status,res.read().decode('utf-8')
+        except urllib.error.HTTPError as res: return res.code,res.read().decode('utf-8')
+    code,html=history_request(brief_ref)
+    assert code==200 and 'Original brief' in html and 'Tylko do odczytu' in html
+    assert history_request(brief_ref,False)[0]==401
+    assert history_request('f'*64)[0]==404
+    assert history_request(brief_ref,method='POST')[0]==405
+    assert read()==saved, 'Read-only history view mutated stored documents'
     print('Analysis retry HTTP checks passed (failure preservation, auth, history, versioning).')
 finally:
     server.terminate(); server.wait(timeout=10); log.close()

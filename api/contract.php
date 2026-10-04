@@ -167,6 +167,7 @@ if(in_array($action,['save','generate'],true)) {
     }
     $c+=['number'=>$s['contract']['number']??'UM-'.date('Y').'-'.strtoupper(substr(hash('sha256',$id),0,8)), 'version'=>(int)($s['contract']['version']??0)+1, 'createdAt'=>time(), 'templateVersion'=>(int)($s['contract']['templateVersion']??$body['templateVersion']??0), 'offerVersion'=>(int)($s['offer']['version']??1), 'status'=>'DRAFT'];
     $c['facts']=$facts;
+    $c['sourceRefs']=documentContractSources($s);
     $sameTemplate=isset($s['contract']) && ($s['contract']['templateId']??'legacy')===$templateId && (int)($body['templateVersion']??$s['contract']['templateVersion']??0)===(int)($s['contract']['templateVersion']??0) && (int)($body['templateRevision']??$s['contract']['templateRevision']??0)===(int)($s['contract']['templateRevision']??0);
     if(!$sameTemplate && ((int)($body['templateVersion']??0)!==(int)$activeTemplate['version'] || (isset($body['templateRevision']) && (int)$body['templateRevision']!==(int)($activeTemplate['revision']??0)))) contractError(409,'Wybrany wzór zmienił się. Wczytaj go ponownie przed zapisem.');
     $c['templateId']=$templateId;
