@@ -97,7 +97,7 @@ try:
     start_before = request(project_path, {"action": "start", "scope": "Test portfolio project", "owner": "Test admin", "budget": 100}, csrf)
     confirm_before = request(project_path, {"action": "confirm_contract", "evidence": "Test agreement evidence"}, csrf)
     accept_draft = request(offer_path, {"action": "accept"})
-    assert start_before[0] == 409 and confirm_before[0] == 409 and accept_draft[0] == 409
+    assert start_before[0] == 409 and confirm_before[0] == 409 and accept_draft[0] == 409, (start_before,confirm_before,accept_draft)
 
     review = request(offer_path, {"action": "review"})
     mock_send = request(offer_path, {"action": "send"})
@@ -152,7 +152,24 @@ $session['contract']['offerVersion']=$session['offer']['version']; writeSession(
     db.close()
     assert repo_state and repo_state[0] == "failed" and "GitHub App ID" in repo_state[1], repo_state
 
-    print("HTTP workflow gates passed: fake test contact cannot complete a brief; DRAFT offer and stale contract are blocked; accepted current offer and matching contract queue and generate the plan; repository creation stops before GitHub when its App credentials are missing.")
+    # Add commercial terms to a legacy offer; all writes stay in this disposable DB.
+    code, editor = request(offer_path+"&format=agreement")
+    assert code == 200, (code, editor)
+    (tmp_root / 'offer-agreement-ui-fixture.json').write_text(json.dumps(editor,ensure_ascii=False),encoding='utf-8')
+    assert request(offer_path,dict(action='updateAgreement',expectedVersion=1,csrf='wrong',agreement={}))[0] == 403
+    assert request(offer_path,dict(action='updateAgreement',expectedVersion=99,csrf=editor['csrf'],agreement={}))[0] == 409
+    saved=request(offer_path,dict(action='updateAgreement',expectedVersion=1,csrf=editor['csrf'],agreement={}))
+    assert saved[0] == 200 and saved[1]['offer']['version'] == 2 and saved[1]['offer']['status'] == 'DRAFT',saved
+    assert request(offer_path,dict(action='review'))[0] == 422,'Missing offer terms must block review'
+    terms={key:('agency' if field.get('options') else 'Fictional agreed terms') for key,field in editor['fields'].items()}
+    terms['acceptanceDays']='14';terms['productionDomain']='example.test'
+    saved=request(offer_path,dict(action='updateAgreement',expectedVersion=2,csrf=editor['csrf'],agreement=terms))
+    assert saved[0] == 200 and saved[1]['offer']['version'] == 3,saved
+    reviewed=request(offer_path,dict(action='review'));assert reviewed[0] == 200,reviewed
+    accepted=request(offer_path,dict(action='accept'));assert accepted[0] == 200,accepted
+    assert accepted[1]['offer']['agreement']['acceptanceDays'] == '14'
+    assert len(request(offer_path)[1]['offerVersions']) == 2,'Prior versions must remain available'
+    print('HTTP workflow and offer agreement gates passed, including CSRF, version conflicts, missing terms and acceptance snapshot.')
 finally:
     server.terminate()
     server.wait(timeout=5)

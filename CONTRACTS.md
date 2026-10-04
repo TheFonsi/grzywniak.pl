@@ -1,5 +1,19 @@
 # Umowy aplikacji i stron — ustalenia PL / UE
 
+## Oferta jako źródło uzgodnionych warunków
+
+Nowe oferty przechowują osobną sekcję `agreement`: kryteria i termin odbioru, współpracę przy materiałach, harmonogram prac i płatności, sposób publikacji, wymagane warunki domeny/hostingu, wsparcie, prawa i licencje, koszty dodatkowe oraz plan danych aplikacji. Brief i potwierdzone odpowiedzi analizy podpowiadają znane wartości. Nieznane ceny, terminy i uprawnienia nie są wymyślane. Szczegóły można wpisać oraz wykorzystać propozycje w rozwijanym formularzu „Warunki realizacji i dane do umowy” przy ofercie.
+
+Zapis tworzy kolejną wersję DRAFT, archiwizuje poprzednią i cofa jej weryfikację/akceptację. Formularz wymaga CSRF i zgodnej wersji. Nową ofertę można zweryfikować i zaakceptować dopiero po uzupełnieniu odpowiednich pól; pola hostingu i domeny zależą od wybranej ścieżki. Stare oferty bez `agreement` pozostają czytelne i działają według dotychczasowych zasad. Można dodać im warunki przez formularz, co tworzy nową wersję do uzgodnienia.
+
+Zaakceptowana oferta ma pierwszeństwo przed późniejszymi zmianami briefu przy podpowiadaniu danych umowy. Jej kryteria odbioru są kopiowane dokładnie, nie tworzone na nowo. Materiały, dni odbioru i ustalenia publikacji/hostingu/domeny również są kopiowane. Harmonogram, płatności, wsparcie, prawa, koszty i plan danych są używane w pierwszym projekcie treści umowy obok klauzul wzoru. Zapisane dokumenty nie są przepisywane w tle. Niezgodność faktów pakietu z zaakceptowaną ofertą blokuje nowy PDF: należy przywrócić ustalenia albo uzgodnić nową wersję oferty. Zakres opcjonalny i wyłączony nie jest przenoszony do przedmiotu umowy.
+
+Oferta nie zastępuje końcowej oceny charakteru świadczenia, statusu klienta, faktycznego wykazu praw, weryfikacji dostawców, szczegółowego powierzenia ani wymaganej formy podpisu. Plan danych pozwala wcześniej ustalić, co będzie potrzebne. Parametry powierzenia muszą odpowiadać rzeczywistym operacjom: [UODO — granice powierzenia](https://orzeczenia.uodo.gov.pl/document/urn%3Andoc%3Agov%3Apl%3Auodo%3A2020%3Adkn_5130_2024/content).
+
+PDF oferty korzysta z układu A4 i fontów proporcjonalnych wspólnych z umową, z polskimi znakami, numerem wersji, ceną brutto, VAT, zaliczką brutto i osobną częścią warunków. Wysyłka do klienta dołącza PDF tej wersji. Pobranie archiwalnej wersji odczytuje jej zapisane dane. Szacowany nakład i stawka pozostają kalkulacją wewnętrzną; automatyczna kalkulacja nie dopisuje logowania lub panelu, jeśli nie wynika to z oferowanego zakresu.
+
+Testy: `php tests/offer-agreement.php`, `php tests/offer-workflow.php`, `python tests/project-gates-http.py`, `node tests/offer-agreement-ui.mjs`, `php tests/contract-brief.php`. Przykładowy PDF układu: `php tests/offer-agreement.php --sample` (dane fikcyjne).
+
 ## Domena kupowana dla klienta i hosting agencji
 
 ### Podpowiedzi z briefu

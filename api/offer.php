@@ -4,6 +4,8 @@ require_once __DIR__ . '/bootstrap.php';
 require_once __DIR__ . '/internal-analysis.php';
 require_once __DIR__ . '/offer-changes.php';
 require_once __DIR__ . '/offer-readiness.php';
+require_once __DIR__.'/offer-agreement.php';
+require_once __DIR__.'/offer-pdf.php';
 
 $user = getenv('ADMIN_USERNAME') ?: '';
 $pass = getenv('ADMIN_PASSWORD') ?: '';
@@ -81,7 +83,7 @@ function offerDocument(array $session, float $rate, float $vat, int $version = 1
     $hours = ($system ? 48 : 12) + ($pages * ($system ? 7 : 5)) + $complexity;
     $hours = max($system ? 48 : 18, min(260, $hours));
     $modules = [];
-    if ($system) { $modules[] = ['name' => 'Analiza i konfiguracja rozwiązania', 'hours' => 12]; $modules[] = ['name' => 'Logowanie i role użytkowników', 'hours' => 14]; $modules[] = ['name' => 'Główne moduły i formularze', 'hours' => max(16, $pages * 7)]; $modules[] = ['name' => 'Panel zarządzania i raporty', 'hours' => 14]; $modules[] = ['name' => 'Testy, wdrożenie i poprawki', 'hours' => 12]; }
+    if ($system) { $modules[] = ['name' => 'Analiza i konfiguracja rozwiązania', 'hours' => 12]; if(preg_match('/logowan|konto|uwierzyteln|role|uprawnien/ui',$features)) $modules[] = ['name' => 'Logowanie i role użytkowników', 'hours' => 14]; $modules[] = ['name' => 'Główne moduły i formularze', 'hours' => max(16, $pages * 7)]; if(preg_match('/panel|raport|zarządzan/ui',$features)) $modules[] = ['name' => 'Panel zarządzania i raporty', 'hours' => 14]; $modules[] = ['name' => 'Testy, wdrożenie i poprawki', 'hours' => 12]; }
     else { $modules[] = ['name' => 'Analiza i przygotowanie struktury', 'hours' => 6]; $modules[] = ['name' => 'Projekt i skład pierwszej wersji', 'hours' => max(6, $pages * 5)]; $modules[] = ['name' => 'Formularz/kontakt i konfiguracja', 'hours' => 4]; $modules[] = ['name' => 'Testy, publikacja i poprawki', 'hours' => 6]; }
     $moduleHours = array_sum(array_map(static fn($module) => (int) ($module['hours'] ?? 0), $modules));
     $hours = max($hours, $moduleHours);
@@ -105,10 +107,11 @@ function offerDocument(array $session, float $rate, float $vat, int $version = 1
             ['title' => 'Cel i kontekst', 'items' => array_values(array_filter([(string) ($state['businessGoals'] ?? ''), (string) ($state['targetUsers'] ?? '')]))],
             ['title' => 'Zakres realizacji', 'items' => $scope],
             ['title' => 'Poza obecnym zakresem / możliwe później', 'items' => $optional ?: ['Elementy niewymienione w zakresie będą wymagały osobnego ustalenia.']],
-            ['title' => 'Planowany termin', 'items' => [(string) ($state['deadline'] ?? 'Termin do potwierdzenia po akceptacji zakresu.')]],
+            ['title' => 'Oczekiwany termin klienta (brief)', 'items' => [(string) ($state['deadline'] ?? 'Termin do potwierdzenia po akceptacji zakresu.')]],
         ],
         'pricing' => ['hours' => $hours, 'rate' => $rate, 'modules' => $modules, 'rationale' => $rationale, 'net' => $net, 'vatRate' => $vat, 'vat' => round($net * $vat / 100, 2), 'gross' => round($net * (1 + $vat / 100), 2)],
         'payment' => ['depositRate' => $depositRate, 'deposit' => round($net * $depositRate / 100, 2), 'note' => 'Pozostała część rozliczana zgodnie z harmonogramem ustalonym przed podpisaniem umowy.'],
+        'agreement'=>offerAgreementDraft($session),
         'note' => 'Dokument ma charakter wstępny i stanowi podstawę do przygotowania umowy oraz finalnego harmonogramu.',
     ];
 }
@@ -122,7 +125,7 @@ function offerChangeLog(array $previous, array $current): array {
     };
     $compare('project', 'Nazwa projektu', $previous['project'] ?? '', $current['project'] ?? '');
     $compare('summary', 'Podsumowanie', $previous['summary'] ?? '', $current['summary'] ?? '');
-    foreach (['sections' => 'Zakres i warunki realizacji', 'contact' => 'Dane klienta', 'payment' => 'Warunki płatności'] as $field => $label) $compare($field, $label, json_encode($previous[$field] ?? [], JSON_UNESCAPED_UNICODE), json_encode($current[$field] ?? [], JSON_UNESCAPED_UNICODE));
+    foreach (['agreement'=>'Ustalenia do umowy','sections' => 'Zakres i warunki realizacji', 'contact' => 'Dane klienta', 'payment' => 'Warunki płatności'] as $field => $label) $compare($field, $label, json_encode($previous[$field] ?? [], JSON_UNESCAPED_UNICODE), json_encode($current[$field] ?? [], JSON_UNESCAPED_UNICODE));
     $compare('pricing.net', 'Cena netto', $previous['pricing']['net'] ?? '', $current['pricing']['net'] ?? '');
     $compare('pricing.gross', 'Cena brutto', $previous['pricing']['gross'] ?? '', $current['pricing']['gross'] ?? '');
     return $changes;
@@ -142,32 +145,16 @@ function pdfFontObject(): string {
     return '<< /Type /Font /Subtype /Type1 /BaseFont /Arial /Encoding << /Type /Encoding /BaseEncoding /WinAnsiEncoding /Differences [140 /Sacute 143 /Zacute 156 /sacute 159 /zacute 163 /Lslash 165 /Aogonek 175 /Zdotaccent 179 /lslash 185 /aogonek 191 /zdotaccent 198 /Cacute 202 /Eogonek 209 /Nacute 211 /Oacute 230 /cacute 234 /eogonek 241 /nacute 243 /oacute] >> >>';
 }
 function offerSlug(string $value): string { $value = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', trim($value)) ?: trim($value); $value = strtolower((string) preg_replace('/[^a-zA-Z0-9]+/', '-', $value)); return trim($value, '-') ?: 'klient'; }
-function sendOfferPdf(array $offer): never { sendOfferPdfFixed($offer, '');
-    $contact = $offer['contact'] ?? [];
-    $lines=['WSTEPNA OFERTA - ZAKRES REALIZACJI I WYCENA','', 'Projekt: '.(string)($offer['project']??'Projekt cyfrowy'), 'Wygenerowano: '.date('Y-m-d H:i',(int)($offer['updatedAt']??$offer['createdAt']??time())), 'Kontakt: '.implode(' | ', array_filter([(string)($contact['name']??''),(string)($contact['phone']??''),(string)($contact['email']??'')])), ''];
-    if (!empty($offer['summary'])) { $lines[]='Podsumowanie'; $lines=array_merge($lines,str_split((string)$offer['summary'],95)); $lines[]=''; }
-    foreach (($offer['sections']??[]) as $section) { $lines[]=(string)($section['title']??'Sekcja'); foreach (($section['items']??[]) as $item) { foreach (str_split(cleanDecisionText((string)$item),88) as $part) $lines[]='- '.$part; } $lines[]=''; }
-    $pricing=$offer['pricing']??[]; $payment=$offer['payment']??[]; $lines[]='WYCENA'; $lines[]='Netto: '.number_format((float)($pricing['net']??0),2,',',' ').' PLN'; $lines[]='VAT '.(float)($pricing['vatRate']??23).'%: '.number_format((float)($pricing['vat']??0),2,',',' ').' PLN'; $lines[]='Brutto: '.number_format((float)($pricing['gross']??0),2,',',' ').' PLN'; $lines[]='Szacowany naklad: '.(int)($pricing['hours']??0).' h'; $lines[]='Zaliczka: '.(int)($payment['depositRate']??0).'% ('.number_format((float)($payment['deposit']??0),2,',',' ').' PLN)'; $lines[]=''; $lines[]=pdfText((string)($offer['note']??''));
-    $pages=array_chunk($lines,45); $objects=[]; $objects[]='<< /Type /Catalog /Pages 2 0 R >>'; $objects[]='<< /Type /Pages /Kids ['.implode(' ',array_map(static fn($i)=>($i+5).' 0 R',array_keys($pages))).'] /Count '.count($pages).' >>'; $objects[]=pdfFontObject();
-    foreach ($pages as $index=>$pageLines) { $content="BT /F1 11 Tf 48 780 Td 15 TL "; foreach ($pageLines as $line) $content.='('.pdfText($line).') Tj T* '; $content.='ET'; $objects[]='<< /Length '.strlen($content).' >>\nstream\n'.$content.'\nendstream'; $objects[]='<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents '.(4+$index*2).' 0 R >>'; }
-    $pdf="%PDF-1.4\n"; $offsets=[]; foreach($objects as $i=>$object){$offsets[$i+1]=strlen($pdf);$pdf.=($i+1).' 0 obj\n'.$object."\nendobj\n";} $xref=strlen($pdf); $pdf.='xref\n0 '.(count($objects)+1).'\n0000000000 65535 f \n'; for($i=1;$i<=count($objects);$i++)$pdf.=sprintf('%010d 00000 n \n',$offsets[$i]); $pdf.='trailer << /Size '.(count($objects)+1).' /Root 1 0 R >>\nstartxref\n'.$xref.'\n%%EOF'; header('Content-Type: application/pdf'); header('Content-Disposition: attachment; filename="wstepna-oferta.pdf"'); header('Content-Length: '.strlen($pdf)); echo $pdf; exit;
+function sendOfferPdf(array $offer): never { sendOfferPdfFixed($offer,''); }
+function sendOfferPdfFixed(array $offer,string $sessionId): never {
+    $pdf=offerPdf($offer);
+    header('Content-Type: application/pdf');
+    header('Content-Disposition: attachment; filename="oferta-'.preg_replace('/[^A-Za-z0-9-]/','',$offer['offerId']??'OF').'-v'.(int)($offer['version']??1).'.pdf"');
+    header('Content-Length: '.strlen($pdf));echo $pdf;exit;
 }
 
-function sendOfferPdfFixed(array $offer, string $sessionId): never {
-    $offer['sections'] = array_values(array_filter($offer['sections'] ?? [], static fn($section) => !preg_match('/zatwierdzone ustalenia|zmiany do potwierdzenia/iu', (string) ($section['title'] ?? ''))));
-    $contact = is_array($offer['contact'] ?? null) ? $offer['contact'] : [];
-    $contactLabel = (string) ($contact['name'] ?? '') ?: (string) ($offer['project'] ?? 'Klient');
-    $offerCode = (string) ($offer['offerId'] ?? '') ?: 'OF-' . strtoupper(substr(hash('sha256', $sessionId . '-offer'), 0, 10));
-    $lines = ['PROPONOWANA OFERTA DLA: ' . $contactLabel, 'Projekt: ' . (string) ($offer['project'] ?? 'Projekt cyfrowy'), 'Numer: ' . $offerCode . '  |  Wersja: ' . (int) ($offer['version'] ?? 1), '', 'Utworzono: ' . date('Y-m-d H:i', (int) ($offer['createdAt'] ?? $offer['updatedAt'] ?? time())), 'Kontakt: ' . implode(' | ', array_filter([(string) ($contact['name'] ?? ''), (string) ($contact['phone'] ?? ''), (string) ($contact['email'] ?? '')])), ''];
-    if (!empty($offer['summary'])) { $lines[] = 'PODSUMOWANIE'; foreach (explode("\n", wordwrap(cleanDecisionText((string) $offer['summary']), 72, "\n", true)) as $line) $lines[] = $line; $lines[] = ''; }
-    foreach (($offer['sections'] ?? []) as $section) { if (str_contains(mb_strtolower((string) ($section['title'] ?? '')), 'zatwierdzone ustalenia')) continue; $lines[] = mb_strtoupper((string) ($section['title'] ?? 'Sekcja'), 'UTF-8'); foreach (($section['items'] ?? []) as $item) { $wrapped = explode("\n", wordwrap(cleanDecisionText((string) $item), 68, "\n", true)); foreach ($wrapped as $lineIndex => $line) $lines[] = ($lineIndex === 0 ? '- ' : '  ') . $line; } $lines[] = ''; }
-    $pricing = $offer['pricing'] ?? []; $payment = $offer['payment'] ?? []; $lines[] = 'WYCENA'; $lines[] = 'Netto: ' . number_format((float) ($pricing['net'] ?? 0), 2, ',', ' ') . ' PLN'; $lines[] = 'VAT ' . (float) ($pricing['vatRate'] ?? 23) . '%: ' . number_format((float) ($pricing['vat'] ?? 0), 2, ',', ' ') . ' PLN'; $lines[] = 'Brutto: ' . number_format((float) ($pricing['gross'] ?? 0), 2, ',', ' ') . ' PLN'; $lines[] = 'Zaliczka: ' . (int) ($payment['depositRate'] ?? 0) . '% (' . number_format((float) ($payment['deposit'] ?? 0), 2, ',', ' ') . ' PLN)'; $lines[] = ''; $lines[] = (string) ($offer['note'] ?? '');
-    $pages = array_chunk($lines, 45); $objects = ['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [' . implode(' ', array_map(static fn($i) => ($i * 2 + 5) . ' 0 R', array_keys($pages))) . '] /Count ' . count($pages) . ' >>', pdfFontObject()];
-    foreach ($pages as $index => $pageLines) { $content = "BT /F1 10 Tf 48 780 Td 14 TL\n"; foreach ($pageLines as $line) $content .= '(' . pdfText($line) . ") Tj T*\n"; $content .= 'ET'; $objects[] = '<< /Length ' . strlen($content) . " >>\nstream\n" . $content . "\nendstream"; $objects[] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents ' . (4 + $index * 2) . ' 0 R >>'; }
-    $pdf = "%PDF-1.4\n%\xE2\xE3\xCF\xD3\n"; $offsets = []; foreach ($objects as $index => $object) { $number = $index + 1; $offsets[$number] = strlen($pdf); $pdf .= $number . " 0 obj\n" . $object . "\nendobj\n"; } $xref = strlen($pdf); $pdf .= "xref\n0 " . (count($objects) + 1) . "\n0000000000 65535 f \n"; for ($i = 1; $i <= count($objects); $i++) $pdf .= sprintf("%010d 00000 n \n", $offsets[$i]); $pdf .= "trailer\n<< /Size " . (count($objects) + 1) . " /Root 1 0 R >>\nstartxref\n" . $xref . "\n%%EOF\n";
-    $version = max(1, (int) ($offer['version'] ?? 1)); $contactLabel = (string) ($contact['name'] ?? '') ?: (string) ($offer['project'] ?? 'klient'); $dateLabel = date('Y-m-d', (int) ($offer['updatedAt'] ?? $offer['createdAt'] ?? time())); $offerCode = strtolower(preg_replace('/[^A-Za-z0-9-]/', '', (string) ($offer['offerId'] ?? $sessionId))); $filename = 'oferta-' . offerSlug($contactLabel) . '-' . $dateLabel . '-' . $offerCode . '-v' . $version . '.pdf'; header('Content-Type: application/pdf'); header('Content-Disposition: attachment; filename="' . $filename . '"'); header('Content-Length: ' . strlen($pdf)); echo $pdf; exit;
-}
-$body = json_decode(file_get_contents('php://input') ?: '{}', true) ?: [];
+$body=json_decode(file_get_contents('php://input')?:'{}',true);
+if(!is_array($body)) $body=[];
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $body['action'] ?? '';
     if (in_array($action, ['generate', 'review', 'send', 'confirmChange'], true)) {
@@ -213,6 +200,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($body['action'] ?? '') === 'review
     $offer = is_array($session['offer'] ?? null) ? $session['offer'] : null;
     if ($offer === null) { http_response_code(404); echo json_encode(['message' => 'Najpierw przygotuj ofertę.']); exit; }
     if (!missingInformationManuallyConfirmed($session)) { http_response_code(409); echo json_encode(['message' => 'Brakuje ręcznie zatwierdzonej odpowiedzi na co najmniej jedno pytanie analizy. Otwórz analizę, zapisz odpowiedź administratora i spróbuj ponownie.'], JSON_UNESCAPED_UNICODE); exit; }
+    if($missing=offerAgreementMissing($offer)) { http_response_code(422); echo json_encode(['message'=>'Uzupełnij warunki oferty przed weryfikacją: '.implode(', ',$missing)],JSON_UNESCAPED_UNICODE); exit; }
     $offer['status'] = 'REVIEWED';
     $offer['reviewedAt'] = time();
     $offer['verification'] = 'HUMAN_REVIEWED';
@@ -232,7 +220,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($body['action'] ?? '') === 'send')
     $p = $offer['pricing'] ?? []; $payment = $offer['payment'] ?? [];
     $bodyText = "Dzień dobry,\n\nprzesyłamy wstępny dokument zakresu realizacji i wyceny projektu.\n\n" . ($offer['project'] ?? 'Projekt cyfrowy') . "\n\n" . ($offer['summary'] ?? '') . "\n\nWycena: " . number_format((float)($p['net'] ?? 0), 2, ',', ' ') . " zł netto / " . number_format((float)($p['gross'] ?? 0), 2, ',', ' ') . " zł brutto.\nSzacowany nakład: " . (int)($p['hours'] ?? 0) . " h.\nZaliczka: " . (int)($payment['depositRate'] ?? 0) . "%.\n\nDokument ma charakter wstępny i wymaga wspólnego potwierdzenia zakresu przed umową.\n\nPozdrawiamy,\nGrzywniak.pl";
     $bodyText = "Klient: " . ((string) ($offer['contact']['name'] ?? '') ?: 'Klient') . "\nData dokumentu: " . date('Y-m-d H:i', (int) ($offer['updatedAt'] ?? time())) . "\nNumer oferty: " . ($offer['offerId'] ?? '') . "\n\n" . $bodyText;
-    $headers = 'From: Grzywniak.pl <'.$sender.'>\r\nContent-Type: text/plain; charset=UTF-8';
+    $boundary='grzywniak-offer-'.bin2hex(random_bytes(16));
+    $headers='From: Grzywniak.pl <'.$sender.">\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=\"".$boundary.'"';
+    $bodyText='--'.$boundary."\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n".chunk_split(base64_encode($bodyText))
+        .'--'.$boundary."\r\nContent-Type: application/pdf\r\nContent-Disposition: attachment; filename=\"oferta-v".(int)($offer['version']??1).".pdf\"\r\nContent-Transfer-Encoding: base64\r\n\r\n".chunk_split(base64_encode(offerPdf($offer))).'--'.$boundary."--\r\n";
     if (getenv('DISCOVERY_MAIL_MOCK') !== 'true' && !@mail($recipient, 'Wstępny zakres realizacji i wycena — Grzywniak.pl', $bodyText, $headers)) { http_response_code(502); echo json_encode(['message' => 'Nie udało się wysłać wiadomości. Sprawdź konfigurację poczty.']); exit; }
     $sentAt = time();
     $offer['sentAt'] = $sentAt; $offer['sentTo'] = $recipient; $offer['status'] = 'SENT'; $offer['updatedAt'] = $sentAt;
@@ -251,6 +242,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($body['action'] ?? '') === 'accept
     if (!is_array($session['offer'] ?? null)) { http_response_code(404); echo json_encode(['message' => 'Najpierw przygotuj ofertę.'], JSON_UNESCAPED_UNICODE); exit; }
     $offer = $session['offer'];
     if (!in_array(($offer['status'] ?? ''), ['REVIEWED', 'SENT'], true)) { http_response_code(409); echo json_encode(['message' => 'Najpierw zweryfikuj ofertę.'], JSON_UNESCAPED_UNICODE); exit; }
+    if($missing=offerAgreementMissing($offer)) {http_response_code(422);echo json_encode(['message'=>'Uzupełnij warunki przed akceptacją: '.implode(', ',$missing)],JSON_UNESCAPED_UNICODE);exit;}
     $offer['status'] = 'ACCEPTED'; $offer['acceptedAt'] = time(); $offer['acceptedBy'] = (string) ($_SERVER['PHP_AUTH_USER'] ?? 'admin');
     $note = trim((string) ($body['clientMessage'] ?? '')); if ($note !== '') { $offer['clientMessage'] = $note; $offer['clientMessageAt'] = time(); }
     $session['offer'] = $offer; file_put_contents($file, json_encode($session, JSON_UNESCAPED_UNICODE), LOCK_EX); echo json_encode(['offer' => $offer], JSON_UNESCAPED_UNICODE); exit;
@@ -288,6 +280,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($body['action'] ?? '') === 'genera
     if ($previous) { $session['offerVersions'] = is_array($session['offerVersions'] ?? null) ? $session['offerVersions'] : []; $session['offerVersions'][] = $previous; }
     $nextVersion = max(1, (int) ($previous['version'] ?? 0) + 1);
     $offer = $updatedOffer ?? offerDocument($session, (float) (getenv('OFFER_HOURLY_RATE_NET') ?: 150), (float) (getenv('OFFER_VAT_RATE') ?: 23), $nextVersion);
+    $offer['agreement']=offerAgreementDraft($session,$offer['agreement']??[]);
+    $offer['provider']=array_intersect_key(contractProfile(),array_flip(['legalName','address','taxId','email','phone']));
     $offer['version'] = $nextVersion;
     $offer['offerId'] = 'OF-' . strtoupper(substr(hash('sha256', $id . '-' . $nextVersion), 0, 10));
     $offer['updatedAt'] = time();
@@ -365,6 +359,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($body['action'] ?? '') === 'update
     $session['offer'] = $offer;
     file_put_contents($file, json_encode($session, JSON_UNESCAPED_UNICODE), LOCK_EX);
     echo json_encode(['offer' => $offer], JSON_UNESCAPED_UNICODE); exit;
+}
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($body['action'] ?? '') === 'updateAgreement') {
+    if(!hash_equals(contractToken(),(string)($body['csrf']??''))) { http_response_code(403); echo json_encode(['message'=>'Odśwież sesję formularza.']);exit; }
+    $offer=$session['offer']??null;
+    if(!is_array($offer)||(int)($body['expectedVersion']??-1)!==(int)($offer['version']??0)) {http_response_code(409);echo json_encode(['message'=>'Oferta zmieniła się. Odśwież panel.']);exit;}
+    try { if(!is_array($body['agreement']??null)) throw new InvalidArgumentException('Niepoprawny formularz ustaleń.');$agreement=offerAgreementRead($body['agreement']); }
+    catch(InvalidArgumentException $e) {http_response_code(422);echo json_encode(['message'=>$e->getMessage()],JSON_UNESCAPED_UNICODE);exit;}
+    $session['offerVersions'][]=$offer;
+    $offer['version']=(int)$offer['version']+1;$offer['offerId']='OF-'.strtoupper(substr(hash('sha256',$id.'-'.$offer['version']),0,10));
+    $offer['agreement']=$agreement;$offer['status']='DRAFT';$offer['needsHumanReview']=true;$offer['updatedAt']=time();$offer['changeLog']=[];
+    if(!isset($offer['provider'])) $offer['provider']=array_intersect_key(contractProfile(),array_flip(['legalName','address','taxId','email','phone']));
+    unset($offer['reviewedAt'],$offer['verification'],$offer['sentAt'],$offer['sentTo'],$offer['acceptedAt']);
+    $session['offer']=$offer;writeSession($session);
+    echo json_encode(['offer'=>$offer],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);exit;
+}
+if(($_GET['format']??'')==='agreement') {
+    $offer=$session['offer']??[];
+    $suggestions=[];foreach(offerAgreementFields() as $key=>$field) $suggestions[$key]=offerAgreementSuggestions($key);
+    echo json_encode(['fields'=>offerAgreementFields(),'values'=>$offer['agreement']??offerAgreementDraft($session),'suggestions'=>$suggestions,'csrf'=>contractToken(),'missing'=>offerAgreementMissing($offer)],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);exit;
 }
 if (($_GET['format'] ?? '') === 'pdf') { $offerForPdf = $requestedVersion > 0 ? $selectedOffer : ($session['offer'] ?? null); if (!is_array($offerForPdf)) { http_response_code(404); echo json_encode(['message' => 'Najpierw przygotuj ofertę.']); exit; } sendOfferPdfFixed($offerForPdf, $id); }
 $visibleOffer = $analysisReady ? ($requestedVersion > 0 ? $selectedOffer : ($session['offer'] ?? null)) : null;

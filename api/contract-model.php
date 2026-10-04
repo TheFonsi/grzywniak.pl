@@ -34,12 +34,18 @@ function contractEditor(array $session): string {
     $selection=contractSelectTemplate($offer);
     $templateId=is_array($saved)?($saved['templateId']??'legacy'):$selection['id'];
     $template=$templateId==='legacy'?contractTemplate():contractCatalogTemplate($templateId);
-    $defaults = array_replace($template, ['party'=>$offer['contact']['name'] ?? '', 'scope'=>implode("\n", array_map(static fn($s)=>($s['title']??'')."\n".implode("\n",$s['items']??[]), $offer['sections']??[])), 'price'=>number_format((float)($offer['pricing']['net']??0),2,',',' ').' zł netto; VAT '.($offer['pricing']['vatRate']??23).'%', 'deposit'=>($offer['payment']['depositRate']??0).'%', 'deadline'=>$session['projectState']['deadline']??'']);
+    $defaults = array_replace($template, ['party'=>$offer['contact']['name'] ?? '', 'scope'=>implode("\n", array_map(static fn($s)=>($s['title']??'')."\n".implode("\n",$s['items']??[]), contractOfferScopeSections($offer))), 'price'=>number_format((float)($offer['pricing']['net']??0),2,',',' ').' zł netto; VAT '.($offer['pricing']['vatRate']??23).'%', 'deposit'=>($offer['payment']['depositRate']??0).'%', 'deadline'=>$session['projectState']['deadline']??'']);
     $defaults['scope']="Zamawiający zleca, a Wykonawca zobowiązuje się wykonać i przekazać projekt w następującym zakresie:\n".$defaults['scope'];
     $net=(float)($offer['pricing']['net']??0); $vat=(float)($offer['pricing']['vatRate']??23);
     $gross=isset($offer['pricing']['gross'])?(float)$offer['pricing']['gross']:round($net*(1+$vat/100),2);
     $defaults['price'].='; '.number_format($gross,2,',',' ').' zł brutto.';
+    $defaults['deposit']='Zaliczka: '.($offer['payment']['depositRate']??0).'% ceny brutto, tj. '.number_format(round($gross*(float)($offer['payment']['depositRate']??0)/100,2),2,',',' ').' zł brutto.';
     if (!empty($offer['contractTerms'])) $defaults['terms'] .= "\n".$offer['contractTerms'];
+    $agreement=is_array($offer['agreement']??null)?$offer['agreement']:[];
+    foreach(['deliverySchedule'=>'deadline','paymentSchedule'=>'deposit','supportPlan'=>'support','rightsSummary'=>'exclusions','externalCosts'=>'extras','dataPlan'=>'terms'] as $source=>$target) if(trim((string)($agreement[$source]??''))!=='') {
+        if($target==='deadline') $defaults[$target]=$agreement[$source];
+        else $defaults[$target].="\nUstalenia zaakceptowanej oferty: ".$agreement[$source];
+    }
     if($profile['version']>0) $defaults['provider']=contractProviderText($profile);
     $defaults['paymentDetails']=implode("\n",array_filter([$profile['bankAccount']!==''?'Rachunek: '.$profile['bankAccount']:'',$profile['paymentTerms']]));
     $values = is_array($saved) ? $saved : $defaults;

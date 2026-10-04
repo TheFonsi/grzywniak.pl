@@ -2,6 +2,7 @@
 declare(strict_types=1);
 if(PHP_SAPI!=='cli') { http_response_code(404); exit; }
 require_once __DIR__ . '/../api/offer-changes.php';
+require_once __DIR__ . '/../api/offer-agreement.php';
 // Test pure document functions without authentication, storage or AI requests.
 $source = file_get_contents(__DIR__ . '/../api/offer.php');
 if (!str_contains($source, "if(\$_SERVER['REQUEST_METHOD']==='POST')")) throw new RuntimeException('Read-only offer requests must not take the exclusive session lock');

@@ -75,7 +75,7 @@ final class ContractPdfLayout {
         $this->heading($label,$compact); $this->paragraph($text,$size);
     }
     public function title(string $title): void {
-        $this->text('PROJEKT UMOWY / DO PODPISANIA',48,$this->y,8,true,'0.38 0.45 0.54'); $this->y+=22;
+        $this->text(($this->contract['documentType']??'')==='offer'?'OFERTA / ZAKRES I WARUNKI REALIZACJI':'PROJEKT UMOWY / DO PODPISANIA',48,$this->y,8,true,'0.38 0.45 0.54'); $this->y+=22;
         foreach($this->wrap($title,499,23,true) as $line) { $this->text($line,48,$this->y,23,true); $this->y+=29; }
         $this->y+=10;
         $this->paragraph('Numer: '.($this->contract['number']??'UM').' | Wersja: '.($this->contract['version']??1),9);
@@ -102,7 +102,7 @@ final class ContractPdfLayout {
         $objects[]='<< /Length '.strlen($cmap)." >>\nstream\n".$cmap."\nendstream";
         foreach($this->pages as $i=>$stream) {
             $this->stream=''; $this->rule(791);
-            $this->text('Projekt do podpisania | '.($this->contract['number']??'UM'),48,802,8,false,'0.38 0.45 0.54');
+            $this->text((($this->contract['documentType']??'')==='offer'?'Oferta':'Projekt do podpisania').' | '.($this->contract['number']??'UM'),48,802,8,false,'0.38 0.45 0.54');
             $this->text('Strona '.($i+1).' / '.count($this->pages),468,802,8,false,'0.38 0.45 0.54'); $stream.=$this->stream;
             $objects[]='<< /Length '.strlen($stream)." >>\nstream\n".$stream."\nendstream";
             $objects[]='<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents '.(6+$i*2).' 0 R >>';

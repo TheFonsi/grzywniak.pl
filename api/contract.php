@@ -155,6 +155,7 @@ if(in_array($action,['save','generate'],true)) {
     try { $review=contractReviewState($body['reviewState']??null,$c,$facts,$s['contract']['review']??[]); } catch(InvalidArgumentException $error) { contractError(422,$error->getMessage()); }
     if($action==='generate') foreach(['provider','party','scope','price','deadline','ip'] as $key) if($c[$key]==='') contractError(422,'Uzupełnij: '.contractFields()[$key]);
     if($action==='generate') {
+        if($differences=contractOfferFactDifferences($s,$facts)) contractError(422,'Ustalenia różnią się od zaakceptowanej oferty: '.implode(', ',$differences).'. Zaktualizuj ofertę i potwierdź nową wersję z klientem albo przywróć jej ustalenia.');
         if($templateId!=='legacy') foreach(contractRequiredReview($c,$facts) as $key) {
             if(!isset($review[$key])) $review[$key]=['value'=>(string)($c[$key]??$facts[$key]??''),'accepted'=>false];
         }
