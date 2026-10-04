@@ -1,5 +1,13 @@
 # Umowy aplikacji i stron — ustalenia PL / UE
 
+## Przyciski ponownego przygotowania dokumentów
+
+Kolejność: rozmowa → brief → analiza → oferta → akceptacja oferty → umowa.
+Brief powstaje przy przekazaniu rozmowy zespołowi. „Przeanalizuj brief od nowa” ponawia analizę istniejącego briefu z uwzględnieniem ręcznych ustaleń, nie generuje nowego briefu, oferty ani umowy.
+Nieudana próba zapisuje `analysisLastAttempt` z numerem błędu i zachowuje ostatnią ukończoną analizę oraz dokumenty. Udana próba archiwizuje analizę, zwiększa jej wersję w bazie i oznacza ofertę jako nieaktualną. Oferta wymaga aktualizacji, przeglądu i ponownej akceptacji przed przygotowaniem umowy. Zapisane lub podpisane umowy nie są przepisywane automatycznie.
+„Wczytaj wybrany wzór” podmienia klauzule w formularzu; „Uzupełnij puste ustalenia z briefu” uzupełnia puste pola z zaakceptowanej oferty i briefu. Nowy PDF powstaje dopiero przez „Zapisz i przygotuj PDF”.
+Test ponownej analizy: `python tests/analysis-retry-http.py`, wyłącznie izolowana baza i atrapa AI.
+
 ## Oferta jako źródło uzgodnionych warunków
 
 Nowe oferty przechowują osobną sekcję `agreement`: kryteria i termin odbioru, współpracę przy materiałach, harmonogram prac i płatności, sposób publikacji, wymagane warunki domeny/hostingu, wsparcie, prawa i licencje, koszty dodatkowe oraz plan danych aplikacji. Brief i potwierdzone odpowiedzi analizy podpowiadają znane wartości. Nieznane ceny, terminy i uprawnienia nie są wymyślane. Szczegóły można wpisać oraz wykorzystać propozycje w rozwijanym formularzu „Warunki realizacji i dane do umowy” przy ofercie.

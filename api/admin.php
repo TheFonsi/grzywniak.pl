@@ -131,6 +131,17 @@ register_shutdown_function(static function(): void {
   const humaniseQuestionLabel = (root) => root.querySelectorAll('h4').forEach((heading) => { if (heading.textContent.trim() === 'Pytania do klienta') { heading.textContent = 'Pytania klienta do zespołu'; heading.title = 'Przykładowe pytania, które klient może zadać naszemu zespołowi po otrzymaniu oferty.'; } });
   const detail = () => document.querySelectorAll('section.panel')[1];
   // Retry handlers are intentionally idempotent: one status node and one progress node per view.
+  const retryBriefAnalysis = async (id) => {
+    let response;
+    try {
+      response = await fetch('/api/discovery.php?action=retryAnalysis&sessionId=' + encodeURIComponent(id), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(150000) });
+    } catch (error) {
+      throw new Error(error.name === 'TimeoutError' ? 'Upłynął czas oczekiwania. Odśwież widok i sprawdź wynik przed ponowieniem analizy.' : 'Nie udało się połączyć z API. Sprawdź połączenie i odśwież widok przed ponowieniem.');
+    }
+    const data = await response.json().catch(() => null);
+    if (!response.ok || data?.analysisStatus !== 'COMPLETED') throw new Error(data?.message || 'API nie zwróciło poprawnej analizy (HTTP ' + response.status + '). Sprawdź log API.');
+    return data;
+  };
   const addRetryStable = (root) => {
     const status = [...root.querySelectorAll('.status')].find((node) => node.textContent.trim() === 'Analiza wymaga ponowienia');
     const id = new URL(location.href).searchParams.get('session');
@@ -140,11 +151,9 @@ register_shutdown_function(static function(): void {
       if (status.dataset.retryBusy) return;
       status.dataset.retryBusy = '1'; status.style.pointerEvents = 'none'; status.textContent = 'Uruchamiamy analizę — może to potrwać…';
       try {
-        const response = await fetch('/api/discovery.php?action=retryAnalysis&sessionId=' + encodeURIComponent(id), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-        const data = await response.json();
-        if (response.ok && data.analysisStatus === 'COMPLETED') { status.textContent = 'Analiza gotowa — odświeżam widok…'; location.reload(); return; }
-        status.textContent = 'Analiza nadal wymaga ponowienia — spróbuj później';
-      } catch { status.textContent = 'Nie udało się połączyć — spróbuj później'; }
+        await retryBriefAnalysis(id);
+        status.textContent = 'Analiza gotowa — odświeżam widok…'; location.reload();
+      } catch (error) { status.textContent = error.message; }
       finally { delete status.dataset.retryBusy; status.style.pointerEvents = 'auto'; }
     };
   };
@@ -153,24 +162,35 @@ register_shutdown_function(static function(): void {
     if (!id || !head || head.querySelector('[data-analysis-refresh]')) return;
     root.querySelector('[data-main-analysis]')?.remove();
     const button = document.createElement('button'); button.type = 'button'; button.className = 'button'; button.dataset.analysisRefresh = '1'; button.textContent = 'Przeanalizuj brief od nowa'; head.append(button);
+    button.title = 'Ponawia analizę istniejącego briefu. Po sukcesie oferta wymaga aktualizacji i ponownej akceptacji. Umowa powstaje z zaakceptowanej oferty.';
+    const flowHint = document.createElement('p'); flowHint.className = 'muted'; flowHint.textContent = 'Rozmowa → brief → analiza → oferta → akceptacja oferty → umowa. Ponowna analiza nie generuje oferty ani umowy.'; head.after(flowHint);
     button.onclick = async () => {
       if (button.dataset.busy) return;
       button.dataset.busy = '1'; button.disabled = true; button.textContent = 'Analiza w toku…';
       root.querySelectorAll('[data-analysis-progress]').forEach((node) => node.remove());
-      const progress = document.createElement('span'); progress.className = 'muted'; progress.dataset.analysisProgress = '1'; progress.textContent = '  Sprawdzam zakres, ryzyka i wycenę…'; progress.style.cssText = 'display:inline-block;margin-left:10px;color:#e7bd58'; head.append(progress);
+      const progress = document.createElement('span'); progress.className = 'muted'; progress.dataset.analysisProgress = '1'; progress.textContent = '  Sprawdzam zakres, ryzyka i brakujące informacje…'; progress.style.cssText = 'display:inline-block;margin-left:10px;color:#e7bd58'; head.append(progress);
       try {
-        const response = await fetch('/api/discovery.php?action=retryAnalysis&sessionId=' + encodeURIComponent(id), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(120000) });
-        const data = await response.json();
-        if (!response.ok || data.analysisStatus !== 'COMPLETED') throw new Error(data.message || 'analysis');
+        await retryBriefAnalysis(id);
         button.textContent = 'Analiza gotowa — odświeżam…'; location.reload();
       } catch (error) {
-        progress.textContent = '  Analiza nie została ukończona. Spróbuj ponownie.'; progress.title = error?.message || ''; progress.style.color = '#ef7c86'; button.textContent = 'Spróbuj ponownie'; button.disabled = false; delete button.dataset.busy;
+        progress.textContent = '  ' + error.message; progress.style.color = '#ef7c86'; button.textContent = 'Ponów analizę'; button.disabled = false; delete button.dataset.busy;
       }
     };
   };
   const humaniseLabels = (root) => root.querySelectorAll('h3').forEach((heading) => { if (heading.textContent.trim() === 'Flagi ryzyka') heading.textContent = 'Obszary wymagające uwagi'; });
-  const addRetry = (root) => { const status=[...root.querySelectorAll('.status')].find((node) => node.textContent.trim() === 'Analiza wymaga ponowienia'); const id=new URL(location.href).searchParams.get('session'); if(!status||!id||status.dataset.retryAnalysis)return; status.dataset.retryAnalysis='1';status.style.cursor='pointer';status.title='Kliknij, aby uruchomić analizę ponownie';status.textContent='Analiza wymaga ponowienia — kliknij tutaj';status.onclick=async()=>{status.style.pointerEvents='none';status.textContent='Uruchamiamy analizę — może to potrwać…';try{const response=await fetch('/api/discovery.php?action=retryAnalysis&sessionId='+encodeURIComponent(id),{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});const data=await response.json();if(response.ok&&data.analysisStatus==='COMPLETED'){status.textContent='Analiza gotowa — odświeżam widok…';location.reload();return;}status.textContent='Analiza nadal wymaga ponowienia — spróbuj później';}catch{status.textContent='Nie udało się połączyć — spróbuj później';}finally{status.style.pointerEvents='auto';}}; };
-  const addMainAnalysisButton = (root) => { const id=new URL(location.href).searchParams.get('session'); const actions=root.querySelector('.actions'); if(!id||!actions||actions.querySelector('[data-main-analysis]'))return; const button=document.createElement('button');button.type='button';button.className='button';button.dataset.mainAnalysis='1';button.textContent='Przeanalizuj brief od nowa';button.onclick=async()=>{button.disabled=true;button.textContent='Analizuję brief…';try{const response=await fetch('/api/discovery.php?action=retryAnalysis&sessionId='+encodeURIComponent(id),{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});const data=await response.json();if(response.ok&&data.analysisStatus==='COMPLETED'){button.textContent='Analiza gotowa — odświeżam…';location.reload();return;}button.textContent='Analiza wymaga ponowienia';}catch{button.textContent='Spróbuj ponownie';}finally{button.disabled=false;}};actions.prepend(button); };
+  const addMainAnalysisButton = (root) => {
+    const id = new URL(location.href).searchParams.get('session');
+    const actions = root.querySelector('.actions');
+    if (!id || !actions || actions.querySelector('[data-main-analysis]')) return;
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'button'; button.dataset.mainAnalysis = '1'; button.textContent = 'Przeanalizuj brief od nowa';
+    button.onclick = async () => {
+      button.disabled = true; button.textContent = 'Analizuję brief…';
+      try { await retryBriefAnalysis(id); location.reload(); }
+      catch (error) { button.textContent = 'Ponów analizę'; alert(error.message); }
+      finally { button.disabled = false; }
+    };
+    actions.prepend(button);
+  };
   const addOfferButton = (root) => {
     const id = new URL(location.href).searchParams.get('session');
     if (!id || root.querySelector('[data-offer-generator]')) return;
@@ -263,37 +283,6 @@ register_shutdown_function(static function(): void {
     if (!timestamp || timestamp.dataset.briefTimestamp) return;
     timestamp.dataset.briefTimestamp = '1';
     timestamp.textContent = timestamp.textContent.replace(/^.*?:\s*/, 'Brief wygenerowany / ostatnio aktualizowany: ');
-  };
-  const addAnalysisControls = (root) => {
-    const id = new URL(location.href).searchParams.get('session');
-    const head = root.querySelector('.analysis-head');
-    if (!id || !head || head.querySelector('[data-analysis-refresh]')) return;
-    root.querySelector('[data-main-analysis]')?.remove();
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'button';
-    button.dataset.analysisRefresh = '1';
-    button.textContent = 'Przeanalizuj brief od nowa';
-    button.onclick = async () => {
-      button.disabled = true;
-      button.textContent = 'Od\u015bwie\u017cam analiz\u0119\u2026';
-      try {
-        const response = await fetch('/api/discovery.php?action=retryAnalysis&sessionId=' + encodeURIComponent(id), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-        const data = await response.json();
-        if (!response.ok || data.analysisStatus !== 'COMPLETED') throw new Error('analysis');
-        button.textContent = 'Analiza gotowa \u2014 od\u015bwie\u017cam\u2026';
-        location.reload();
-      } catch {
-        button.textContent = 'Spr\u00f3buj ponownie';
-        button.disabled = false;
-      }
-    };
-    button.onclick = async () => {
-      button.disabled = true; button.textContent = 'Analiza w toku…';
-      const progress = document.createElement('span'); progress.className = 'muted'; progress.textContent = '  Sprawdzam zakres, ryzyka i wycenę…'; progress.style.cssText = 'display:inline-block;margin-left:10px;color:#e7bd58'; head.append(progress);
-      try { const response = await fetch('/api/discovery.php?action=retryAnalysis&sessionId=' + encodeURIComponent(id), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(120000) }); const data = await response.json(); if (!response.ok || data.analysisStatus !== 'COMPLETED') throw new Error('analysis'); button.textContent = 'Analiza gotowa — odświeżam…'; location.reload(); } catch { progress.textContent = '  Analiza nie została ukończona. Spróbuj ponownie.'; progress.style.color = '#ef7c86'; button.textContent = 'Spróbuj ponownie'; button.disabled = false; }
-    };
-    head.append(button);
   };
   const generateOfferWithStatus = async (sessionId, container) => {
     const root = container.closest('[data-visible-offer]') || container;

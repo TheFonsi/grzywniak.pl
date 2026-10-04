@@ -1,5 +1,18 @@
 <?php
 declare(strict_types=1);
+function internalAnalysisFailure(Throwable $error): array {
+  $detail = $error->getMessage();
+  $message = match (true) {
+    str_contains($detail, 'Brak konfiguracji') => 'Brak klucza API usługi AI w konfiguracji API.',
+    str_contains($detail, 'HTTP 401'), str_contains($detail, 'HTTP 403') => 'Usługa AI odrzuciła dostęp. Sprawdź klucz API i uprawnienia projektu.',
+    str_contains($detail, 'HTTP 429') => 'Usługa AI odrzuciła żądanie z powodu limitu lub braku środków. Sprawdź rozliczenia i limity.',
+    str_contains($detail, 'HTTP 400'), str_contains($detail, 'HTTP 404') => 'Usługa AI odrzuciła konfigurację żądania. Sprawdź nazwę modelu; szczegóły zapisano w logu API.',
+    str_contains($detail, 'AI_INCOMPLETE') => 'Usługa AI nie ukończyła odpowiedzi. Ponów analizę.',
+    str_contains($detail, 'HTTP 0') => 'Nie udało się połączyć z usługą AI w wymaganym czasie. Sprawdź połączenie serwera i ponów analizę.',
+    default => 'Nie udało się ukończyć analizy. Szczegóły zapisano w logu API.',
+  };
+  return ['status'=>'FAILED','createdAt'=>time(),'reference'=>bin2hex(random_bytes(6)),'message'=>$message];
+}
 function internalAnalysis(array $session, bool $updateOffer = false): array {
   @set_time_limit(120);
   if (getenv('DISCOVERY_MOCK') === 'true') return ['status'=>'COMPLETED','readiness'=>'NEEDS_CLARIFICATION','summary'=>'Wewnętrzna analiza demonstracyjna briefu.','missingInformation'=>['Potwierdzenie zakresu pierwszego etapu'],'risks'=>[],'recommendedScope'=>['Ustalenie zakresu z zespołem'],'optionalScope'=>[],'questionsForClient'=>['Który element jest najważniejszy na początku?'],'nextStep'=>'Krótka weryfikacja briefu przez zespół.'];
@@ -19,7 +32,11 @@ function internalAnalysis(array $session, bool $updateOffer = false): array {
   for($attempt=1;$attempt<=3;$attempt++){
     $ch=curl_init('https://api.openai.com/v1/responses'); curl_setopt_array($ch,[CURLOPT_POST=>true,CURLOPT_HTTPHEADER=>['Authorization: Bearer '.$key,'Content-Type: application/json'],CURLOPT_POSTFIELDS=>json_encode($payload,JSON_UNESCAPED_UNICODE),CURLOPT_RETURNTRANSFER=>true,CURLOPT_TIMEOUT=>35]); $raw=curl_exec($ch); $code=(int)curl_getinfo($ch,CURLINFO_HTTP_CODE); $error=curl_error($ch);
     if($raw===false||$code===429||$code>=500){$lastError='HTTP '.$code.' '.$error;if($attempt<3){usleep(200000*$attempt);continue;}throw new RuntimeException($lastError);}
-    if($code<200||$code>=300)throw new RuntimeException('HTTP '.$code.' '.$error);
+    if($code<200||$code>=300) {
+      $failure=json_decode((string)$raw,true);
+      $reason=(string)($failure['error']['code']??$failure['error']['type']??'unknown');
+      throw new RuntimeException('HTTP '.$code.' '.preg_replace('/[^a-zA-Z0-9_.-]/','',$reason));
+    }
     $envelope = json_decode($raw, true);
     if (($envelope['status'] ?? '') === 'incomplete') {
       $payload['max_output_tokens'] = 6500;
