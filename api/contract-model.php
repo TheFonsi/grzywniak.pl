@@ -57,10 +57,10 @@ function contractEditor(array $session): string {
         if($key==='rightsTerms' && !in_array($saved['facts']['ipMode']??'',['exclusive','nonexclusive'],true)) $value='';
         if($key==='publicationDestination') $html.='<h4>Publikacja i przekazanie ustalone z klientem</h4><p class="muted">Te ustalenia trafią do umowy i po jej potwierdzeniu zostaną automatycznie przeniesione do etapu publikacji.</p>' ;
         $clientOnly=in_array($key,['productionDomain','domainRegistrar','domainOwnershipTerms','productionHosting','serverTarget','backupResponsibility','dnsTlsResponsibility'],true);
-        $hidden=$clientOnly && ($saved['facts']['publicationDestination']??'')!=='client_handoff';
+        $hidden=!contractPublicationFieldApplicable($key,$saved['facts']??[]);
         if($key==='consumerDocuments') $hidden=!in_array($saved['facts']['clientType']??'',['consumer','protected'],true);
         if($key==='dataProcessingTerms') $hidden=($saved['facts']['dataRole']??'')!=='processor';
-        $html.='<label'.($clientOnly?' data-client-publication-field':'').($key==='rightsTerms'?' data-license-terms'.(!in_array($saved['facts']['ipMode']??'',['exclusive','nonexclusive'],true)?' hidden':''):'').($hidden?' hidden':'').'>'.$e($field['label']);
+        $html.='<label'.($clientOnly?' data-client-publication-field data-publication-key="'.$key.'"':'').($key==='rightsTerms'?' data-license-terms'.(!in_array($saved['facts']['ipMode']??'',['exclusive','nonexclusive'],true)?' hidden':''):'').($hidden?' hidden':'').'>'.$e($field['label']);
         if(isset($field['options'])) { $html.='<select name="'.$key.'"'.($key==='publicationDestination'?' required':'').'><option value="">Wybierz</option>'; foreach($field['options'] as $option=>$label) { if($option==='') continue; $html.='<option value="'.$e($option).'"'.($value===$option?' selected':'').'>'.$e($label).'</option>'; } $html.='</select>'; }
         else $html.='<input name="'.$key.'" maxlength="2000" value="'.$e($value).'"'.($key==='contractDate'?' type="date"':'').'>';
         $html.='</label>';

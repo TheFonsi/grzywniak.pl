@@ -1,5 +1,13 @@
 # Umowy aplikacji i stron — ustalenia PL / UE
 
+## Domena kupowana dla klienta i hosting agencji
+
+Wariant `agency_purchase` oznacza zakup domeny dla klienta oraz hosting u Grzywniak. Wymaga nazwy domeny, ustaleń o abonencie i upoważnieniu, kosztach zakupu, niedostępności nazwy, odnowieniach i przekazaniu kontroli. Rejestrator może być jeszcze nieustalony; trzeba go uzgodnić przed zakupem. Dochodzą wszystkie warunki hostingu agencji. Pola serwera klienta są ukryte i nie blokują tego wariantu. Ustalenia tworzą osobny załącznik do PDF i podlegają ręcznej akceptacji oraz weryfikacji całego pakietu.
+
+Mapa pobiera warunki z aktualnej podpisanej umowy. Podgląd nie zmienia adresu ani zabezpieczeń. Integracja zakupu u rejestratora i podłączenia zewnętrznych domen do VPS nie jest jeszcze wdrożona: panel pokazuje wymagane działania i blokuje automatyczną publikację zastępczą w domenie agencji. Zmiana ścieżki wymaga nowej wersji umowy; zapisanych podpisanych dokumentów system nie aktualizuje automatycznie.
+
+Dla domen .pl abonent i rejestrator to różne role. Wydanie AuthInfo nie może zależeć od dodatkowej opłaty. Źródło: [NASK — prawa abonenta domeny .pl](https://www.dns.pl/prawa_abonenta_domeny_pl). Koszty osobnych prac migracyjnych nie warunkują wydania kodu. Dane dostępowe pozostają poza umową.
+
 Przegląd źródeł i biblioteki: 03.10.2026. Panel zawiera własne wzory z konkretnymi klauzulami, przeznaczone do sprawdzenia i zatwierdzenia dla danej transakcji. Nie jest to opinia prawna. Przed użyciem w działalności należy zatwierdzić bibliotekę z prawnikiem, w szczególności warunki praw autorskich i załączniki konsumenckie.
 
 ## Biblioteka i wygląd dokumentów

@@ -71,4 +71,11 @@ assert.equal(reopenedForm.querySelector('[data-review-field="support"]').dataset
 form.elements.ipMode.value='transfer';
 form.elements.ipMode.dispatchEvent(new dom.window.Event('change',{bubbles:true}));
 assert.equal(card('rightsTerms').hidden,true);
-console.log('Contract UI: accept, edit, changed-value invalidation, accepted-value preservation, reopen, missing facts and license visibility passed.');
+form.elements.publicationDestination.value='agency_purchase';
+form.elements.publicationDestination.dispatchEvent(new dom.window.Event('change',{bubbles:true}));
+for(const name of ['productionDomain','domainRegistrar','domainRegistrant','domainRenewalTerms','hostingFee']) assert.equal(card(name).hidden,false,`${name} visible for managed domain purchase`);
+assert.equal(card('productionHosting').hidden,true,'Customer server details excluded');
+form.elements.publicationDestination.value='agency';
+form.elements.publicationDestination.dispatchEvent(new dom.window.Event('change',{bubbles:true}));
+assert.equal(card('domainRegistrant').hidden,true,'Domain procurement hidden for agency subdomain');
+console.log('Contract UI checks passed, including managed domain purchase visibility.');

@@ -22,8 +22,8 @@ function contractProviderText(array $profile): string {
 }
 function contractFacts(): array {
     return array_merge([
-        'publicationDestination'=>['label'=>'Sposób publikacji produkcyjnej','options'=>[''=>'Wybierz','agency'=>'Publikacja na infrastrukturze i domenie Grzywniak','client_handoff'=>'Przekazanie klientowi do publikacji na jego domenie i serwerze']],
-        'productionDomain'=>['label'=>'Domena produkcyjna klienta (wymagana przy publikacji klienta)'],
+        'publicationDestination'=>['label'=>'Sposób publikacji produkcyjnej','options'=>[''=>'Wybierz','agency'=>'Publikacja na infrastrukturze i domenie Grzywniak','agency_purchase'=>'Zakup domeny dla klienta i hosting na infrastrukturze Grzywniak','client_handoff'=>'Przekazanie klientowi do publikacji na jego domenie i serwerze']],
+        'productionDomain'=>['label'=>'Docelowa domena klienta (także nazwa planowana do zakupu)'],
         'domainRegistrar'=>['label'=>'Rejestrator lub operator DNS (opcjonalnie)'],
         'domainOwnershipTerms'=>['label'=>'Ustalenie o prawie klienta do domeny i jej weryfikacji'],
         'productionHosting'=>['label'=>"Dostawca hostingu klienta (je\u{015B}li ustalony)"],
@@ -57,6 +57,11 @@ function contractReadFacts(array $body, array $saved = [], ?array $template = nu
     if($facts['ipMode']==='transfer') $facts['rightsTerms']=($saved['ipMode']??'')==='transfer' && trim((string)($saved['rightsTerms']??''))!=='' ? $saved['rightsTerms'] : $template['defaultTransferTerms'];
     return $facts;
 }
+function contractPublicationFieldApplicable(string $key,array $facts): bool {
+    if(in_array($key,['productionDomain','domainRegistrar'],true)) return in_array($facts['publicationDestination']??'',['client_handoff','agency_purchase'],true);
+    if(in_array($key,['domainOwnershipTerms','productionHosting','serverTarget','backupResponsibility','dnsTlsResponsibility'],true)) return ($facts['publicationDestination']??'')==='client_handoff';
+    return true;
+}
 function contractFactsMissing(array $facts): array {
     $missing=[];
     foreach(contractFacts() as $key=>$field) {
@@ -66,10 +71,10 @@ function contractFactsMissing(array $facts): array {
         if($key==='dataProcessingTerms' && ($facts['dataRole']??'')!=='processor') continue;
         if(in_array($key,['clientTaxId','domainRegistrar','serverTarget'],true)) continue;
         if(in_array($key,['domainOwnershipTerms','productionHosting','backupResponsibility','dnsTlsResponsibility'],true) && ($facts['publicationDestination']??'')!=='client_handoff') continue;
-        if(in_array($key,['productionDomain'],true) && ($facts['publicationDestination']??'')!=='client_handoff') continue;
+        if($key==='productionDomain' && !in_array($facts['publicationDestination']??'',['client_handoff','agency_purchase'],true)) continue;
         if(trim((string)($facts[$key]??''))==='') $missing[]=$field['label'];
     }
-    if(($facts['publicationDestination']??'')==='client_handoff') {
+    if(in_array($facts['publicationDestination']??'',['client_handoff','agency_purchase'],true)) {
         $domain=strtolower(trim((string)($facts['productionDomain']??'')));
         if($domain!=='' && (strlen($domain)>253 || preg_match('/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$/D',$domain)!==1)) $missing[]='Poprawna domena produkcyjna klienta';
     }

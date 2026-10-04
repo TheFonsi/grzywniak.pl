@@ -73,11 +73,13 @@ function projectSignedPublicationPlan(array $session,array $case): ?array {
     if(!projectContractMatchesAcceptedOffer($session) || empty($contract['pdfBase64']) || (int)($case['contractSignedVersion']??0)<1 || (int)$case['contractSignedVersion']!==(int)($contract['version']??0)) return null;
     $facts=is_array($contract['facts']??null)?$contract['facts']:[];
     $destination=(string)($facts['publicationDestination']??'');
-    if(!in_array($destination,['agency','client_handoff'],true)) return null;
+    if(!in_array($destination,['agency','client_handoff','agency_purchase'],true)) return null;
     if($destination==='client_handoff') {
         foreach(['productionDomain','domainOwnershipTerms','productionHosting','backupResponsibility','dnsTlsResponsibility'] as $field) if(trim((string)($facts[$field]??''))==='') return null;
     }
+    if($destination==='agency_purchase' && (trim($facts['productionDomain']??'')==='' || contractFactsMissing($facts))) return null;
     return [
+        'domainProcurement'=>$destination==='agency_purchase'?array_intersect_key($facts,array_flip(['domainRegistrant','domainPurchaseTerms','domainAvailabilityTerms','domainRenewalTerms','domainHandoverTerms','hostingFee','hostingPeriod','hostingBackup','hostingExit','hostingDns'])):[],
         'destination'=>$destination,
         'domain'=>strtolower(trim((string)($facts['productionDomain']??''))),
         'registrar'=>trim((string)($facts['domainRegistrar']??'')),

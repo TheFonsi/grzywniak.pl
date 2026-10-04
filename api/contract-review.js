@@ -38,9 +38,14 @@
   function refresh(form) {
     form.querySelectorAll('[data-contract-module]').forEach(label => {
       const module=label.dataset.contractModule;
-      label.hidden=(module==='hosting'&&form.elements.publicationDestination.value!=='agency') ||
+      label.hidden=(module==='hosting'&&!['agency','agency_purchase'].includes(form.elements.publicationDestination.value)) ||
+        (module==='domain_purchase'&&form.elements.publicationDestination.value!=='agency_purchase') ||
         (module==='consumer'&&!['consumer','protected'].includes(form.elements.clientType.value)) ||
         (module==='dpa'&&form.elements.dataRole.value!=='processor');
+    });
+    form.querySelectorAll('[data-client-publication-field]').forEach(label => {
+      const destination=form.elements.publicationDestination.value;
+      label.hidden=destination!=='client_handoff' && !(destination==='agency_purchase' && ['productionDomain','domainRegistrar'].includes(label.dataset.publicationKey));
     });
     const state = read(form);
     form.querySelectorAll('[data-review-field]').forEach(card => {
@@ -104,6 +109,9 @@
           clientType:['terms'], dataRole:['terms'], rightsTerms:['ip'], signing:['ip'],
           consumerDocuments:['terms'], dataProcessingTerms:['terms'],
           publicationDestination:['deploymentTerms'], productionDomain:['deploymentTerms'],
+          domainRegistrant:['deploymentTerms'], domainPurchaseTerms:['deploymentTerms'],
+          domainAvailabilityTerms:['deploymentTerms'], domainRenewalTerms:['deploymentTerms'],
+          domainHandoverTerms:['deploymentTerms'],
           productionHosting:['deploymentTerms'], domainOwnershipTerms:['deploymentTerms'],
           backupResponsibility:['deploymentTerms'], dnsTlsResponsibility:['deploymentTerms']
         };

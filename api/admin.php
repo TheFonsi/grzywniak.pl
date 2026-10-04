@@ -47,7 +47,7 @@ register_shutdown_function(static function(): void {
     if (event.target.name === 'publicationDestination') {
       const form = event.target.form;
       const clientRoute = event.target.value === 'client_handoff';
-      form?.querySelectorAll('[data-client-publication-field]').forEach(label => { label.hidden = !clientRoute; });
+      form?.querySelectorAll('[data-client-publication-field]').forEach(label => { label.hidden = !clientRoute && !(event.target.value === 'agency_purchase' && ['productionDomain','domainRegistrar'].includes(label.dataset.publicationKey)); });
       return;
     }
     if (event.target.name !== 'ipMode') return;

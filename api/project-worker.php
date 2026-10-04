@@ -264,6 +264,8 @@ function runOneJob(): bool {
             })(),
             'provision_preview'=>provisionPreview($session,$case,(static function() use ($id): array { foreach(projectJobs($id) as $job) if($job['kind']==='create_repository'&&$job['state']==='done') return json_decode((string)$job['result'],true)?:[]; throw new RuntimeException('Repozytorium nie jest gotowe.'); })()),
             'publish_production'=>(static function() use ($id,$session,$case,$job): array {
+                $plan=projectSignedPublicationPlan($session,$case);
+                if(!$plan || $plan['destination']!=='agency') throw new RuntimeException('Automatyczne wdrożenie wymaga aktualnej podpisanej umowy na publikację w domenie agencji. Zewnętrzna domena wymaga osobnego podłączenia.');
                 $approved=json_decode((string)$job['input'],true)?:[];
                 if(($approved['imageDigest']??'')!==($case['productionApprovedDigest']??'') || ($approved['commitSha']??'')!==($case['productionApprovedCommit']??'')) throw new RuntimeException('Zgoda na produkcję nie dotyczy tej wersji.');
                 $results=[]; foreach(projectJobs($id) as $related) if($related['state']==='done') $results[$related['kind']]=json_decode((string)$related['result'],true)?:[];

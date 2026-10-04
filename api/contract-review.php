@@ -11,7 +11,7 @@ function contractReviewState(mixed $raw, array $fields, array $facts, array $pre
     foreach(array_replace($previous,$submitted) as $key=>$entry) {
         if(!contractPackageApplicable($key,$facts)) continue;
         if(in_array($key,['consumerDocuments','dataProcessingTerms'],true) && trim($facts[$key]??'')==='') continue;
-        if(in_array($key,['productionDomain','domainRegistrar','domainOwnershipTerms','productionHosting','serverTarget','backupResponsibility','dnsTlsResponsibility'],true) && ($facts['publicationDestination']??'')!=='client_handoff') continue;
+        if(!contractPublicationFieldApplicable($key,$facts)) continue;
         if($key==='consumerDocuments' && !in_array($facts['clientType']??'',['consumer','protected'],true)) continue;
         if($key==='dataProcessingTerms' && ($facts['dataRole']??'')!=='processor') continue;
         if(!array_key_exists($key,contractFields())&&!array_key_exists($key,contractFacts())) continue;
@@ -31,7 +31,7 @@ function contractRequiredReview(array $fields,array $facts): array {
         if(in_array($key,['consumerDocuments','dataProcessingTerms'],true) && trim($facts[$key]??'')==='') continue;
         if($key==='ipPayment' || ($key==='rightsTerms' && ($facts['ipMode']??'')==='transfer')) continue;
         if(in_array($key,['clientTaxId','domainRegistrar','serverTarget'],true) && trim($facts[$key]??'')==='') continue;
-        if(in_array($key,['productionDomain','domainRegistrar','domainOwnershipTerms','productionHosting','serverTarget','backupResponsibility','dnsTlsResponsibility'],true) && ($facts['publicationDestination']??'')!=='client_handoff') continue;
+        if(!contractPublicationFieldApplicable($key,$facts)) continue;
         if($key==='consumerDocuments' && !in_array($facts['clientType']??'',['consumer','protected'],true)) continue;
         if($key==='dataProcessingTerms' && ($facts['dataRole']??'')!=='processor') continue;
         $required[]=$key;

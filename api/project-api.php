@@ -274,6 +274,7 @@ try {
             }
     } elseif($action==='approve_production') {
         $publicationPlan=projectSignedPublicationPlan($session,$case);
+        if(($publicationPlan['destination']??'')==='agency_purchase') throw new DomainException('Zakup domeny i podłączenie zewnętrznej domeny do VPS wymagają osobnej obsługi. Nie opublikujemy tego projektu pod zastępczą domeną agencji.');
         if(!$publicationPlan || $publicationPlan['destination']!=='agency') throw new DomainException('Umowa musi potwierdzać publikację na infrastrukturze Grzywniak.');
         if(!empty($case['clientHandoffPreparedAt'])) throw new DomainException('Ta sprawa ma juz przygotowana sciezke przekazania klientowi.');
         $evidence=trim((string)($body['evidence']??''));

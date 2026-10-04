@@ -3,12 +3,24 @@ declare(strict_types=1);
 if(PHP_SAPI!=='cli') { http_response_code(404); exit; }
 require_once __DIR__.'/../api/contract-model.php';
 require_once __DIR__.'/../api/contract-pdf.php';
+require_once __DIR__.'/../api/contract-review.php';
 function packageAssert(bool $ok,string $message): void { if(!$ok) throw new RuntimeException($message); }
 $site=contractSampleContract('website'); $app=contractSampleContract('webapp'); $shop=contractSampleContract('ecommerce');
 packageAssert(count($site['package']['documents'])===4,'Site needs specification, rights, privacy and hosting');
 packageAssert(count($app['package']['documents'])===5,'Application needs a real DPA');
 packageAssert(count($shop['package']['documents'])===6,'Protected customer needs notices and withdrawal form');
 packageAssert(contractPackageMissing($site['facts'])===[],'Complete fictional package facts');
+$purchase=$site; $purchase['facts']['publicationDestination']='agency_purchase';
+$purchase['facts']['productionDomain']='example.test';
+packageAssert(contractFactsMissing($purchase['facts'])!==[],'Purchase requires actual agreed domain terms');
+foreach(['domainRegistrant','domainPurchaseTerms','domainAvailabilityTerms','domainRenewalTerms','domainHandoverTerms'] as $key) $purchase['facts'][$key]='Fictional agreed terms for '.$key;
+packageAssert(contractFactsMissing($purchase['facts'])===[],'Purchase does not require client hosting details');
+$docs=contractPackageBuild($purchase)['documents'];
+packageAssert(in_array('hosting',array_column($docs,'id'),true)&&in_array('domain_purchase',array_column($docs,'id'),true),'Purchase includes domain and agency hosting appendices');
+packageAssert(contractPublicationFieldApplicable('productionDomain',$purchase['facts']),'Purchase needs target domain');
+packageAssert(!contractPublicationFieldApplicable('productionHosting',$purchase['facts']),'Purchase excludes customer server questions');
+packageAssert(in_array('domainRenewalTerms',contractRequiredReview([],$purchase['facts']),true),'Domain renewal terms need manual review');
+$purchase['facts']['hostingFee']=''; packageAssert(contractFactsMissing($purchase['facts'])!==[],'Purchase still requires hosting price');
 $bad=$site['facts']; $bad['hostingFee']=''; packageAssert(contractPackageMissing($bad)!==[],'Agency hosting must not bypass price and duration');
 $bad=$site['facts']; $bad['rightsInventory']='[]'; packageAssert(contractPackageMissing($bad)!==[],'Empty inventory cannot pass');
 $bad=$app['facts']; $bad['processingSubprocessors']='[{"name":"unknown"}]'; packageAssert(contractPackageMissing($bad)!==[],'Subprocessors require service and location');

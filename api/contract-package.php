@@ -22,6 +22,11 @@ function contractPackageFields(): array {
         'hostingBackup'=>$text('Kopie: częstotliwość, retencja, zakres, test odtworzenia, czas odtworzenia i odpowiedzialność','hosting'),
         'hostingExit'=>$text('Zakończenie hostingu: eksport kodu i danych, format, termin, koszt, okres przechowania i usunięcie','hosting'),
         'hostingDns'=>$text('Hosting: operator infrastruktury, lokalizacja danych, odpowiedzialność za DNS, TLS, domenę i awarie','hosting'),
+        'domainRegistrant'=>$text('Abonent domeny: dane klienta, na którego rejestrowana jest domena, oraz upoważnienie agencji do działania w jego imieniu','domain_purchase'),
+        'domainPurchaseTerms'=>$text('Zakup domeny: cena brutto lub limit, płatnik, okres rejestracji i zasady zatwierdzenia wydatku','domain_purchase'),
+        'domainAvailabilityTerms'=>$text('Dostępność nazwy: sposób sprawdzenia i decyzja klienta, gdy wybrana domena jest zajęta','domain_purchase'),
+        'domainRenewalTerms'=>$text('Odnowienie domeny: odpowiedzialny, koszt, powiadomienia, zgoda na zmianę ceny i skutki braku płatności','domain_purchase'),
+        'domainHandoverTerms'=>$text('Dostęp do domeny: konto rejestratora, DNS, przekazanie kontroli i kodu transferowego oraz termin i koszt zakończenia obsługi','domain_purchase'),
         'consumerChannel'=>['label'=>'Sposób zawarcia umowy','module'=>'consumer','options'=>[''=>'Wybierz','distance'=>'Na odległość','premises'=>'W lokalu','offpremises'=>'Poza lokalem','unsolicited'=>'Niezamówiona wizyta w domu lub wycieczka']],
         'consumerPerformance'=>['label'=>'Świadczenie konsumenckie — oceń osobno usługę i dostarczenie treści cyfrowych','module'=>'consumer','options'=>[''=>'Wybierz','service'=>'Usługa','digital'=>'Treść / usługa cyfrowa','mixed'=>'Świadczenia mieszane — podział w zakresie']],
         'consumerTechnical'=>$text('Wymagania techniczne, funkcjonalność, interoperacyjność, zabezpieczenia, aktualizacje i sposób reklamacji','consumer',true),
@@ -38,7 +43,8 @@ function contractPackageFields(): array {
 function contractPackageApplicable(string $key,array $facts): bool {
     $group=contractPackageFields()[$key]['module']??null;
     return match($group) {
-        'hosting'=>($facts['publicationDestination']??'')==='agency',
+        'hosting'=>in_array($facts['publicationDestination']??'',['agency','agency_purchase'],true),
+        'domain_purchase'=>($facts['publicationDestination']??'')==='agency_purchase',
         'consumer'=>in_array($facts['clientType']??'',['consumer','protected'],true),
         'dpa'=>($facts['dataRole']??'')==='processor',
         default=>true
@@ -123,9 +129,20 @@ function contractPackageBuild(array $contract): array {
         'Przechowywanie i źródło'=>$f['privacyRetention'],
         'Prawa i podanie danych'=>'Na zasadach RODO można żądać dostępu, sprostowania, usunięcia, ograniczenia i przenoszenia danych oraz wnieść sprzeciw wobec przetwarzania opartego na uzasadnionym interesie. Jeżeli odrębne przetwarzanie opiera się na zgodzie, można ją wycofać bez wpływu na zgodność wcześniejszych działań. Skargę można złożyć Prezesowi UODO. Podanie niezbędnych danych umownych jest potrzebne do zawarcia i obsługi umowy; brak może uniemożliwić jej zawarcie. Zakres danych wymaganych prawem wynika z konkretnego obowiązku. Dane zbędne nie są wymagane. Niniejsza informacja dotyczy danych umownych wykonawcy; nie zastępuje obowiązku informacyjnego klienta wobec użytkowników aplikacji.',
     ]);
-    if(($f['publicationDestination']??'')==='agency') $add('hosting','Załącznik 3. Hosting i zakończenie utrzymania',[
+    if(in_array($f['publicationDestination']??'',['agency','agency_purchase'],true)) $add('hosting','Załącznik 3. Hosting i zakończenie utrzymania',[
         'Usługi i płatności'=>$f['hostingFee'],'Okres i zmiana warunków'=>$f['hostingPeriod'],'Kopie i odtwarzanie'=>$f['hostingBackup'],'Operator, DNS i TLS'=>$f['hostingDns'],'Eksport i zakończenie'=>$f['hostingExit'],
         'Dostępność i odpowiedzialność'=>'Brak osobno określonego SLA nie stanowi gwarancji nieprzerwanej dostępności. Wykonawca zachowuje obowiązek należytej staranności, usuwania awarii we własnym zakresie i informowania o incydentach. Awaria dostawcy nie zwalnia z odpowiedzialności za własną konfigurację, dobór i działania. Odnowienie płatne i zmiany opłat wymagają podstawy w uzgodnionych warunkach; nowe usługi nie powstają przez milczenie klienta. Hosting jest usługą odrębną od wykonania oznaczonego rezultatu. Wypowiedzenie i rozliczenie usług uwzględnia art. 750 w związku z art. 746 KC; nie wyłącza się wypowiedzenia z ważnych powodów. Zakończenie hostingu nie odbiera nabytych praw do projektu.',
+    ]);
+    if(($f['publicationDestination']??'')==='agency_purchase') $add('domain_purchase','Załącznik 4. Rejestracja i obsługa domeny klienta',[
+        'Wybrana domena'=>$f['productionDomain'],
+        'Rejestrator'=>($f['domainRegistrar']??'')?:'Wybór rejestratora wymaga uzgodnienia przed zakupem.',
+        'Abonent i upoważnienie'=>$f['domainRegistrant'],
+        'Zakup i rozliczenie'=>$f['domainPurchaseTerms'],
+        'Dostępność nazwy'=>$f['domainAvailabilityTerms'],
+        'Odnowienie'=>$f['domainRenewalTerms'],
+        'Kontrola i przekazanie'=>$f['domainHandoverTerms'],
+        'Domeny .pl'=>'Dla domen .pl wydanie kodu AuthInfo nie jest uzależnione od opłaty ani dodatkowych warunków. Ewentualny koszt innych uzgodnionych prac migracyjnych nie warunkuje wydania kodu. Zmiana abonenta lub rejestratora wymaga jego wiedzy i zgody zgodnie z zasadami rejestru.',
+        'Warunki realizacji'=>'Wskazanie nazwy w umowie nie potwierdza jej dostępności ani rejestracji. Przed zakupem wykonawca sprawdza dostępność, warunki rejestratora, upoważnienie oraz zaakceptowany koszt. Inna nazwa, przekroczenie limitu lub inne dane abonenta wymagają udokumentowanej decyzji klienta. Rejestracja jest potwierdzana osobno; hosting i podgląd nie stanowią dowodu nabycia domeny. Publikacja pod docelową domeną wymaga potwierdzenia kontroli DNS, routingu i HTTPS. Hasła, tokeny i kody transferowe przekazuje się bezpiecznym kanałem, poza treścią umowy.',
     ]);
     if(in_array($f['clientType']??'',['consumer','protected'],true)) {
         $days=$f['consumerChannel']==='unsolicited'?30:14;
@@ -170,7 +187,7 @@ function contractPackageApproved(array $c): bool {
 }
 function contractPackageEditor(array $c,string $id): string {
     $e='contractEscape'; $html='<h4>Pakiet dokumentów i załączników</h4><p class="muted">Zakres i wykaz praw są obowiązkowe. Pozostałe moduły wynikają z ustaleń. AI nie określa statusu klienta ani nie dopisuje zgód. Sprawdzenie danych nie zastępuje weryfikacji prawnej.</p>';
-    $group=null; $names=['general'=>'Charakter umowy, odbiór i prawa','hosting'=>'Hosting, kopie i przekazanie','consumer'=>'Ochrona klienta i odstąpienie','dpa'=>'Powierzenie danych osobowych'];
+    $group=null; $names=['general'=>'Charakter umowy, odbiór i prawa','hosting'=>'Hosting, kopie i przekazanie','domain_purchase'=>'Zakup i obsługa domeny klienta','consumer'=>'Ochrona klienta i odstąpienie','dpa'=>'Powierzenie danych osobowych'];
     foreach(contractPackageFields() as $key=>$field) {
         if($group!==$field['module']) {
             if($group!==null) $html.='</fieldset>';
