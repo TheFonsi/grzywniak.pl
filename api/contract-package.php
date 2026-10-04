@@ -196,7 +196,13 @@ function contractPackageEditor(array $c,string $id): string {
         }
         $value=$c['facts'][$key]??'';
         $html.='<label data-contract-module="'.$e($field['module']).'"'.(!contractPackageApplicable($key,$c['facts']??[])?' hidden':'').'>'.$e($field['label']);
-        if(isset($field['options'])) { $html.='<select name="'.$key.'">'; foreach($field['options'] as $option=>$label) $html.='<option value="'.$e($option).'"'.($value===$option?' selected':'').'>'.$e($label).'</option>'; $html.='</select>'; }
+        if($key==='acceptanceDays') {
+            $numeric=ctype_digit((string)$value)&&(int)$value>=1&&(int)$value<=90;
+            $html.='<input name="acceptanceDays" type="number" min="1" max="90" step="1" inputmode="numeric" value="'.($numeric?$e($value):'').'" placeholder="Np. 7" aria-describedby="acceptance-days-help-'.$e($id).'">';
+            $html.='<small id="acceptance-days-help-'.$e($id).'">Ile dni kalendarzowych klient ma na sprawdzenie wersji po skutecznym zawiadomieniu i otrzymaniu dostępu? Wybierz propozycję albo wpisz od 1 do 90 dni. Wybór wymaga akceptacji.</small>';
+            if($value!==''&&!$numeric) $html.='<small>Poprzedni zapis: '.$e($value).'. Wskaż samą liczbę dni.</small>';
+        }
+        elseif(isset($field['options'])) { $html.='<select name="'.$key.'">'; foreach($field['options'] as $option=>$label) $html.='<option value="'.$e($option).'"'.($value===$option?' selected':'').'>'.$e($label).'</option>'; $html.='</select>'; }
         else $html.='<textarea name="'.$key.'"'.(in_array($key,['rightsInventory','processingSubprocessors'],true)?' data-contract-inventory':'').' rows="'.(!empty($field['long'])?5:2).'" maxlength="20000">'.$e($value).'</textarea>';
         $html.='</label>';
     }

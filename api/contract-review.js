@@ -55,7 +55,8 @@
       card.hidden = label.hidden;
       const entry = state[name];
       const accepted = entry?.accepted && entry.value.trim() === input.value.trim();
-      const missing = (!input.value.trim() && !optional.has(name)) || unresolved(input.value);
+      const invalidDays=name==='acceptanceDays' && (!/^\d+$/.test(input.value)||Number(input.value)<1||Number(input.value)>90);
+      const missing = (!input.value.trim() && !optional.has(name)) || unresolved(input.value) || invalidDays;
       card.dataset.accepted = accepted ? '1' : '0';
       card.querySelector('[data-review-status]').textContent = accepted ? 'Zaakceptowano' : missing ? 'Uzupełnij dane' : entry ? 'Propozycja do akceptacji' : 'Dane do sprawdzenia';
       const accept = card.querySelector('[data-review-accept]');
@@ -65,6 +66,7 @@
       edit.disabled = !!form.dataset.saving;
       input.hidden = !!accepted || !!input.dataset.inventoryReady;
       const inventory=card.querySelector('[data-inventory-editor]'); if(inventory) inventory.hidden=!!accepted;
+      const choices=card.querySelector('[data-day-choices]'); if(choices) { choices.hidden=!!accepted; choices.querySelectorAll('button').forEach(button=>{button.disabled=!!form.dataset.saving;button.setAttribute('aria-pressed',String(button.dataset.days===input.value));}); }
       const preview = card.querySelector('[data-review-preview]');
       preview.hidden = !accepted;
       preview.textContent = input.tagName === 'SELECT' ? input.selectedOptions[0]?.textContent || input.value : input.value || 'Nie dotyczy';
@@ -119,6 +121,11 @@
         write(form,state); refresh(form);
       };
       input.addEventListener('input',change); input.addEventListener('change',change);
+      if(input.name==='acceptanceDays') {
+        const choices=document.createElement('div'); choices.dataset.dayChoices=''; choices.setAttribute('role','group'); choices.setAttribute('aria-label','Propozycje terminu sprawdzenia'); choices.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin:10px 0';
+        for(const days of [3,7,14,30]) { const button=document.createElement('button');button.type='button';button.className='button';button.dataset.days=String(days);button.textContent=`${days} dni`;button.onclick=()=>{input.value=String(days);change();input.focus();};choices.append(button); }
+        label.after(choices);
+      }
       if(input.hasAttribute('data-contract-inventory')) inventoryEditor(input,card);
       input.addEventListener('keydown',event=>{
         if(event.key!=='Enter'||input.tagName==='TEXTAREA'||event.isComposing) return;
