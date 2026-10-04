@@ -96,10 +96,12 @@ try {
         $evidence=trim((string)($body['evidence']??''));
         if(!projectContractMatchesAcceptedOffer($session)) throw new DomainException('Umowa musi dotyczyć aktualnej, zaakceptowanej wersji oferty.');
         if(empty($contract['pdfBase64']) || (int)($contract['version']??0)<1) throw new DomainException('Najpierw przygotuj aktualną wersję umowy PDF.');
+        if(isset($contract['package']) && !contractPackageApproved($contract)) throw new DomainException('Najpierw potwierdź weryfikację prawną aktualnego pakietu.');
         if(mb_strlen($evidence)<8 || mb_strlen($evidence)>500) throw new DomainException('Wpisz sposób i datę potwierdzenia zawarcia umowy (8–500 znaków).');
         $case['contractSignedVersion']=(int)$contract['version'];
         $case['contractEvidence']=$evidence;
         $case['contractConfirmedAt']=time();
+        if(isset($contract['package'])) $case['contractSignedPackageHash']=$contract['package']['hash'];
         projectSave($id,$case);
         projectEvent($id,'contract','confirmed',$adminUser,'Potwierdzono zawarcie umowy v'.$case['contractSignedVersion'].': '.$evidence);
     } elseif($action==='start') {
@@ -107,6 +109,17 @@ try {
         if(!projectContractMatchesAcceptedOffer($session)) throw new DomainException('Najpierw zaakceptuj aktualną wersję oferty i przygotuj do niej umowę.');
         if(empty($case['contractSignedVersion']) || (int)$case['contractSignedVersion']!==(int)($contract['version']??0)) throw new DomainException('Potwierdź zawarcie aktualnej wersji umowy.');
         if(!empty($case['startedAt'])) throw new DomainException('Realizacja została już uruchomiona.');
+        if(isset($contract['package'])) {
+            if(!contractPackageApproved($contract)||($case['contractSignedPackageHash']??'')!==$contract['package']['hash']) throw new DomainException('Podpis i weryfikacja muszą dotyczyć aktualnego pakietu.');
+            $facts=$contract['facts'];
+            if(in_array($facts['clientType']??'',['consumer','protected'],true)&&($facts['consumerChannel']??'')!=='premises') {
+                $receipt=$contract['package']['receipt']??[];
+                if(($receipt['packageHash']??'')!==$contract['package']['hash']) throw new DomainException('Zapisz dowód otrzymania pakietu przez klienta przed startem.');
+                $days=($facts['consumerChannel']??'')==='unsolicited'?30:14;
+                $startDate=contractPackageEarliestStart((int)$case['contractConfirmedAt'],(int)($receipt['at']??time()),$days);
+                if((new DateTimeImmutable('now',new DateTimeZone('Europe/Warsaw')))->format('Y-m-d')<$startDate) throw new DomainException('Start po terminie odstąpienia: '.$startDate.'. Wcześniejszy start wymaga odrębnej weryfikacji prawnej i udokumentowanych oświadczeń; system ich nie domniemywa.');
+            }
+        }
         $scope=trim((string)($body['scope']??'')); $owner=trim((string)($body['owner']??'')); $budget=$body['budget']??null;
         if(mb_strlen($scope)<10 || mb_strlen($scope)>3000) throw new DomainException('Opisz zatwierdzony zakres (10–3000 znaków).');
         if(mb_strlen($owner)<2 || mb_strlen($owner)>120) throw new DomainException('Wpisz osobę odpowiedzialną.');

@@ -22,6 +22,7 @@ def request(path,body=None,authorized=True):
     headers={'Authorization':auth} if authorized else {}
     if body is not None:
         headers['Content-Type']='application/json'
+        if path.startswith('/api/project-api.php'): headers['X-CSRF-Token']=body.get('csrf','')
         if body.get('action')=='generate' and 'reviewState' not in body:
             # Emulate explicit admin acceptance; the endpoint rejects unreviewed clauses.
             body=dict(body,reviewState=json.dumps({key:{'value':body.get(key,''),'accepted':True} for key in review_keys}))
@@ -51,6 +52,7 @@ try:
     review_keys=[key.decode() for key in re.findall(rb'<(?:textarea|input|select)[^>]*name="([^"]+)"',html)]
     body={k.decode():'Example text' for k in fields}
     body.update(csrf=token,contract_session=sid,expectedVersion=0,templateVersion=0,profileVersion=1,action='generate',clientType='business',ipMode='transfer',signing='qualified',dataRole='none',clientAddress='Testowa 2, Warszawa',clientTaxId='',clientRepresentative='Jan Test',contractDate='2026-09-15',publicationDestination='agency')
+    body.update(json.loads(subprocess.check_output(['php','-r',"require 'api/contract-model.php'; echo json_encode(contractSamplePackageFacts());"],cwd=work,env=env)))
     assert b'name="ipPayment"' not in html and b'data-license-terms hidden' in html
     assert request('/api/contract.php',dict(body,ipMode='exclusive',rightsTerms=''))[0]==422
     code,data=request('/api/contract.php',dict(body,action='ai-fill'));assert code==200,(code,data)
@@ -69,7 +71,19 @@ try:
     assert 'pełnego wynagrodzenia' in saved_facts['rightsTerms'] and 'zawarte w cenie' in saved_facts['ipPayment']
     code,pdf=request('/api/contract.php?session='+sid+'&format=pdf');assert code==200 and pdf.startswith(b'%PDF-')
     assert request('/api/contract.php',body)[0]==409
+    assert request('/api/contract.php',dict(body,expectedVersion=1,action='send'))[0]==409
+    current=json.loads(request('/api/contract.php?session='+sid)[1])['contract']
+    assert len(current['package']['documents'])==4
+    approve=dict(csrf=token,contract_session=sid,expectedVersion=1,action='legal-review',packageHash=current['package']['hash'],reviewer='Test legal reviewer',evidence='Isolated test only: fictional legal review evidence')
+    assert request('/api/contract.php',dict(approve,packageHash='stale'))[0]==409
+    assert request('/api/contract.php',approve)[0]==200
     code,data=request('/api/contract.php',dict(body,expectedVersion=1,action='send'));assert code==200,(code,data)
+    assert request('/api/contract.php',dict(body,expectedVersion=1,action='send'))[0]==409
+    sent=json.loads(data)['contract']
+    assert sent['deliveryLog'][0]['pdfSha256']==sent['package']['pdfSha256']
+    assert sent['deliveryLog'][0]['manifest']==sent['package']['manifest']
+    assert 'receipt' not in sent['package']
+    assert request('/api/contract.php?session='+sid+'&format=manifest')[0]==200
     assert json.loads(data)['contract']['status']=='MOCK_SENT'
     code,data=request('/api/contract.php',dict(body,expectedVersion=1,action='save',party='Changed client'));assert code==200
     assert json.loads(data)['contract']['party']=='Changed client'
@@ -140,6 +154,51 @@ try:
     assert json.loads(data)['contract']['templateVersion']==0 and json.loads(data)['contract']['templateSnapshot']==old_snapshot, 'Library edits must not rewrite a saved contract snapshot'
     assert request('/api/contract.php',dict(changed,expectedVersion=7,action='generate',clientType='protected',consumerDocuments='',reviewState='{}'))[0]==422
     assert request('/api/contract.php',dict(changed,expectedVersion=7,action='generate',dataRole='processor',dataProcessingTerms='',reviewState='{}'))[0]==422
+    # The actual project API must enforce package review, receipt and start gates.
+    seed_packages=r"""
+require 'api/project-model.php'; require 'api/contract-pdf.php';
+foreach(['website'=>'11111111111111111111111111111111','ecommerce'=>'22222222222222222222222222222222'] as $type=>$id) {
+  $c=contractSampleContract($type); $c['offerVersion']=1; $c['package']=contractPackageBuild($c);
+  $pdf=contractPdf($c); $c['pdfBase64']=base64_encode($pdf); $c['package']['pdfSha256']=hash('sha256',$pdf);
+  writeSession(['id'=>$id,'status'=>'COMPLETED','projectState'=>[],'offer'=>['status'=>'ACCEPTED','version'=>1,'contact'=>['email'=>'test@example.com']],'contract'=>$c]); projectSave($id,[]);
+}
+"""
+    subprocess.run(['php','-r',seed_packages],cwd=work,env=env,check=True)
+    for case_id in ['1'*32,'2'*32]:
+        path='/api/project-api.php?session='+case_id
+        project=json.loads(request(path)[1]); project_token=project['csrf']
+        confirm=dict(action='confirm_contract',csrf=project_token,evidence='Isolated test: paper agreement and every annex checked')
+        assert request(path,confirm)[0]==409, 'Unreviewed package cannot be confirmed as signed'
+        c=json.loads(request('/api/contract.php?session='+case_id)[1])['contract']
+        event=dict(csrf=token,contract_session=case_id,expectedVersion=1,packageHash=c['package']['hash'],reviewer='Fictional reviewer',evidence='Isolated test evidence for this complete package only')
+        assert request('/api/contract.php',dict(event,action='legal-review'))[0]==200
+        assert request(path,confirm)[0]==200
+        kickoff=dict(action='start',csrf=project_token,scope='Fictional scope for gate verification',owner='Test admin',budget=10)
+        if case_id=='1'*32:
+            assert request(path,kickoff)[0]==200, 'Reviewed, confirmed B2B can start'
+            # Simulate interruption after reserving a mail side effect.
+            pending=r"""
+require 'api/project-model.php';
+$id='11111111111111111111111111111111'; $s=readSession($id); $c=$s['contract'];
+$entry=['reference'=>'uncertain-test','state'=>'sending','to'=>'test@example.com','at'=>time()];
+$s['contract']['deliveryLog'][]=$entry; writeSession($s);
+sessionDb()->prepare('INSERT INTO contract_delivery_outbox(session_id,version,package_hash,state,data,updated_at) VALUES(?,?,?,\'sending\',?,?)')->execute([$id,1,$c['package']['hash'],json_encode($entry),time()]);
+"""
+            subprocess.run(['php','-r',pending],cwd=work,env=env,check=True)
+            assert request('/api/contract.php',dict(event,action='send'))[0]==409, 'Uncertain attempt must not duplicate mail'
+            assert request('/api/contract.php',dict(event,action='resolve-delivery',deliveryOutcome='failed'))[0]==409, 'Do not resolve an active attempt'
+            age="require 'api/bootstrap.php'; sessionDb()->exec(\"UPDATE contract_delivery_outbox SET updated_at=updated_at-601 WHERE session_id='11111111111111111111111111111111'\");"
+            subprocess.run(['php','-r',age],cwd=work,env=env,check=True)
+            assert request('/api/contract.php',dict(event,action='resolve-delivery',deliveryOutcome='failed'))[0]==200
+            code,mailed=request('/api/contract.php',dict(event,action='send')); assert code==200,(code,mailed)
+            assert request('/api/contract.php',dict(event,action='send'))[0]==409, 'Resolved and sent version remains idempotent'
+        else:
+            assert request(path,kickoff)[0]==409, 'Protected client without receipt cannot start'
+            assert request('/api/contract.php',dict(event,action='record-receipt'))[0]==200
+            code,denied=request(path,kickoff)
+            assert code==409 and 'Start po terminie'.encode() in denied, (code,denied)
+            snapshot=json.loads(request(path)[1])['project']
+            assert snapshot['contract']['package']['earliestStart'] and not snapshot['jobs'], 'No agent job can escape withdrawal gate'
     print('HTTP checks passed: profile, AI fill (mock), protected fields, no AI persistence, required facts, markers, snapshots, auth, CSRF, PDF, version conflict, mock send, history, templates, admin JavaScript.')
 finally:
     server.terminate();server.wait(timeout=10);log.close()

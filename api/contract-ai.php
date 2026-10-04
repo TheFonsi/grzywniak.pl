@@ -15,7 +15,7 @@ function contractAiValidate(mixed $result): array {
     $facts=[];
     foreach(contractFacts() as $key=>$field) {
         $value=$result['facts'][$key]??null;
-        if(!is_string($value)||mb_strlen($value)>2000||(isset($field['options'])&&!array_key_exists($value,$field['options']))) throw new RuntimeException('AI zwróciło niepoprawne ustalenia umowy.');
+        if(!is_string($value)||mb_strlen($value)>(isset($field['module'])?20000:2000)||(isset($field['options'])&&!array_key_exists($value,$field['options']))) throw new RuntimeException('AI zwróciło niepoprawne ustalenia umowy.');
         $facts[$key]=trim($value);
     }
     return ['fields'=>$fields,'facts'=>$facts,'missing'=>$result['missing']];
@@ -30,7 +30,7 @@ function contractAiDraft(array $offer,array $draft,array $facts,array $template,
     $key=getenv('OPENAI_API_KEY'); if(!$key) throw new RuntimeException('Brak konfiguracji AI na serwerze.');
     $editableKeys=array_values(array_diff(contractAiKeys(),contractTemplateFields()));
     $properties=array_fill_keys($editableKeys,['type'=>'string']);
-    $factProperties=[]; foreach(contractFacts() as $name=>$field) $factProperties[$name]=isset($field['options'])?['type'=>'string','enum'=>array_keys($field['options'])]:['type'=>'string'];
+    $factProperties=[]; foreach(contractFacts() as $name=>$field) { if(isset($field['module'])) continue; $factProperties[$name]=isset($field['options'])?['type'=>'string','enum'=>array_keys($field['options'])]:['type'=>'string']; }
     $schema=['type'=>'object','additionalProperties'=>false,'required'=>['fields','facts','missing'],'properties'=>['fields'=>['type'=>'object','additionalProperties'=>false,'required'=>$editableKeys,'properties'=>$properties],'facts'=>['type'=>'object','additionalProperties'=>false,'required'=>array_keys($factProperties),'properties'=>$factProperties],'missing'=>['type'=>'array','items'=>['type'=>'string']]]];
     $prompt=<<<'PROMPT'
 Uzupełniasz po polsku dane projektu w istniejącym wzorze umowy. Nie tworzysz ani nie przepisujesz klauzul prawnych. Pola wzoru (deploymentTerms, acceptance, ip, exclusions, support, extras, terms) są utrzymywane przez aplikację i nie należą do Twojej odpowiedzi.
@@ -40,7 +40,7 @@ Ustalenia dotyczące domeny, hostingu, DNS, TLS i kopii zapasowych zachowaj bez 
 
 PROMPT;
     // Only contract-relevant data: no conversation history, credentials or bank account.
-    $private=['provider','party','paymentDetails','clientAddress','clientTaxId','clientRepresentative'];
+    $private=array_merge(['provider','party','paymentDetails','clientAddress','clientTaxId','clientRepresentative'],array_keys(contractPackageFields()));
     $input=['today'=>date('Y-m-d'),'offer'=>array_intersect_key($offer,array_flip(['project','sections','pricing','payment','contractTerms'])), 'draft'=>array_diff_key($draft,array_flip($private)), 'facts'=>array_diff_key($facts,array_flip($private)), 'template'=>array_diff_key($template,array_flip(['provider'])), 'accepted'=>array_diff_key($accepted,array_flip($private))];
     $payload=['model'=>getenv('OPENAI_CONTRACT_MODEL')?:getenv('OPENAI_MODEL')?:'gpt-6-luna','store'=>false,'max_output_tokens'=>8000,'input'=>[['role'=>'system','content'=>$prompt],['role'=>'user','content'=>json_encode($input,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR)]],'text'=>['format'=>['type'=>'json_schema','name'=>'contract_draft','strict'=>true,'schema'=>$schema]]];
     @set_time_limit(100);
@@ -58,5 +58,6 @@ PROMPT;
     if(!is_array($result)||!is_array($result['fields']??null)) throw new RuntimeException('Incomplete contract response.');
     foreach($editableKeys as $field) if(!is_string($result['fields'][$field]??null)) throw new RuntimeException('AI zwróciło niepełne dane projektu.');
     $result['fields']=array_replace($draft,$result['fields'],contractTemplateProposal($template,$facts));
+    $result['facts']=array_replace(is_array($result['facts']??null)?$result['facts']:[],array_intersect_key($facts,contractPackageFields()));
     return contractAiValidate($result);
 }

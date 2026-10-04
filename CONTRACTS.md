@@ -57,7 +57,7 @@ W formularzu ustala się status klienta, rodzaj praw, warunki ich przejścia/lic
 
 Każde pole ma przyciski „Akceptuj” i „Zmień”. Akceptacja dotyczy projektu administratora, nie zgody klienta ani podpisania umowy. Zapis projektu utrwala treść i stan akceptacji. Edycja wartości cofa jej akceptację. Ponowne uruchomienie AI zachowuje zaakceptowane pola i otrzymuje je jako ustalenia do dopasowania reszty dokumentu. Domyślne warunki IP pozostają w ustawieniach; czas i zakres licencji są widoczne przy licencji.
 
-PDF nowych wzorów wymaga ręcznej akceptacji wszystkich odpowiednich pól i uzupełnienia braków. Zmiana statusu klienta, rodzaju praw lub sposobu publikacji cofa akceptację powiązanych klauzul. Konsument i chroniony przedsiębiorca wymagają identyfikacji uzgodnionych załączników informacyjnych; przetwarzanie w imieniu klienta wymaga identyfikacji załącznika powierzenia. Są to ręcznie weryfikowane odniesienia, nie automatyczna kontrola kompletności lub podpisania załączników. Samo wpisanie ich nazwy nie zastępuje przygotowania i doręczenia dokumentów. Kontrole nie zastępują oceny prawnej. AI nie przegląda aktualnego prawa podczas wypełniania formularza.
+PDF wymaga akceptacji odpowiednich pól i kompletnego pakietu opisanego poniżej. Dawne pola nazw załączników są opcjonalnymi dodatkowymi uzgodnieniami; nie zastępują tworzonych dokumentów. Kontrole nie zastępują oceny prawnej. AI nie przegląda aktualnego prawa podczas wypełniania formularza.
 
 Nowy agent nie jest potrzebny. Integracja korzysta z `OPENAI_API_KEY` i `OPENAI_MODEL`; opcjonalnie `OPENAI_CONTRACT_MODEL` pozwala ustawić model tylko do umów. `CONTRACT_AI_MOCK=true` służy wyłącznie do testów. AI uzupełnia formularz bez zapisu i bez wysyłki; decyzję o zapisie, PDF i wysyłce podejmuje użytkownik. Zapisana umowa zachowuje własną treść i wersję profilu wykonawcy.
 
@@ -66,3 +66,51 @@ Walidacja: `php tests/contract-workflow.php`, `python tests/contract-http.py`, `
 ### Sprawdzenie wyglądu
 
 `php tests/contract-samples.php` tworzy trzy fikcyjne przykłady w `output/pdf/` (katalog nie jest commitowany). Testy HTTP obejmują dobór i zastosowanie wzoru, ochronę pól, wersjonowanie osobnych wzorów, kopie zapisanych klauzul, wymagane akceptacje i załączniki. `node tests/contract-review-ui.mjs` sprawdza zachowanie formularza po akceptacji i zmianie wzoru.
+
+## Pakiety umów — wersja zasad 2026-10-04.1
+
+Implementacja: `api/contract-package.php`. System deterministycznie składa umowę i rzeczywiste załączniki w jeden PDF. Oddziela kompletność danych, ręcznie potwierdzoną weryfikację prawną, przyjęcie wiadomości przez serwer pocztowy, otrzymanie przez klienta i potwierdzenie podpisania. Żaden z wcześniejszych stanów nie zastępuje następnego.
+
+### Dobór dokumentów
+
+| Dokument | Warunek |
+| --- | --- |
+| Zakres, materiały, kryteria i protokół odbioru | Zawsze |
+| Wykaz praw, komponentów, podwykonawców utrzymania i AI | Zawsze |
+| Informacja o danych kontaktowych i umownych | Zawsze |
+| Hosting, płatności, kopie, DNS/TLS i eksport | Publikacja na infrastrukturze agencji |
+| Informacje dla chronionego klienta i formularz odstąpienia | Konsument lub chroniony przedsiębiorca |
+| Powierzenie, środki bezpieczeństwa, instrukcje i dalsze powierzenie | Wykonawca jest podmiotem przetwarzającym |
+
+Rodzaj świadczenia (dzieło, usługi, umowa mieszana) wymaga oceny zakresu. Status klienta wymaga uzasadnienia: NIP sam w sobie nie wyklucza ochrony konsumenckiej. AI nie uzupełnia tych ocen, wykazu praw, uzgodnień hostingu ani danych powierzenia. Dane stron i zaakceptowanej oferty nadal są kopiowane automatycznie; znane ustalenia nie są ponownie wymyślane.
+
+Wykaz praw i podwykonawców wypełnia się przez przyciski dodawania pozycji. Wewnętrznie zapisuje się ustrukturyzowaną listę. Każdy składnik ma pochodzenie, autora/dostawcę, podstawę dysponowania prawami, licencję i warunki utrzymania przez inny zespół. Pusty wykaz praw blokuje PDF. W powierzeniu brak podwykonawców wymaga świadomego potwierdzenia, a nie pustego pola. W rzeczywistym projekcie trzeba uwzględnić wszystkich faktycznych dostawców mających dostęp do danych. Informacja administratora dotycząca danych umownych nie zastępuje informacji klienta dla użytkowników aplikacji.
+
+Odbiór ma sprawdzalne kryteria i uzgodniony termin 1–90 dni. Milczenie nie stanowi automatycznego odbioru. Zmiany zakresu wymagają uzgodnienia ceny i terminu. Rozliczenie zakończenia jest dobierane do charakteru świadczenia; hosting ma odrębne zasady dla usług. Wykaz AI nie zapewnia nieistniejących wyłącznych praw do wyników modelu. Wymagana forma przeniesienia praw i licencji wyłącznej pozostaje własnoręczna albo kwalifikowana elektroniczna.
+
+### Obieg i dowody
+
+1. Uzupełnij fakty oraz zaakceptuj pola. Możesz zapisywać niekompletny szkic.
+2. Wygeneruj PDF. Umowa, załączniki, kopia wzoru, wersja oferty i profil wykonawcy są zamrożone w tej wersji. Manifest wskazuje dokumenty i sumy SHA-256; zapisuje się także sumę rzeczywistych bajtów PDF.
+3. Przekaż cały pakiet do rzeczywistej weryfikacji prawnej. Zapisz w panelu osobę oraz identyfikator/odniesienie do opinii i jej zakres. To ręczne potwierdzenie administratora, nie automatyczna certyfikacja ani sprawdzenie kwalifikacji prawnika przez aplikację. Nie zaznaczaj go bez przeprowadzonej weryfikacji.
+4. Wyślij pakiet z manifestem. Podmiana treści, załącznika lub PDF unieważnia dopasowanie zatwierdzenia. Zmiana danych tworzy nową wersję bez dotychczasowych zatwierdzeń i potwierdzeń klienta. Stare PDF-y są dostępne w historii.
+5. Zapisz rzeczywisty dowód otrzymania dokumentów. Przyjęcie przez serwer nie jest dowodem doręczenia. Otrzymanie dokumentów nie jest podpisem ani zgodą na wcześniejsze świadczenie.
+6. Potwierdź rzeczywiście podpisany pakiet w etapie umowy na mapie. Powiązanie podpisu z wersją i identyfikatorem pakietu jest sprawdzane przed startem agentów.
+
+Planowanie i zadania wykonawcze otrzymują zakres z umowy, mierzalne kryteria odbioru, zasady współpracy, wykaz praw oraz uzgodnione ograniczenia przetwarzania. Pełne dane stron, rachunek i informacje prywatności dotyczące samej umowy nie są dokładane do tego kontekstu. Zlecenia sprawdzają dopasowanie zatwierdzonego pakietu; agenci mają zgłaszać brak materiałów, kolizje licencji i potrzebę nowych usług do decyzji, a nie wymyślać zgody. Przekazanie projektu wymaga rzeczywistego wykazu użytych składników, który może wymagać uzupełnienia pierwotnie uzgodnionego wykazu. Kompletność tego wykazu i faktyczne prawa nadal wymagają sprawdzenia, nie samego zapewnienia modelu.
+
+Próba wysyłki jest zapisywana w `contract_delivery_outbox` przed operacją pocztową. Podczas wywołania poczty nie trzyma się blokady zapisu SQLite ani sesji PHP. Powtórzenie zaakceptowanej lub niepewnej próby nie wysyła duplikatu. Wyraźne odrzucenie przez serwer pozwala ponowić. Przerwanie procesu w trakcie wysyłki pozostawia stan niepewny: po sprawdzeniu dziennika i kolejki po identyfikatorze próby administrator może zapisać wynik w panelu (po 10 minutach). Jeśli umowę edytowano podczas wysyłki, wynik trafia do historii wysłanej wersji, nie do nowego dokumentu.
+
+### Start chronionego klienta
+
+Dla umów na odległość i poza lokalem system nie domniemywa zgód i przyjmuje start po upływie terminu odstąpienia: zwykle 14 dni, a dla wskazanej niezapowiedzianej wizyty domowej / wycieczki 30 dni. Wyliczenie ostrożnie liczy od późniejszego zapisu potwierdzenia zawarcia i otrzymania dokumentów; nie udaje, że data wpisana przez administratora jest datą podpisania przez klienta. Koniec terminu przypadający w sobotę lub dzień ustawowo wolny jest przesuwany. Daty są liczone w `Europe/Warsaw`. Mapa pokazuje najwcześniejszy start; API blokuje zlecenie agentom przed tą datą lub bez dowodu otrzymania pakietu.
+
+**Wcześniejszy start nie jest obsługiwany przez automatyczne checkboxy.** Wymaga odrębnego, zweryfikowanego prawnie dokumentu i faktycznych oświadczeń właściwych dla usług, treści cyfrowych lub świadczeń mieszanych. Ten przepływ nie został zastąpiony pozorną zgodą administratora. Formularz odstąpienia nie stwierdza utraty prawa, a gwarancje ustawowe nie są wyłączane płatnym wsparciem.
+
+### Wdrożenie i utrzymanie biblioteki
+
+Nie potrzeba nowych tokenów ani usług. Nowe pliki PHP i istniejące skrypty admina są publikowane przez dotychczasowy deploy folderu `api/`; tabela outbox powstaje automatycznie. Historyczne dokumenty pozostają zachowane; wysyłka starszego dokumentu bez pakietu wymaga jego ponownego przygotowania w nowym systemie. System nie zastępuje ani nie przepisuje podpisanych dokumentów. Wzory są projektami do weryfikacji, nie gwarancją ważności każdej umowy. Zmiana treści modułów lub wersji zasad wymaga przeglądu nowych pakietów; wersjonowanych, wysłanych PDF-ów nie regeneruje się w tle.
+
+Źródła sprawdzone przy opracowaniu: [Kodeks cywilny — tekst jednolity 2026](https://api.sejm.gov.pl/eli/acts/DU/2026/795/text.pdf), [prawo autorskie](https://api.sejm.gov.pl/eli/acts/DU/2025/24/text.pdf), [ustawa o prawach konsumenta](https://eli.gov.pl/api/acts/DU/2024/1796/text.html), [UOKiK — zasady rozpoczęcia usług](https://prawakonsumenta.uokik.gov.pl/prawo-odstapienia-od-umowy/umowy-szczegolne/), [RODO](https://eur-lex.europa.eu/eli/reg/2016/679/oj?locale=pl). Szczególne regulacje, transfery danych, warunki dostawców i przyszłe zmiany prawa wymagają odrębnej oceny.
+
+Testy: `php tests/contract-package.php`, `php tests/contract-workflow.php`, `python tests/contract-http.py`, `node tests/contract-review-ui.mjs`, `python tests/project-gates-http.py`, `php tests/project-map-review.php`. Testy HTTP korzystają wyłącznie z odrębnych baz i atrap poczty, nie wysyłają klientom wiadomości ani nie tworzą infrastruktury.

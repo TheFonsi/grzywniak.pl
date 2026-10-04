@@ -235,6 +235,7 @@ function runOneJob(): bool {
             $db->exec('COMMIT'); echo "Job {$job['id']} cancelled before execution\n"; return true;
         }
         if(!$session || empty($case['startedAt']) || (int)($case['sourceContractVersion']??0)!==(int)($session['contract']['version']??0)) throw new RuntimeException('Projekt lub zatwierdzona umowa uległy zmianie.');
+        if(isset($session['contract']['package'])) contractPackageExecutionInstructions($session,$case);
         $callKey='job:'.$job['id'].':'.((int)$job['attempts']+1);
         $result=$isFeedback?(static function() use ($db,$id,$case,$feedbackMatch,$callKey): array {
                 $feedbackId=(int)$feedbackMatch[1];

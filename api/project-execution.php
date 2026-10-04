@@ -114,6 +114,7 @@ function projectDispatchAgentTask(): bool {
             $id=(string)$task['session_id'];
             $session=readSession($id); $case=projectCase($id);
             if(!$session || !empty($case['closedAt']) || (int)($case['sourceContractVersion']??0)!==(int)($session['contract']['version']??0)) continue;
+            if(isset($session['contract']['package'])&&(!contractPackageApproved($session['contract'])||($case['contractSignedPackageHash']??'')!==$session['contract']['package']['hash'])) continue;
             $repoStmt=$db->prepare("SELECT result FROM project_jobs WHERE session_id=? AND kind='create_repository' AND state='done'");
             $repoStmt->execute([$id]); $repo=json_decode((string)$repoStmt->fetchColumn(),true);
             if(!is_array($repo) || empty($repo['url'])) continue;
@@ -127,6 +128,8 @@ function projectDispatchAgentTask(): bool {
             $selected=$task; break;
         }
         if(!$selected) { $db->exec('COMMIT'); return false; }
+        $contractRules=contractPackageExecutionInstructions($session,$case);
+        if($contractRules&&count(json_decode((string)$selected['acceptance'],true)?:[])+count($contractRules)>19) throw new RuntimeException('Ustalenia umowne i kryteria zadania są zbyt obszerne. Skróć kryteria planu bez pomijania warunków umowy.');
         [$url,$token]=projectRunnerConfig();
         $id=(string)$selected['session_id'];
         [$projectTotal,$monthlyTotal]=projectTaskTotals($db,$id);
@@ -148,7 +151,7 @@ function projectDispatchAgentTask(): bool {
             $dependencyRow=$dependencyStmt->fetch(PDO::FETCH_ASSOC);
             if($dependencyRow) $dependencyResults[]=['taskId'=>$dependency,'title'=>$dependencyRow['title'],'role'=>$dependencyRow['role'],'result'=>json_decode((string)$dependencyRow['result'],true)?:[]];
         }
-        $acceptance=json_decode((string)$selected['acceptance'],true)?:[];
+        $acceptance=array_merge(json_decode((string)$selected['acceptance'],true)?:[],$contractRules);
         if(in_array((string)$selected['role'],['ux','ui','frontend','backend','integration'],true)) {
             $assetsStmt=$db->prepare("SELECT * FROM project_assets WHERE session_id=? AND status='approved' ORDER BY id"); $assetsStmt->execute([$id]); $approvedAssets=$assetsStmt->fetchAll(PDO::FETCH_ASSOC);
             if($approvedAssets) {

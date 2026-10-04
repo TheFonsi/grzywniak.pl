@@ -1,9 +1,47 @@
 (() => {
-  const optional = new Set(['clientTaxId', 'paymentDetails', 'domainRegistrar', 'serverTarget']);
+  const optional = new Set(['clientTaxId', 'paymentDetails', 'domainRegistrar', 'serverTarget','consumerDocuments','dataProcessingTerms']);
   const unresolved = value => /\[DO (UZUPEŁNIENIA|UZGODNIENIA):/iu.test(value);
   const read = form => { try { return JSON.parse(form.elements.reviewState.value) || {}; } catch { return {}; } };
   const write = (form, state) => { form.elements.reviewState.value = JSON.stringify(state); };
+  function inventoryEditor(input,card) {
+    const rights=input.name==='rightsInventory';
+    const labels=rights?{name:'Nazwa składnika',origin:'Pochodzenie',author:'Autor / dostawca',license:'Prawa lub warunki licencji',rightsBasis:'Podstawa dysponowania prawami',maintenanceRights:'Utrzymanie i modyfikacje przez inny zespół'}:{name:'Dostawca',service:'Usługa',location:'Lokalizacja danych'};
+    const origins={'':'Wybierz',own:'Własny utwór',reusable:'Wcześniejszy komponent',third_party:'Biblioteka / osoba trzecia',client:'Materiał klienta',ai:'Element z użyciem AI'};
+    const editor=document.createElement('div'); editor.dataset.inventoryEditor=''; card.append(editor);
+    const rows=document.createElement('div'); editor.append(rows);
+    let items;
+    try { items=input.value?JSON.parse(input.value):[]; if(!Array.isArray(items)) throw new Error(); }
+    catch { editor.textContent='Zapisany wykaz wymaga poprawienia formatu. Zachowano jego treść.'; return; }
+    input.dataset.inventoryReady='1';
+    const sync=()=>{input.value=JSON.stringify(items); input.dispatchEvent(new Event('input',{bubbles:true}));};
+    const render=()=>{
+      rows.replaceChildren();
+      items.forEach((item,index)=>{
+        const row=document.createElement('section'); row.className='contract-inventory-item'; row.style.cssText='padding:12px;margin:10px 0;border:1px solid #40516b;border-radius:8px';
+        const heading=document.createElement('h5'); heading.textContent=`Pozycja ${index+1}`; row.append(heading);
+        for(const [key,title] of Object.entries(labels)) {
+          const label=document.createElement('label'); label.textContent=title;
+          const control=document.createElement(key==='origin'?'select':'input'); control.name=`_${input.name}_${index}_${key}`;
+          if(key==='origin') for(const [value,text] of Object.entries(origins)) {const option=document.createElement('option');option.value=value;option.textContent=text;control.append(option);}
+          control.value=item[key]||''; control.maxLength=2000; control.setAttribute('aria-label',title);
+          control.addEventListener('input',()=>{item[key]=control.value;sync();});
+          control.addEventListener('keydown',event=>{if(event.key==='Enter') event.preventDefault();});
+          label.append(control); row.append(label);
+        }
+        const remove=document.createElement('button');remove.type='button';remove.className='button';remove.textContent='Usuń pozycję';remove.onclick=()=>{items.splice(index,1);render();sync();}; row.append(remove);rows.append(row);
+      });
+    };
+    const add=document.createElement('button');add.type='button';add.className='button';add.textContent=rights?'Dodaj składnik':'Dodaj podwykonawcę';add.onclick=()=>{items.push(Object.fromEntries(Object.keys(labels).map(key=>[key,''])));render();sync();};editor.append(add);
+    if(!rights) {const none=document.createElement('button');none.type='button';none.className='button';none.textContent='Potwierdź brak podwykonawców';none.onclick=()=>{items=[];render();sync();};editor.append(none);}
+    render();
+  }
   function refresh(form) {
+    form.querySelectorAll('[data-contract-module]').forEach(label => {
+      const module=label.dataset.contractModule;
+      label.hidden=(module==='hosting'&&form.elements.publicationDestination.value!=='agency') ||
+        (module==='consumer'&&!['consumer','protected'].includes(form.elements.clientType.value)) ||
+        (module==='dpa'&&form.elements.dataRole.value!=='processor');
+    });
     const state = read(form);
     form.querySelectorAll('[data-review-field]').forEach(card => {
       const name = card.dataset.reviewField;
@@ -20,10 +58,14 @@
       accept.textContent = accepted ? 'Zaakceptowano' : 'Akceptuj';
       const edit = card.querySelector('[data-review-edit]');
       edit.disabled = !!form.dataset.saving;
-      input.hidden = !!accepted;
+      input.hidden = !!accepted || !!input.dataset.inventoryReady;
+      const inventory=card.querySelector('[data-inventory-editor]'); if(inventory) inventory.hidden=!!accepted;
       const preview = card.querySelector('[data-review-preview]');
       preview.hidden = !accepted;
       preview.textContent = input.tagName === 'SELECT' ? input.selectedOptions[0]?.textContent || input.value : input.value || 'Nie dotyczy';
+      if(input.dataset.inventoryReady && accepted) {
+        try {const rows=JSON.parse(input.value); preview.textContent=rows.length?rows.map((item,i)=>`${i+1}. ${Object.values(item).join(' · ')}`).join('\n'):'Potwierdzono brak podwykonawców.';preview.style.whiteSpace='pre-wrap';}catch{}
+      }
     });
     const pending = Object.entries(state).filter(([name,item]) => {
       const input=form.elements.namedItem(name);
@@ -69,6 +111,7 @@
         write(form,state); refresh(form);
       };
       input.addEventListener('input',change); input.addEventListener('change',change);
+      if(input.hasAttribute('data-contract-inventory')) inventoryEditor(input,card);
       input.addEventListener('keydown',event=>{
         if(event.key!=='Enter'||input.tagName==='TEXTAREA'||event.isComposing) return;
         const accept=card.querySelector('[data-review-accept]');

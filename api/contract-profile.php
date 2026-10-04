@@ -21,7 +21,7 @@ function contractProviderText(array $profile): string {
     return implode("\n",$lines);
 }
 function contractFacts(): array {
-    return [
+    return array_merge([
         'publicationDestination'=>['label'=>'Sposób publikacji produkcyjnej','options'=>[''=>'Wybierz','agency'=>'Publikacja na infrastrukturze i domenie Grzywniak','client_handoff'=>'Przekazanie klientowi do publikacji na jego domenie i serwerze']],
         'productionDomain'=>['label'=>'Domena produkcyjna klienta (wymagana przy publikacji klienta)'],
         'domainRegistrar'=>['label'=>'Rejestrator lub operator DNS (opcjonalnie)'],
@@ -40,15 +40,15 @@ function contractFacts(): array {
         'clientTaxId'=>['label'=>'NIP / identyfikator i rejestr klienta (jeśli dotyczy)'],
         'clientRepresentative'=>['label'=>'Osoba podpisująca po stronie klienta / podstawa umocowania'],
         'contractDate'=>['label'=>'Planowana data zawarcia umowy (RRRR-MM-DD)'],
-        'consumerDocuments'=>['label'=>'Załączniki konsumenckie — informacje przedumowne, pouczenie i formularz odstąpienia'],
-        'dataProcessingTerms'=>['label'=>'Załącznik powierzenia danych — identyfikator, zakres i uzgodniona wersja'],
-    ];
+        'consumerDocuments'=>['label'=>'Dodatkowe uzgodnienia ochrony klienta (opcjonalnie; właściwe załączniki są tworzone poniżej)'],
+        'dataProcessingTerms'=>['label'=>'Dodatkowe uzgodnienia powierzenia (treść załącznika jest tworzona z danych poniżej)'],
+    ], contractPackageFields());
 }
 function contractReadFacts(array $body, array $saved = [], ?array $template = null): array {
     $facts=[];
     foreach(contractFacts() as $key=>$field) {
         $value=$body[$key]??'';
-        if(!is_string($value)||mb_strlen($value)>2000 || (isset($field['options'])&&!array_key_exists($value,$field['options']))) throw new InvalidArgumentException('Niepoprawne pole: '.$field['label']);
+        if(!is_string($value)||mb_strlen($value)>(isset($field['module'])?20000:2000) || (isset($field['options'])&&!array_key_exists($value,$field['options']))) throw new InvalidArgumentException('Niepoprawne pole: '.$field['label']);
         $facts[$key]=trim($value);
     }
     if($facts['contractDate']!=='' && (!preg_match('/^\d{4}-\d{2}-\d{2}$/',$facts['contractDate']) || date('Y-m-d',strtotime($facts['contractDate'])?:0)!==$facts['contractDate'])) throw new InvalidArgumentException('Podaj poprawną datę zawarcia umowy.');
@@ -60,6 +60,8 @@ function contractReadFacts(array $body, array $saved = [], ?array $template = nu
 function contractFactsMissing(array $facts): array {
     $missing=[];
     foreach(contractFacts() as $key=>$field) {
+        if(isset($field['module'])) continue;
+        if(in_array($key,['consumerDocuments','dataProcessingTerms'],true)) continue;
         if($key==='consumerDocuments' && !in_array($facts['clientType']??'',['consumer','protected'],true)) continue;
         if($key==='dataProcessingTerms' && ($facts['dataRole']??'')!=='processor') continue;
         if(in_array($key,['clientTaxId','domainRegistrar','serverTarget'],true)) continue;
@@ -71,7 +73,7 @@ function contractFactsMissing(array $facts): array {
         $domain=strtolower(trim((string)($facts['productionDomain']??'')));
         if($domain!=='' && (strlen($domain)>253 || preg_match('/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$/D',$domain)!==1)) $missing[]='Poprawna domena produkcyjna klienta';
     }
-    return $missing;
+    return array_merge($missing,contractPackageMissing($facts));
 }
 function contractProfileForm(): string {
     $profile=contractProfile(); $e='contractEscape';

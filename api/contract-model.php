@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require_once __DIR__.'/contract-profile.php';
 require_once __DIR__.'/contract-catalog.php';
+require_once __DIR__.'/contract-package.php';
 
 function contractFields(): array {
     return ['deploymentTerms'=>'Domena, hosting, publikacja i przekazanie', 'provider'=>'Wykonawca — dane i reprezentacja', 'party'=>'Klient — dane i reprezentacja', 'paymentDetails'=>'Rachunek i zasady płatności', 'scope'=>'Przedmiot i zakres (aplikacja, strona, materiały)', 'price'=>'Wynagrodzenie, VAT i część za prawa IP', 'deposit'=>'Zaliczka i harmonogram płatności', 'deadline'=>'Termin i etapy', 'acceptance'=>'Odbiór i przekazanie kodu / dostępów', 'ip'=>'Prawa autorskie — zakres, pola eksploatacji i moment przejścia', 'exclusions'=>'Komponenty zewnętrzne, licencje i wyłączenia', 'support'=>'Usuwanie wad i wsparcie — okres, zakres, czasy reakcji', 'extras'=>'Dodatkowe płatne prace i koszty usług zewnętrznych', 'terms'=>'Pozostałe warunki, odpowiedzialność, rozwiązanie, dane osobowe'];
@@ -51,6 +52,7 @@ function contractEditor(array $session): string {
     $html.='<input type="hidden" name="reviewState" value="'.$e(json_encode($saved['review']??new stdClass(),JSON_UNESCAPED_UNICODE)).'">';
     foreach(contractFacts() as $key=>$field) {
         if($key==='ipPayment') continue;
+        if(isset($field['module'])) continue;
         $value=$saved['facts'][$key]??'';
         if($key==='rightsTerms' && !in_array($saved['facts']['ipMode']??'',['exclusive','nonexclusive'],true)) $value='';
         if($key==='publicationDestination') $html.='<h4>Publikacja i przekazanie ustalone z klientem</h4><p class="muted">Te ustalenia trafią do umowy i po jej potwierdzeniu zostaną automatycznie przeniesione do etapu publikacji.</p>' ;
@@ -63,11 +65,13 @@ function contractEditor(array $session): string {
         else $html.='<input name="'.$key.'" maxlength="2000" value="'.$e($value).'"'.($key==='contractDate'?' type="date"':'').'>';
         $html.='</label>';
     }
+    $html.=contractPackageEditor($saved??[],$session['id']);
     $html.='<p class="muted">Moment przeniesienia praw i wynagrodzenie za IP są pobierane z ustawień wzoru. Zapisana umowa zachowuje własne warunki.</p>';
     $html.='<div><button class="button" name="contract_action" value="ai-fill" formnovalidate>Uzupełnij dane projektu AI</button></div><div data-ai-feedback role="status"></div>';
     foreach(contractFields() as $key=>$label) $html.='<label>'.$e($label).'<textarea name="'.$key.'" rows="'.(in_array($key,['ip','terms','scope'],true)?5:3).'" maxlength="20000">'.$e($values[$key]??'').'</textarea></label>';
     $html.='<div><button class="button" name="contract_action" value="save">Zapisz projekt umowy</button> <button class="button" name="contract_action" value="generate">Zapisz i przygotuj PDF</button></div></form></details>';
-    if (!empty($saved['pdfBase64'])) $html.='<p><a class="button" href="'.$contractUrl.'?session='.$id.'&amp;format=pdf">Pobierz PDF</a></p><form method="post" action="'.$contractUrl.'" class="contract-send"><input type="hidden" name="contract_session" value="'.$id.'"><input type="hidden" name="csrf" value="'.$e(contractToken()).'"><input type="hidden" name="expectedVersion" value="'.(int)$saved['version'].'"><button class="button" name="action" value="send">Wyślij PDF klientowi</button></form>';
+    if (!empty($saved['pdfBase64'])) $html.='<p><a class="button" href="'.$contractUrl.'?session='.$id.'&amp;format=pdf">Pobierz PDF</a></p><form method="post" action="'.$contractUrl.'" class="contract-send"><input type="hidden" name="contract_session" value="'.$id.'"><input type="hidden" name="csrf" value="'.$e(contractToken()).'"><input type="hidden" name="expectedVersion" value="'.(int)$saved['version'].'"><button class="button" name="action" value="send"'.(contractPackageApproved($saved)?'':' disabled').'>Wyślij PDF klientowi</button></form>';
+    $html.=contractPackageControls($saved??[],$session['id']);
     if (!empty($session['contractVersions'])) { $html.='<details><summary>Historia wersji</summary>'; foreach(array_reverse($session['contractVersions']) as $old) $html.='<p>Wersja '.(int)$old['version'].' · '.$e($old['status']??'DRAFT').(!empty($old['pdfBase64'])?' · <a href="'.$contractUrl.'?session='.$id.'&amp;format=pdf&amp;version='.(int)$old['version'].'">Pobierz PDF</a>':'').'</p>'; $html.='</details>'; }
     return $html.'</section>';
 }

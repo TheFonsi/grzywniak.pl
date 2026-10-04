@@ -10,6 +10,7 @@ final class ContractPdfLayout {
     public function __construct(private array $contract) {
         $this->metrics=require __DIR__.'/contract-font-metrics.php'; $this->page();
     }
+    public function pageBreak(): void { $this->page(); }
     private function bytes(string $text): string {
         return iconv('UTF-8','Windows-1250//TRANSLIT',str_replace("\t",'    ',$text)) ?: '';
     }
@@ -46,6 +47,7 @@ final class ContractPdfLayout {
         return $lines ?: [''];
     }
     public function paragraph(string $text,float $size=10.5,bool $bold=false,float $tailReserve=0): void {
+        $leading=$size<10.5?14:15;
         $paragraphs=explode("\n",rtrim(str_replace(["\r\n","\r"],"\n",$text)));
         foreach($paragraphs as $index=>$paragraph) {
             $paragraph=trim($paragraph);
@@ -57,14 +59,20 @@ final class ContractPdfLayout {
             if($tailReserve>0 && $index===count($paragraphs)-1) $height=max($height,min(count($lines)*15,674-$tailReserve)+$tailReserve);
             $this->ensure($height);
             if($subheading) $this->y+=6;
-            foreach($lines as $line) { $this->ensure(15); $this->text($line,48,$this->y,$size,$isBold); $this->y+=15; }
+            foreach($lines as $line) { $this->ensure($leading); $this->text($line,48,$this->y,$size,$isBold); $this->y+=$leading; }
             $this->y+=6;
         }
     }
-    public function heading(string $label): void {
-        $lines=$this->wrap($label,499,12,true); $this->ensure(count($lines)*17+52); $this->y+=12;
-        foreach($lines as $line) { $this->text($line,48,$this->y,12,true,'0.16 0.29 0.46'); $this->y+=17; }
-        $this->rule($this->y+3); $this->y+=14;
+    public function heading(string $label,bool $compact=false): void {
+        $size=$compact?11:12; $leading=$compact?16:17;
+        $lines=$this->wrap($label,499,$size,true); $this->ensure(count($lines)*$leading+52); $this->y+=$compact?8:12;
+        foreach($lines as $line) { $this->text($line,48,$this->y,$size,true,'0.16 0.29 0.46'); $this->y+=$leading; }
+        $this->rule($this->y+3); $this->y+=$compact?9:14;
+    }
+    public function section(string $label,string $text,float $size=10.5,bool $compact=false): void {
+        $height=($compact?33:43)+count($this->wrap($text,499,$size))*($size<10.5?14:15)+6;
+        if($height<320) $this->ensure($height);
+        $this->heading($label,$compact); $this->paragraph($text,$size);
     }
     public function title(string $title): void {
         $this->text('PROJEKT UMOWY / DO PODPISANIA',48,$this->y,8,true,'0.38 0.45 0.54'); $this->y+=22;
@@ -123,12 +131,18 @@ function contractPdf(array $contract): string {
         ['Odpowiedzialność i postanowienia końcowe',['terms'],['dataRole','consumerDocuments','dataProcessingTerms']],
     ];
     foreach($groups as $i=>[$label,$keys,$factKeys]) {
+        if($i===10&&!empty($contract['package'])) {
+            $layout->heading('Pakiet dokumentów');
+            $layout->paragraph('Załączniki poniżej stanowią część projektu umowy. Identyfikator wersji pakietu: '.$contract['package']['hash'],9);
+            foreach($contract['package']['documents'] as $doc) $layout->paragraph($doc['title'],10);
+        }
         $layout->heading('§ '.($i+1).'. '.$label);
         foreach($keys as $key) {
             $value=trim((string)($contract[$key]??'')); if($value==='') continue;
             if(count($keys)>1) $layout->paragraph(match($key){'party'=>'Zamawiający','provider'=>'Wykonawca','price'=>'Wynagrodzenie','deposit'=>'Zaliczka i etapy płatności',default=>'Sposób płatności'},10.5,true);
             $layout->paragraph($value,10.5,false,$key==='terms'?180:0);
         }
+        if($i===3&&!empty($contract['package'])&&in_array($facts['clientType']??'',['consumer','protected'],true)&&($facts['consumerChannel']??'')!=='premises') $layout->paragraph('Harmonogram rozpoczyna się po spełnieniu warunków startu oraz po upływie terminu odstąpienia wskazanego w informacji dla chronionego klienta. System nie przyjmuje domniemanej zgody na wcześniejsze świadczenie. Odmienne ustalenie wymaga odrębnego, zweryfikowanego prawnie dokumentu i rzeczywistych oświadczeń klienta.',10);
         foreach($factKeys as $key) if(trim((string)($facts[$key]??''))!=='') {
             if($key==='consumerDocuments' && !in_array($facts['clientType']??'',['consumer','protected'],true)) continue;
             if($key==='dataProcessingTerms' && ($facts['dataRole']??'')!=='processor') continue;
@@ -137,5 +151,10 @@ function contractPdf(array $contract): string {
             $layout->paragraph($label.': '.$value,10);
         }
     }
-    $layout->signatures(); return $layout->output();
+    $layout->signatures();
+    foreach($contract['package']['documents']??[] as $doc) {
+        $layout->pageBreak(); $layout->title($doc['title']);
+        foreach($doc['sections'] as $label=>$text) { $compact=in_array($doc['id'],['privacy','hosting'],true); $layout->section($label,$text,$compact?10:10.5,$compact); }
+    }
+    return $layout->output();
 }

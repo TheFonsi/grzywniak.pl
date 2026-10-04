@@ -6,6 +6,7 @@ require_once __DIR__.'/contract-pdf.php';
 require_once __DIR__.'/contract-ai.php';
 require_once __DIR__.'/contract-review.php';
 header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store');
 $user=getenv('ADMIN_USERNAME')?:''; $password=getenv('ADMIN_PASSWORD')?:'';
 if($user==='' || $password==='' || !hash_equals($user,(string)($_SERVER['PHP_AUTH_USER']??'')) || !hash_equals($password,(string)($_SERVER['PHP_AUTH_PW']??''))) { header('WWW-Authenticate: Basic realm="Grzywniak Discovery"'); http_response_code(401); exit; }
 function contractError(int $status,string $message): never { http_response_code($status); echo json_encode(['message'=>$message],JSON_UNESCAPED_UNICODE); exit; }
@@ -74,6 +75,12 @@ $s=readSession($id);
 if(!$s) contractError(404,'Nie znaleziono rozmowy.');
 if($method==='GET' && ($_GET['format']??'')==='editor') { header('Content-Type: text/html; charset=utf-8'); echo contractEditor($s); exit; }
 if($method==='GET') {
+    if(($_GET['format']??'')==='manifest') {
+        $c=$s['contract']??[];
+        if(!isset($c['package'])) contractError(404,'Ta wersja nie ma manifestu pakietu.');
+        header('Content-Disposition: attachment; filename="pakiet-v'.(int)$c['version'].'.json"');
+        echo json_encode(['hash'=>$c['package']['hash'],'pdfSha256'=>$c['package']['pdfSha256'],'manifest'=>$c['package']['manifest']],JSON_UNESCAPED_UNICODE|JSON_PRETTY_PRINT|JSON_THROW_ON_ERROR); exit;
+    }
     if(($_GET['format']??'')==='pdf') {
         $contract=$s['contract']??null;
         if(isset($_GET['version']) && (int)$_GET['version']!==(int)($contract['version']??0)) { $contract=null; foreach($s['contractVersions']??[] as $old) if((int)$old['version']===(int)$_GET['version']) $contract=$old; }
@@ -118,6 +125,7 @@ if($action==='ai-fill') {
         if(trim($draft['price'])==='') $result['fields']['price']='[DO UZUPEŁNIENIA: wynagrodzenie zgodne z ofertą]';
         foreach(['clientAddress','clientTaxId','clientRepresentative','clientType','dataRole','publicationDestination','productionDomain','domainRegistrar','domainOwnershipTerms','productionHosting','serverTarget','backupResponsibility','dnsTlsResponsibility','consumerDocuments','dataProcessingTerms','ipMode','signing','contractDate'] as $key) $result['facts'][$key]=$facts[$key];
         foreach($facts as $key=>$value) if($value!=='' && !($key==='rightsTerms'&&$facts['ipMode']==='')) $result['facts'][$key]=$value;
+        foreach(contractPackageFields() as $key=>$field) $result['facts'][$key]=$facts[$key];
         $result['facts']=contractReadFacts($result['facts'],$s['contract']['facts']??[],$template);
         foreach($accepted as $key=>$value) { if(array_key_exists($key,$result['fields'])) $result['fields'][$key]=$value; elseif(array_key_exists($key,$result['facts'])) $result['facts'][$key]=$value; }
         $latest=readSession($id);
@@ -159,23 +167,87 @@ if(in_array($action,['save','generate'],true)) {
     $c['templateSnapshot']=$sameTemplate?($s['contract']['templateSnapshot']??[]):array_intersect_key($activeTemplate,array_flip(contractTemplateFields()));
     $c['review']=$review;
     $c['profileVersion']=(int)($s['contract']['profileVersion']??$body['profileVersion']??0);
-    if($action==='generate') $c['pdfBase64']=base64_encode(contractPdf($c));
+    if($action==='generate') {
+        $c['package']=contractPackageBuild($c);
+        $pdf=contractPdf($c);
+        $c['pdfBase64']=base64_encode($pdf);
+        $c['package']['pdfSha256']=hash('sha256',$pdf);
+    }
     if(is_array($s['contract']??null)) $s['contractVersions'][]=$s['contract'];
     $s['contract']=$c; writeSession($s);
     contractReply(['contract'=>$c],apiPath('admin.php').'?view=all&session='.$id.'#contract-panel');
 }
+if(in_array($action,['legal-review','record-receipt','resolve-delivery'],true)) {
+    $c=$s['contract']??[];
+    if(!contractPackageIntegrity($c)) contractError(409,'Przygotuj kompletny, aktualny pakiet PDF.');
+    if(!hash_equals($c['package']['hash'],(string)($body['packageHash']??''))) contractError(409,'Pakiet zmienił się. Odśwież panel.');
+    $reviewer=trim((string)($body['reviewer']??'')); $evidence=trim((string)($body['evidence']??''));
+    if(mb_strlen($reviewer)<2||mb_strlen($reviewer)>200||mb_strlen($evidence)<20||mb_strlen($evidence)>3000) contractError(422,'Podaj osobę oraz konkretny dowód i zakres potwierdzenia (20–3000 znaków).');
+    $record=['packageHash'=>$c['package']['hash'],'pdfSha256'=>$c['package']['pdfSha256'],'reviewer'=>$reviewer,'evidence'=>$evidence,'recordedBy'=>$user,'at'=>time(),'source'=>'manual_evidence'];
+    if($action==='resolve-delivery') {
+        $hasPending=false; foreach($c['deliveryLog']??[] as $entry) if(($entry['state']??'')==='sending') $hasPending=true;
+        if(!$hasPending) contractError(409,'Ta wersja nie ma niepewnej próby wysyłki.');
+        $outcome=(string)($body['deliveryOutcome']??'');
+        if(!in_array($outcome,['accepted','failed'],true)) contractError(422,'Wybierz potwierdzony wynik wysyłki.');
+        $find=sessionDb()->prepare('SELECT state,updated_at FROM contract_delivery_outbox WHERE session_id=? AND version=? AND package_hash=?');
+        $find->execute([$id,$c['version'],$c['package']['hash']]); $attempt=$find->fetch(PDO::FETCH_ASSOC);
+        if(!$attempt||$attempt['state']!=='sending'||(int)$attempt['updated_at']>time()-600) contractError(409,'Rozstrzygnięcie dotyczy wyłącznie niepewnej próby starszej niż 10 minut. Sprawdź kolejkę i dziennik serwera poczty.');
+        sessionDb()->prepare('UPDATE contract_delivery_outbox SET state=?,data=?,updated_at=? WHERE session_id=? AND version=? AND package_hash=?')->execute([$outcome,json_encode($record,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),time(),$id,$c['version'],$c['package']['hash']]);
+        foreach($s['contract']['deliveryLog']??[] as $i=>$entry) if(($entry['state']??'')==='sending') { $s['contract']['deliveryLog'][$i]['state']=$outcome; $s['contract']['deliveryLog'][$i]['resolution']=$record; }
+        if($outcome==='accepted') $s['contract']['status']='SENT';
+        $s['contract']['package']['evidenceLog'][]=['kind'=>'delivery_resolution','outcome'=>$outcome]+$record;
+        writeSession($s); contractReply(['contract'=>$s['contract']],apiPath('admin.php').'?view=all&session='.$id.'#contract-panel');
+    }
+    $key=$action==='legal-review'?'legalReview':'receipt';
+    $s['contract']['package'][$key]=$record;
+    $s['contract']['package']['evidenceLog'][]=['kind'=>$key]+$record;
+    writeSession($s);
+    contractReply(['contract'=>$s['contract']],apiPath('admin.php').'?view=all&session='.$id.'#contract-panel');
+}
 if($action==='send') {
     $c=$s['contract']??null;
     if(empty($c['pdfBase64'])) contractError(409,'Najpierw przygotuj PDF aktualnej wersji.');
+    if(!contractPackageApproved($c)) contractError(409,'Wysyłka wymaga kompletnego pakietu i udokumentowanej weryfikacji prawnej tej wersji.');
+    if((int)$c['offerVersion']!==(int)($s['offer']['version']??1)) contractError(409,'Oferta zmieniła się. Przygotuj nowy pakiet.');
+    foreach($c['deliveryLog']??[] as $delivery) if(in_array($delivery['state']??'accepted',['accepted','mail_server_accepted','mock'],true)) contractError(409,'Ten pakiet został już przekazany do serwera poczty. Sprawdź historię wysyłki; ponowienie nie wysyła duplikatu.');
     $to=(string)(($s['offer']['contact']['email']??'')?:($s['projectState']['contactEmail']??''));
     if(!filter_var($to,FILTER_VALIDATE_EMAIL)) contractError(422,'Brak poprawnego adresu e-mail klienta.');
+    // Persist intent before the external mail side effect. A crash during send
+    // leaves an explicit uncertain attempt, never an automatic duplicate email.
+    $db=sessionDb();
+    $db->exec('CREATE TABLE IF NOT EXISTS contract_delivery_outbox (session_id TEXT NOT NULL, version INTEGER NOT NULL, package_hash TEXT NOT NULL, state TEXT NOT NULL, data TEXT NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY(session_id,version,package_hash))');
+    $find=$db->prepare('SELECT state FROM contract_delivery_outbox WHERE session_id=? AND version=? AND package_hash=?');
+    $key=[$id,(int)$c['version'],$c['package']['hash']]; $find->execute($key); $prior=$find->fetchColumn();
+    if($prior!==false&&$prior!=='failed') contractError(409,'Wysyłka jest już zapisana lub jej wynik jest niepewny. Sprawdź kolejkę pocztową; system nie powiela wiadomości.');
+    $attempt=['reference'=>bin2hex(random_bytes(12)),'to'=>$to,'at'=>time(),'packageHash'=>$c['package']['hash'],'pdfSha256'=>$c['package']['pdfSha256'],'manifest'=>$c['package']['manifest'],'actor'=>$user,'state'=>'sending'];
+    $reserve=$db->prepare('INSERT INTO contract_delivery_outbox(session_id,version,package_hash,state,data,updated_at) VALUES(?,?,?,\'sending\',?,?) ON CONFLICT(session_id,version,package_hash) DO UPDATE SET state=excluded.state,data=excluded.data,updated_at=excluded.updated_at');
+    $reserve->execute([...$key,json_encode($attempt,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),time()]);
+    $s['contract']['deliveryLog'][]=$attempt; writeSession($s);
+    $db->exec('COMMIT'); session_write_close();
     $boundary='contract_'.bin2hex(random_bytes(16));
-    $headers='MIME-Version: 1.0'."\r\n".'Content-Type: multipart/mixed; boundary="'.$boundary.'"';
-    $message='--'.$boundary."\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n".chunk_split(base64_encode('W załączeniu projekt umowy do zapoznania się i podpisania.')).'--'.$boundary."\r\nContent-Type: application/pdf\r\nContent-Disposition: attachment; filename=\"umowa-v".(int)$c['version'].".pdf\"\r\nContent-Transfer-Encoding: base64\r\n\r\n".chunk_split($c['pdfBase64']).'--'.$boundary."--\r\n";
+    $headers='MIME-Version: 1.0'."\r\n".'X-Grzywniak-Delivery: '.$attempt['reference']."\r\n".'Content-Type: multipart/mixed; boundary="'.$boundary.'"';
+    $message='--'.$boundary."\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n".chunk_split(base64_encode('W załączeniu projekt umowy wraz ze wszystkimi załącznikami do zapoznania się i podpisania. Identyfikator pakietu: '.$c['package']['hash'].'. Prosimy o potwierdzenie otrzymania dokumentów. Wiadomość nie zastępuje wymaganych podpisów ani odrębnej zgody na wcześniejsze rozpoczęcie świadczenia.')).'--'.$boundary."\r\nContent-Type: application/pdf\r\nContent-Disposition: attachment; filename=\"pakiet-v".(int)$c['version'].".pdf\"\r\nContent-Transfer-Encoding: base64\r\n\r\n".chunk_split($c['pdfBase64']);
+    $manifest=json_encode(['hash'=>$c['package']['hash'],'pdfSha256'=>$c['package']['pdfSha256'],'manifest'=>$c['package']['manifest']],JSON_UNESCAPED_UNICODE|JSON_PRETTY_PRINT|JSON_THROW_ON_ERROR);
+    $message.='--'.$boundary."\r\nContent-Type: application/json; charset=UTF-8\r\nContent-Disposition: attachment; filename=\"manifest-v".(int)$c['version'].".json\"\r\nContent-Transfer-Encoding: base64\r\n\r\n".chunk_split(base64_encode($manifest)).'--'.$boundary."--\r\n";
     $mock=getenv('DISCOVERY_MAIL_MOCK')==='true';
-    if(!$mock && !@mail($to,'=?UTF-8?B?'.base64_encode('Projekt umowy — Grzywniak.pl').'?=',$message,$headers)) contractError(502,'Nie udało się przekazać wiadomości do serwera poczty.');
-    $s['contract']['status']=$mock?'MOCK_SENT':'SENT'; $s['contract']['sentAt']=time(); $s['contract']['sentTo']=$to;
-    $s['contract']['deliveryLog'][]=['to'=>$to,'at'=>time(),'mock'=>$mock]; writeSession($s);
-    contractReply(['contract'=>$s['contract']],apiPath('admin.php').'?view=all&session='.$id.'#contract-panel');
+    $ok=$mock||@mail($to,'=?UTF-8?B?'.base64_encode('Projekt umowy — Grzywniak.pl').'?=',$message,$headers);
+    $attempt['mock']=$mock; $attempt['state']=$ok?($mock?'mock':'mail_server_accepted'):'failed'; $attempt['finishedAt']=time();
+    $db->exec('BEGIN IMMEDIATE');
+    $db->prepare('UPDATE contract_delivery_outbox SET state=?,data=?,updated_at=? WHERE session_id=? AND version=? AND package_hash=?')->execute([$ok?'accepted':'failed',json_encode($attempt,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),time(),...$key]);
+    $latest=readSession($id);
+    if($latest) {
+        // Editing while mail is in flight archives the version. Update only its
+        // delivery metadata; retain the actual payload, PDFs and approvals.
+        $record=static function(array &$target) use($c,$attempt,$ok,$mock,$to): void {
+            if((int)($target['version']??0)!==(int)$c['version']||($target['package']['hash']??'')!==$c['package']['hash']) return;
+            foreach($target['deliveryLog']??[] as $i=>$entry) if(($entry['reference']??'')===$attempt['reference']) $target['deliveryLog'][$i]=$attempt;
+            if($ok) { $target['status']=$mock?'MOCK_SENT':'SENT'; $target['sentAt']=time(); $target['sentTo']=$to; }
+        };
+        if(isset($latest['contract'])) $record($latest['contract']);
+        if(isset($latest['contractVersions'])) foreach($latest['contractVersions'] as &$old) $record($old);
+        unset($old); writeSession($latest);
+    }
+    if(!$ok) { $db->exec('COMMIT'); contractError(502,'Serwer poczty odrzucił wysyłkę. Próba została zapisana i można ją ponowić.'); }
+    contractReply(['contract'=>$latest['contract']??null,'sentVersion'=>(int)$c['version']],apiPath('admin.php').'?view=all&session='.$id.'#contract-panel');
 }
 contractError(400,'Nieznana operacja.');

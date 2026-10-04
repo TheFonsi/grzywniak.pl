@@ -19,13 +19,14 @@ contractCheck(contractSelectTemplate(['sections'=>[['title'=>'Aplikacja z bazą 
 contractCheck(contractSelectTemplate(['sections'=>[['title'=>'Sklep z koszykiem']]])['id']==='ecommerce','Select shop by scope');
 contractCheck(str_contains(contractStandardClauses('webapp')['terms'],'AI'),'Responsibility includes tools and subcontracting');
 try { contractStandardClauses('invalid'); throw new LogicException('Unknown template accepted'); } catch(InvalidArgumentException $expected) {}
-$agencyFacts=array_fill_keys(array_keys(contractFacts()),'ustalone'); $agencyFacts['publicationDestination']='agency';
+$agencyFacts=array_fill_keys(array_keys(contractFacts()),'ustalone'); $agencyFacts['publicationDestination']='agency'; $agencyFacts=array_replace($agencyFacts,contractSamplePackageFacts());
 contractCheck(contractFactsMissing($agencyFacts)===[],'Agency hosting must not require customer-domain facts.');
-$protected=$agencyFacts; $protected['clientType']='protected'; $protected['consumerDocuments']='';
+$protected=$agencyFacts; $protected['clientType']='protected'; $protected['consumerTechnical']='';
 contractCheck(contractFactsMissing($protected)!==[],'Consumer annexes must not be fabricated or optional');
-$processor=$agencyFacts; $processor['dataRole']='processor'; $processor['dataProcessingTerms']='';
+$processor=$agencyFacts; $processor['dataRole']='processor'; $processor['processingPurpose']='';
 contractCheck(contractFactsMissing($processor)!==[],'DPA reference required before a processor contract can pass');
-$clientFacts=array_replace(array_fill_keys(array_keys(contractFacts()),'ustalone'),['publicationDestination'=>'client_handoff','productionDomain'=>'jar-bud-gm.pl','domainOwnershipTerms'=>'Klient potwierdza prawo do domeny i dostep do DNS.','productionHosting'=>'Hosting klienta','backupResponsibility'=>'Kopie wykonuje klient.','dnsTlsResponsibility'=>'DNS i TLS obsluguje klient.']);
+$clientFacts=array_replace(contractSamplePackageFacts(),array_fill_keys(array_keys(contractFacts()),'ustalone'),['publicationDestination'=>'client_handoff','productionDomain'=>'jar-bud-gm.pl','domainOwnershipTerms'=>'Klient potwierdza prawo do domeny i dostep do DNS.','productionHosting'=>'Hosting klienta','backupResponsibility'=>'Kopie wykonuje klient.','dnsTlsResponsibility'=>'DNS i TLS obsluguje klient.']);
+$clientFacts=array_replace($clientFacts,contractSamplePackageFacts());
 contractCheck(contractFactsMissing($clientFacts)===[],'A complete customer-owned publication plan must pass the contract gate.');
 $invalidDomainFacts=$clientFacts; $invalidDomainFacts['productionDomain']='https://jar-bud-gm.pl/path';
 contractCheck(contractFactsMissing($invalidDomainFacts)!==[],'Customer publication must have a syntactically valid production domain.');

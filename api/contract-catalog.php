@@ -57,7 +57,7 @@ function contractSampleContract(string $id,?array $template=null): array {
         'webapp'=>"Aplikacja do rejestracji zgłoszeń: logowanie, role użytkownik i administrator, lista zgłoszeń, historia statusów oraz eksport CSV. Zakres nie obejmuje migracji danych ani integracji niewymienionych w umowie.\nPrzekazanie obejmuje kod źródłowy, instrukcję wdrożenia, opis konfiguracji oraz scenariusze odbioru. Testy są wykonywane na danych syntetycznych, bez danych osobowych klienta.",
         'ecommerce'=>"Sklep internetowy: katalog do 50 produktów, koszyk, zamówienia oraz jedna uzgodniona integracja płatności i dostawy. Zamawiający dostarcza dane produktów, zdjęcia i zatwierdzone dokumenty sprzedaży.\nPrzekazanie obejmuje kod, instrukcję obsługi i konfiguracji oraz wykaz licencji. Konta operatorów i opłaty transakcyjne pozostają po stronie Zamawiającego. Testy wykorzystują dane syntetyczne.",
     };
-    return array_replace($template,[
+    $contract=array_replace($template,[
         'number'=>'WZOR-'.strtoupper($id).'-01','version'=>1,'templateName'=>$catalog[$id]['title'],
         'provider'=>"Przykładowe Studio Cyfrowe sp. z o.o.\nAdres: ul. Przykładowa 1, 00-001 Warszawa\nReprezentacja: osoba uprawniona zgodnie z rejestrem\nE-mail: studio@example.test",
         'party'=>"Przykładowy Zamawiający sp. z o.o.\nDane w tym dokumencie są fikcyjne; przykład służy ocenie wzoru i wyglądu.",
@@ -67,6 +67,40 @@ function contractSampleContract(string $id,?array $template=null): array {
         'deadline'=>"Rozpoczęcie po zawarciu umowy, wpłacie zaliczki i przekazaniu uzgodnionych materiałów. Realizacja: 20 dni roboczych od spełnienia tych warunków; projekt graficzny w pierwszych 5 dniach, następnie budowa, kontrola jakości i odbiór. Zmiany terminu wymagają udokumentowania przyczyny i uzgodnienia stron.",
         'facts'=>['clientType'=>'business','publicationDestination'=>'agency','ipMode'=>'transfer','rightsTerms'=>$template['defaultTransferTerms'],'ipPayment'=>$template['defaultIpPayment'],'signing'=>'paper','dataRole'=>'none','clientAddress'=>'ul. Testowa 2, 00-001 Warszawa','clientRepresentative'=>'Przykładowy przedstawiciel zgodnie z rejestrem','contractDate'=>'2026-10-03'],
     ]);
+    $contract['facts']=array_replace($contract['facts'],contractSamplePackageFacts());
+    $contract['facts']['acceptanceCriteria']=$scope;
+    if($id==='webapp') $contract['facts']['dataRole']='processor';
+    if($id==='ecommerce') {
+        $contract['party']='Przykładowa Anna Testowa, prowadząca działalność gospodarczą. Dane fikcyjne.';
+        $contract['facts']['clientType']='protected';
+        $contract['facts']['legalStatusBasis']='Przykład JDG: zakup sklepu poza zawodowym charakterem działalności, do sprawdzenia względem rzeczywistych okoliczności.';
+    }
+    $contract['package']=contractPackageBuild($contract);
+    return $contract;
+}
+/** Fictional values exclusively for examples and isolated tests, never project defaults. */
+function contractSamplePackageFacts(): array {
+    return [
+        'obligationKind'=>'result','legalStatusBasis'=>'Przykład: spółka kapitałowa reprezentowana zgodnie z rejestrem; zakup na potrzeby przedsiębiorstwa.',
+        'acceptanceCriteria'=>'Każdy uzgodniony widok działa na telefonie i komputerze. Linki kontaktowe i nawigacja działają. Brak błędów blokujących uzgodnione funkcje. Raport testów i instrukcja uruchomienia są przekazane.',
+        'acceptanceDays'=>'7','cooperationTerms'=>'Przykład: klient przekazuje logo i zdjęcia przez prywatny formularz materiałów w ciągu 5 dni od zawarcia umowy. Wykonawca przygotowuje teksty w ciągu 3 dni od otrzymania materiałów. Przy brakach strony uzgadniają nowy termin po udokumentowaniu wpływu.',
+        'rightsInventory'=>json_encode([['name'=>'Indywidualny układ i teksty','origin'=>'own','author'=>'Fikcyjny autor przykładu','license'=>'Przeniesienie na zasadach umowy; wynagrodzenie w cenie','rightsBasis'=>'Przykładowe własne autorstwo; w realnym projekcie wymagana weryfikacja praw','maintenanceRights'=>'Klient może zlecać modyfikację i utrzymanie innemu zespołowi na nabytych polach eksploatacji']],JSON_UNESCAPED_UNICODE),
+        'privacyRecipients'=>'Przykład: upoważniona obsługa studia, dostawca poczty w Polsce, księgowość; brak transferów poza EOG. Rzeczywistych dostawców trzeba wskazać i sprawdzić przed użyciem.',
+        'privacyRetention'=>'Przykład: dokumenty rozliczeniowe przez ustawowy okres właściwy dla obowiązków podatkowych; pozostałe dane umowne do upływu właściwego terminu przedawnienia roszczeń, bez zbędnych kopii. Dane reprezentanta otrzymano od zamawiającego w toku ustaleń.',
+        'hostingFee'=>'Przykład: hosting przez 30 dni bez dodatkowej opłaty w cenie projektu. Dalsze utrzymanie nie jest zamówione; wymaga odrębnego uzgodnienia ceny i zakresu.',
+        'hostingPeriod'=>'Przykład: 30 dni od publikacji, bez automatycznego płatnego odnowienia. Powiadomienie o końcu okresu 7 dni wcześniej. Zmiana ceny wymaga odrębnej zgody.',
+        'hostingBackup'=>'Przykład: kopia codziennie, retencja 7 dni, pliki i baza; test odtworzenia przed publikacją. Odtworzenie w ciągu 2 dni roboczych od zgłoszenia. Wykonawca obsługuje kopie; klient zachowuje przekazany pakiet.',
+        'hostingExit'=>'Przykład: eksport kodu, plików i bazy w otwartych formatach do 7 dni, bez dopłaty; odbiór przed końcem hostingu. Usunięcie danych 14 dni po zakończeniu, z uwzględnieniem retencji kopii i obowiązków prawnych.',
+        'hostingDns'=>'Przykład: infrastruktura studia w Polsce; wykonawca obsługuje DNS i TLS na własnej subdomenie. Domenę klienta i dostęp do jej DNS uzgadnia się odrębnie. Awarie zgłaszane na kontakt wykonawcy.',
+        'consumerChannel'=>'distance','consumerPerformance'=>'mixed','consumerTechnical'=>'Przykład: aktualne przeglądarki Chrome, Firefox i Safari, dostęp do internetu. Zakres obejmuje responsywny interfejs i eksport kodu. Aktualizacje wymagane do zachowania zgodności są zapewniane przez okres wymagany ustawą. Reklamacje na e-mail i adres wykonawcy, z opisem problemu; nie wymaga się szczególnego formularza.',
+        'processingPurpose'=>'Przykład: utrzymanie formularza zgłoszeń, zapis, dostęp upoważnionych osób, eksport i usuwanie na instrukcję klienta.',
+        'processingDuration'=>'Przykład: wyłącznie uzgodniony okres utrzymania; środowisko testowe zawiera dane syntetyczne.',
+        'processingCategories'=>'Przykład: użytkownicy formularza; imię, służbowy e-mail, treść zgłoszenia i czas. Brak danych szczególnych kategorii.',
+        'processingLocations'=>'Przykład: Polska; transfer poza EOG zabroniony bez odrębnej instrukcji i weryfikacji podstawy z rozdziału V RODO.',
+        'processingSubprocessors'=>'[]','processingSecurity'=>'Przykład: imienne konta z MFA dla administracji, TLS, ograniczenie uprawnień, szyfrowane kopie, oddzielenie środowisk, ewidencja dostępu i kwartalna kontrola odtworzenia.',
+        'processingReturn'=>'Przykład: administrator wybiera zwrot CSV/SQL i usunięcie albo samo usunięcie; termin 7 dni od instrukcji, kopie wygasają po 7 dniach, potwierdzenie pisemne. Zachowanie tylko danych wymaganych przepisami, z ograniczeniem dostępu.',
+        'processingIncident'=>'Przykład: kontakt administratora privacy@example.test; pierwsze powiadomienie bez zbędnej zwłoki, nie później niż 24 godziny od stwierdzenia naruszenia.',
+    ];
 }
 function contractCatalogSettings(): string {
     $id=(string)($_GET['template']??'website');
@@ -84,7 +118,7 @@ function contractCatalogSettings(): string {
     foreach([
         'https://bip.intibs.pl/uploads/files/migration/konkursy/2010/web_new_loks/wzor_umowy_o_wykonanie_serwisu_WWW_NEW_LOKS.pdf'=>'Publiczny wzór INTiBS PAN — układ umowy',
         'https://meetcosta.com/umowa'=>'Publiczny wzór wykonania strony — struktura',
-        'https://api.sejm.gov.pl/eli/acts/DU/2025/1071/text.pdf'=>'Kodeks cywilny — odpowiedzialność i wykonanie zobowiązań',
+        'https://api.sejm.gov.pl/eli/acts/DU/2026/795/text.pdf'=>'Kodeks cywilny — odpowiedzialność i wykonanie zobowiązań',
         'https://api.sejm.gov.pl/eli/acts/DU/2025/24/text.pdf'=>'Prawo autorskie — pola eksploatacji i forma umowy',
         'https://eli.gov.pl/api/acts/DU/2024/1796/text.html'=>'Ustawa o prawach konsumenta',
         'https://eur-lex.europa.eu/eli/reg/2016/679/oj?locale=pl'=>'RODO — umowa powierzenia',
