@@ -6,6 +6,7 @@ require_once __DIR__ . '/offer-changes.php';
 require_once __DIR__ . '/offer-readiness.php';
 require_once __DIR__.'/offer-agreement.php';
 require_once __DIR__.'/offer-pdf.php';
+require_once __DIR__.'/offer-scope.php';
 
 $user = getenv('ADMIN_USERNAME') ?: '';
 $pass = getenv('ADMIN_PASSWORD') ?: '';
@@ -73,7 +74,7 @@ function offerDocument(array $session, float $rate, float $vat, int $version = 1
     $scope = listOf($analysis['recommendedScope'] ?? []);
     $scope = array_values(array_unique($scope));
     if (!$scope) $scope = array_values(array_filter([(string) ($state['mustHaveFeatures'] ?? ''), (string) ($state['coreProcesses'] ?? ''), 'Testy oraz publikacja uzgodnionego rozwiązania']));
-    $optional = listOf($analysis['optionalScope'] ?? []);
+    $optional = offerOptionalIdeas($scope,listOf($analysis['optionalScope'] ?? []));
     $features = mb_strtolower(implode(' ', $scope));
     preg_match('/\b(\d{1,2})\s*(?:podstron|stron)\b/ui', $features, $pageMatch);
     $pages = isset($pageMatch[1]) ? max(1, (int) $pageMatch[1]) : (preg_match('/one.page|landing|wizytówk|strona internetowa/ui', $features) ? 1 : 3);
@@ -164,6 +165,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!missingInformationManuallyConfirmed($session)) { http_response_code(409); echo json_encode(['message' => 'Brakuje ręcznie zatwierdzonej odpowiedzi na co najmniej jedno pytanie analizy. Otwórz analizę, zapisz odpowiedź administratora i spróbuj ponownie.'], JSON_UNESCAPED_UNICODE); exit; }
     }
     if ($action !== 'generate' && ($session['offer']['status'] ?? '') === 'OUTDATED') { http_response_code(409); echo json_encode(['message' => 'Oferta jest nieaktualna. Przygotuj nową wersję z aktualnej analizy.']); exit; }
+}
+if($_SERVER['REQUEST_METHOD']==='POST'&&in_array($body['action']??'',['promoteOptional','expandOptional'],true)) {
+    if(!hash_equals(contractToken(),(string)($body['csrf']??''))) {http_response_code(403);echo json_encode(['message'=>'Odśwież sesję formularza.']);exit;}
+    $previous=$session['offer']??null;
+    if(!is_array($previous)||(int)($body['expectedVersion']??-1)!==(int)($previous['version']??0)) {http_response_code(409);echo json_encode(['message'=>'Oferta zmieniła się. Odśwież panel.']);exit;}
+    try {
+        $offer=($body['action']==='expandOptional')?offerExpandOptional($previous):offerPromoteOptional($previous,(int)($body['section']??-1),(int)($body['item']??-1),(string)($body['text']??''));
+    } catch(InvalidArgumentException $error) {http_response_code(422);echo json_encode(['message'=>$error->getMessage()],JSON_UNESCAPED_UNICODE);exit;}
+    if($offer['sections']===$previous['sections']) {echo json_encode(['offer'=>$previous],JSON_UNESCAPED_UNICODE);exit;}
+    $session['offerVersions'][]=$previous;
+    $offer['version']=(int)$previous['version']+1;$offer['offerId']='OF-'.strtoupper(substr(hash('sha256',$id.'-'.$offer['version']),0,10));
+    $offer['status']='DRAFT';$offer['needsHumanReview']=true;$offer['updatedAt']=time();
+    unset($offer['reviewedAt'],$offer['verification'],$offer['acceptedAt'],$offer['acceptedBy'],$offer['sentAt'],$offer['sentTo'],$offer['commercialSnapshot']);
+    offerMarkDependentReview($previous,$offer);
+    $offer['changeLog']=offerTextChanges($previous,$offer);$offer['sourceRefs']=documentOfferSources($session);
+    $session['offer']=$offer;writeSession($session);
+    echo json_encode(['offer'=>$offer],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);exit;
 }
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($body['action'] ?? '') === 'restoreChange') {
     $offer = $session['offer'] ?? [];
@@ -294,6 +312,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($body['action'] ?? '') === 'genera
     $offer['offerId'] = 'OF-' . strtoupper(substr(hash('sha256', $id . '-' . $nextVersion), 0, 10));
     $offer['updatedAt'] = time();
     $offer['sourceHash'] = offerSourceHash($session);
+    $offer=offerExpandOptional($offer);
     offerMarkDependentReview($previous,$offer);
     $offer['sourceSnapshot'] = ['projectState' => $session['projectState'] ?? [], 'adminDecisions' => $session['adminDecisions'] ?? []];
     $offer['sourceRefs']=documentOfferSources($session);

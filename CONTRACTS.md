@@ -2,6 +2,8 @@
 
 ## Spójność oferty i umowy
 
+W części **„Poza obecnym zakresem / możliwe później”** nowe oferty zawierają 3–5 pomysłów rozbudowy. Analiza proponuje je na podstawie projektu; brakujące pomysły są uzupełniane propozycjami dla strony, aplikacji lub sklepu. **„Przenieś do zakresu realizacji”** usuwa punkt z części opcjonalnej, dopisuje go do zamówionego zakresu i tworzy nową wersję roboczą. Cena nie jest zgadywana ani automatycznie podnoszona: administrator sprawdza wycenę, termin i powiązane warunki, a klient potwierdza nową ofertę. Poprzednia oferta i podpisana umowa pozostają w historii. Starsze lub skrócone listy można uzupełnić przyciskiem **„Uzupełnij pomysły rozbudowy”**. Przed przeniesieniem zapisz trwającą edycję treści.
+
 Zakres, cena netto/VAT/brutto, zaliczka i harmonogram pochodzą z zaakceptowanego pakietu oferty. W umowie są tylko do odczytu. Zmianę negocjuj w ofercie, a następnie użyj **„Wczytaj aktualne ustalenia oferty i sprawdź różnice”**. Przycisk wypełnia formularz, pokazuje poprzednie i nowe wartości oraz cofa akceptację zastąpionych pól; sam nie zapisuje ani nie wysyła dokumentu. PDF jest zablokowany przy niezgodności treści lub identyfikatora pakietu. Starszy niesynchronizowany szkic zachowuje poprzednie źródła.
 
 Pełny załącznik handlowy zawiera także wyłączenia, płatności, wsparcie, prawa, dodatkowe koszty, dane, materiały, odbiór, hosting i publikację. Wczytanie innego wzoru zmienia wyłącznie klauzule prawne. W starych szkicach usuń jawnie nieaktualne fragmenty oznaczone „Ustalenia zaakceptowanej oferty:” — bieżące warunki są w załączniku. Podpisane/archiwalne PDF-y pozostają bez zmian.

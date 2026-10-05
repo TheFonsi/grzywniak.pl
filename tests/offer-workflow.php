@@ -3,6 +3,7 @@ declare(strict_types=1);
 if(PHP_SAPI!=='cli') { http_response_code(404); exit; }
 require_once __DIR__ . '/../api/offer-changes.php';
 require_once __DIR__ . '/../api/offer-agreement.php';
+require_once __DIR__ . '/../api/offer-scope.php';
 // Test pure document functions without authentication, storage or AI requests.
 $source = file_get_contents(__DIR__ . '/../api/offer.php');
 if (!str_contains($source, "if(\$_SERVER['REQUEST_METHOD']==='POST')")) throw new RuntimeException('Read-only offer requests must not take the exclusive session lock');
@@ -15,6 +16,7 @@ function check(bool $ok, string $message): void { if (!$ok) throw new RuntimeExc
 $session = ['id' => str_repeat('a', 32), 'projectState' => ['mustHaveFeatures' => 'sklep integracja CRM'], 'internalAnalysis' => ['recommendedScope' => ['Prosta strona'], 'missingInformation' => ['Zakres']], 'adminDecisions' => ['Zakres' => ['source' => 'AI_AUTO', 'answer' => 'Dodatkowy system']]];
 $offer = offerDocument($session, 150, 23);
 check($offer['status'] === 'DRAFT', 'New document must be a draft');
+check(count($offer['sections'][2]['items'])>=3&&count($offer['sections'][2]['items'])<=5,'New offers need 3–5 optional ideas');
 check($offer['sections'][1]['items'] === ['Prosta strona'], 'AI hypothesis leaked into scope');
 $session['projectState']['mustHaveFeatures'] = 'Inny pierwotny pomysł';
 check(offerDocument($session, 150, 23)['pricing'] === $offer['pricing'], 'Pricing must follow offered scope');
