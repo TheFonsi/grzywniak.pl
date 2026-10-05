@@ -267,6 +267,11 @@
       const c = data.contract;
       const signed = Number(data.case.contractSignedVersion || 0) === Number(c.version || 0) && Number(c.version || 0) > 0;
       let html = documentSources(c) + section("Dokument", `<p>Numer: ${escapeHtml(c.number || "—")}; wersja: ${escapeHtml(c.version || "—")}; stan wysyłki: ${escapeHtml(c.status || "brak")}.</p><p>Potwierdzenie zawarcia: ${signed ? "tak" : "nie"}. Wysłanie dokumentu nie potwierdza zawarcia umowy.</p>${adminLink("#contract-panel")}`, true);
+      if(c.hasPdf) {
+        const freshLayout=!signed && c.status==="DRAFT" && Number(c.pdfLayoutVersion || 0)<3;
+        const url=`${apiPath("contract.php")}?session=${encodeURIComponent(id)}&format=${freshLayout ? "layout-preview" : "pdf"}&inline=1&layout=3`;
+        html+=section("Podgląd PDF umowy", `${freshLayout ? `<p>Aktualny układ szkicu. Nowy wygląd zapiszesz, przygotowując PDF w edycji umowy.</p>` : ""}<iframe title="Podgląd PDF umowy" src="${escapeHtml(url)}" style="width:100%;height:75vh;border:0;border-radius:8px;background:white"></iframe><p><a href="${escapeHtml(url)}" target="_blank" rel="noopener">Otwórz PDF w osobnej karcie ↗</a></p>`,true);
+      }
       if(c.package) html += section("Pakiet umowny", `<p>Weryfikacja prawna: ${c.package.approved ? "potwierdzona dla tej wersji" : "wymagana przed wysyłką i potwierdzeniem umowy"}.</p><p>Dowód otrzymania przez klienta: ${c.package.hasReceipt ? "zapisany" : "brak"}.</p>${lines(c.package.documents)}${c.package.earliestStart ? `<p>Najwcześniejszy start według zapisanych potwierdzeń: ${escapeHtml(c.package.earliestStart)}.</p>` : ""}${adminLink("#contract-panel")}`, true);
       if (c.hasPdf && !signed && (!c.package || c.package.approved)) html += section("Potwierdź zawarcie", `<form class="form" data-action="confirm_contract"><label>Podstawa potwierdzenia, data i sposób podpisania<textarea name="evidence" rows="3" required minlength="8" maxlength="500" placeholder="Np. podpisana umowa v2 z dnia …, dokument sprawdzony …"></textarea></label><button class="primary">Potwierdź aktualną wersję</button></form>`, true);
       if (signed) html += section("Zapisane potwierdzenie", `<p>${escapeHtml(data.case.contractEvidence || "")}</p><p>${date(data.case.contractConfirmedAt)}</p>`, true);

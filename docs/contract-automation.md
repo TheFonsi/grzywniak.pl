@@ -8,6 +8,8 @@ Zakres, cena, płatności, harmonogram, odbiór, materiały, publikacja, prawa i
 
 PDF ma osobną stronę tytułową z podsumowaniem i danymi obu stron, numerowane paragrafy, wcięcia i czytelne odstępy. Panel pokazuje właściwy PDF w osadzonym podglądzie. Oferta stanowi Załącznik 1: dla nowych akceptacji dołączane są dokładne zapisane strony zaakceptowanego pliku. Starszych podpisanych plików nie przepisujemy. Aby zmienić wygląd starszego szkicu, trzeba przygotować i wygenerować nową wersję.
 
+Układ v3 używa szeryfowej typografii Times, z metrykami polskich znaków. Starszy niewysłany i niepodpisany szkic pokazuje aktualny układ przez osobny, tylko do odczytu endpoint `format=layout-preview`. Informacja przy podglądzie rozróżnia go od zapisanego pliku używanego do pobrania i wysyłki. PDF jest również widoczny w etapie „Umowa” na mapie. Podgląd nie zmienia treści, wersji, historii ani zatwierdzenia pakietu. Wysłane, podpisane i archiwalne wersje pokazują oryginalny plik.
+
 Automatyczne uzupełnienie nie stanowi indywidualnej opinii prawnej. Forma podpisu i pola eksploatacji wymagają uwagi przy przeniesieniu praw ([PARP](https://www.parp.gov.pl/component/content/article/83261%3Aumowa-o-przeniesienie-autorskich-praw-majatkowych)); rzeczywiste powierzenie przetwarzania wymaga ustaleń odpowiadających art. 28 [RODO](https://eur-lex.europa.eu/eli/reg/2016/679/oj?locale=PL).
 
 Weryfikacja: `tests/contract-http.py`, `tests/document-flow-http.py`, `tests/contract-package.php`, `tests/contract-review-ui.mjs` oraz render wszystkich stron fikcyjnej umowy z `tests/offer-annex.py`. Testy używają osobnych baz i fikcyjnych danych.

@@ -3,19 +3,24 @@ declare(strict_types=1);
 
 /** Proportional A4 layout with Polish glyphs, searchable text and measured wrapping. */
 final class ContractPdfLayout {
+    public const VERSION=3;
     private array $pages=[];
     private string $stream='';
     private float $y=92;
     private array $metrics;
+    private array $faces;
     public function __construct(private array $contract) {
-        $this->metrics=require __DIR__.'/contract-font-metrics.php'; $this->page();
+        $this->metrics=require __DIR__.'/contract-font-metrics.php';
+        $this->faces=['Helvetica','Helvetica-Bold'];
+        if(($contract['documentType']??'')!=='offer') {$this->metrics=array_replace($this->metrics,require __DIR__.'/contract-serif-metrics.php');$this->faces=['Times-Roman','Times-Bold'];}
+        $this->page();
     }
     public function pageBreak(): void { $this->page(); }
     private function bytes(string $text): string {
         return iconv('UTF-8','Windows-1250//TRANSLIT',str_replace("\t",'    ',$text)) ?: '';
     }
     private function width(string $text,float $size,bool $bold=false): float {
-        $width=0; $metrics=$this->metrics[$bold?'Helvetica-Bold':'Helvetica'];
+        $width=0; $metrics=$this->metrics[$this->faces[$bold?1:0]];
         foreach(str_split($this->bytes($text)) as $char) $width+=$metrics[ord($char)];
         return $width*$size/1000;
     }
@@ -110,7 +115,7 @@ final class ContractPdfLayout {
         foreach(array_chunk($map,90) as $chunk) $cmap.=count($chunk)." beginbfchar\n".implode("\n",$chunk)."\nendbfchar\n";
         $cmap.='endcmap CMapName currentdict /CMap defineresource pop end end';
         $objects=['<< /Type /Catalog /Pages 2 0 R >>','<< /Type /Pages /Kids ['.implode(' ',array_map(static fn($i)=>(7+$i*2).' 0 R',array_keys($this->pages))).'] /Count '.count($this->pages).' >>'];
-        foreach(['Helvetica','Helvetica-Bold'] as $face) $objects[]='<< /Type /Font /Subtype /Type1 /BaseFont /'.$face.' '.$encoding.' /FirstChar 0 /LastChar 255 /Widths ['.implode(' ',$this->metrics[$face]).'] /ToUnicode 5 0 R >>';
+        foreach($this->faces as $face) $objects[]='<< /Type /Font /Subtype /Type1 /BaseFont /'.$face.' '.$encoding.' /FirstChar 0 /LastChar 255 /Widths ['.implode(' ',$this->metrics[$face]).'] /ToUnicode 5 0 R >>';
         $objects[]='<< /Length '.strlen($cmap)." >>\nstream\n".$cmap."\nendstream";
         foreach($this->pages as $i=>$stream) {
             $this->stream=''; $this->rule(791);

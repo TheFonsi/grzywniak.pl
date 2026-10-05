@@ -30,6 +30,14 @@ function contractToken(): string {
     return $_SESSION['contract_csrf'] ??= bin2hex(random_bytes(32));
 }
 function contractEscape(mixed $text): string { return htmlspecialchars((string)$text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
+function contractDraftLayoutAllowed(array $session,array $contract):bool {
+    if(($contract['status']??'')!=='DRAFT'||!empty($contract['sentAt'])||!empty($contract['deliveryLog'])) return false;
+    $db=sessionDb();
+    if(!$db->query("SELECT 1 FROM sqlite_master WHERE type='table' AND name='project_cases'")->fetchColumn()) return true;
+    $query=$db->prepare('SELECT data FROM project_cases WHERE session_id=?');$query->execute([$session['id']]);
+    $case=json_decode((string)($query->fetchColumn()?:'{}'),true,512,JSON_THROW_ON_ERROR);
+    return (int)($case['contractSignedVersion']??0)!==(int)($contract['version']??0);
+}
 function contractEditor(array $session): string {
     $offer = $session['offer'] ?? [];
     if (($offer['status'] ?? '') !== 'ACCEPTED') return '<section id="contract-panel" class="conversation-contract"><h3>Umowa</h3><p class="muted">Przygotowanie umowy będzie dostępne po zaakceptowaniu oferty.</p></section>';
@@ -81,7 +89,10 @@ function contractEditor(array $session): string {
         if(is_string($reference)&&trim($reference)!=='') $html.='<p class="muted"><strong>'.$e($label).' (brief):</strong> '.$e($reference).'. Uzgodnij konkretne warunki przed akceptacją pakietu.</p>';
     }
     $html.='<div><button class="button" name="contract_action" value="auto-prepare" formnovalidate>Przygotuj automatycznie z oferty i aktualnego wzoru</button> <button class="button" name="contract_action" value="approve-generate">Przejrzałem — zatwierdź całość i przygotuj PDF</button> <button class="button" name="contract_action" value="save">Zapisz projekt umowy</button> <button class="button" name="contract_action" value="generate">Zapisz i przygotuj PDF</button></div><p class="muted">Automat dobiera wzór i pobiera zakres, kwoty, płatności, harmonogram oraz warunki z zaakceptowanej oferty. Zatwierdzenie całości zastępuje akceptowanie każdego pola osobno. Brakujących danych stron, praw do materiałów i rzeczywistych dostawców nie wymyślamy.</p></form></details>';
-    if(!empty($saved['pdfBase64'])) $html.='<details open style="margin:18px 0"><summary>Podgląd dokumentu do podpisania</summary><iframe title="Podgląd PDF umowy" src="'.$contractUrl.'?session='.$id.'&amp;format=pdf&amp;inline=1" style="width:100%;height:80vh;border:1px solid #465474;border-radius:10px;background:#fff"></iframe></details>';
+    if(!empty($saved['pdfBase64'])) {
+        $freshLayout=contractDraftLayoutAllowed($session,$saved)&&(int)($saved['pdfLayoutVersion']??0)<3;
+        $html.='<details open style="margin:18px 0"><summary>Podgląd PDF umowy</summary>'.($freshLayout?'<p class="muted">Poniżej aktualny układ szkicu z zachowaną treścią. Pobieranie i wysyłka korzystają z zapisanego pliku. Aby zapisać nowy wygląd, otwórz „Edytuj umowę” i kliknij „Przejrzałem — zatwierdź całość i przygotuj PDF”.</p>':'').'<iframe title="Podgląd PDF umowy" src="'.$contractUrl.'?session='.$id.'&amp;format='.($freshLayout?'layout-preview':'pdf').'&amp;inline=1&amp;layout=3" style="width:100%;height:80vh;border:1px solid #465474;border-radius:10px;background:#fff"></iframe></details>';
+    }
     if (!empty($saved['pdfBase64'])) $html.='<p><a class="button" href="'.$contractUrl.'?session='.$id.'&amp;format=pdf">Pobierz PDF</a></p><form method="post" action="'.$contractUrl.'" class="contract-send"><input type="hidden" name="contract_session" value="'.$id.'"><input type="hidden" name="csrf" value="'.$e(contractToken()).'"><input type="hidden" name="expectedVersion" value="'.(int)$saved['version'].'"><button class="button" name="action" value="send"'.(contractPackageApproved($saved)?'':' disabled').'>Wyślij PDF klientowi</button></form>';
     $html.=documentSourceLinks($saved??[],$session['id']);
     $html.=contractPackageControls($saved??[],$session['id']);

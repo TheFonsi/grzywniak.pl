@@ -91,6 +91,9 @@ try:
     saved_facts=json.loads(data)['contract']['facts']
     assert 'pełnego wynagrodzenia' in saved_facts['rightsTerms'] and 'zawarte w cenie' in saved_facts['ipPayment']
     code,pdf=request('/api/contract.php?session='+sid+'&format=pdf');assert code==200 and pdf.startswith(b'%PDF-')
+    before_preview=json.loads(request('/api/contract.php?session='+sid)[1])['contract']
+    code,preview=request('/api/contract.php?session='+sid+'&format=layout-preview&inline=1');assert code==200 and b'/BaseFont /Times-Roman' in preview
+    assert json.loads(request('/api/contract.php?session='+sid)[1])['contract']==before_preview,'Visual preview must not change saved bytes, package approval or history'
     assert request('/api/contract.php',body)[0]==409
     assert request('/api/contract.php',dict(body,expectedVersion=1,action='send'))[0]==409
     current=json.loads(request('/api/contract.php?session='+sid)[1])['contract']
@@ -106,6 +109,7 @@ try:
     assert 'receipt' not in sent['package']
     assert request('/api/contract.php?session='+sid+'&format=manifest')[0]==200
     assert json.loads(data)['contract']['status']=='MOCK_SENT'
+    assert request('/api/contract.php?session='+sid+'&format=layout-preview')[0]==409,'Sent versions must retain the original PDF'
     code,data=request('/api/contract.php',dict(body,expectedVersion=1,action='save',party='Changed client'));assert code==200
     assert json.loads(data)['contract']['party']=='Changed client'
     assert json.loads(data)['contract']['facts']['ipMode']=='transfer'

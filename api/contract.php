@@ -83,10 +83,15 @@ if($method==='GET') {
         header('Content-Disposition: attachment; filename="pakiet-v'.(int)$c['version'].'.json"');
         echo json_encode(['hash'=>$c['package']['hash'],'pdfSha256'=>$c['package']['pdfSha256'],'manifest'=>$c['package']['manifest']],JSON_UNESCAPED_UNICODE|JSON_PRETTY_PRINT|JSON_THROW_ON_ERROR); exit;
     }
-    if(($_GET['format']??'')==='pdf') {
+    if(in_array($_GET['format']??'',['pdf','layout-preview'],true)) {
         $contract=$s['contract']??null;
         if(isset($_GET['version']) && (int)$_GET['version']!==(int)($contract['version']??0)) { $contract=null; foreach($s['contractVersions']??[] as $old) if((int)$old['version']===(int)$_GET['version']) $contract=$old; }
+        if(!is_array($contract)) contractError(404,'Nie znaleziono tej wersji umowy.');
         $pdf=base64_decode((string)($contract['pdfBase64']??''),true);
+        if(($_GET['format']??'')==='layout-preview') {
+            if(!contractDraftLayoutAllowed($s,$contract)||isset($_GET['version'])) contractError(409,'Wysłany, podpisany lub archiwalny dokument pokazujemy w zapisanym układzie.');
+            try {$pdf=contractPdf($contract);} catch(Throwable $error) {contractError(422,'Nie udało się przygotować podglądu pakietu. Sprawdź zapisane załączniki.');}
+        }
         if(!$pdf || !str_starts_with($pdf,'%PDF-')) contractError(404,'Ta wersja nie ma przygotowanego PDF.');
         header('Content-Type: application/pdf'); header('Content-Disposition: '.(($_GET['inline']??'')==='1'?'inline':'attachment').'; filename="umowa-'.preg_replace('/[^A-Za-z0-9-]/','',$contract['number']).'-v'.(int)$contract['version'].'.pdf"'); header('Content-Length: '.strlen($pdf)); echo $pdf; exit;
     }
@@ -206,6 +211,7 @@ if(in_array($action,['save','generate','approve-generate'],true)) {
         $c['package']=contractPackageBuild($c);
         $pdf=contractPdf($c);
         $c['pdfBase64']=base64_encode($pdf);
+        $c['pdfLayoutVersion']=ContractPdfLayout::VERSION;
         $c['package']['pdfSha256']=hash('sha256',$pdf);
     }
     if(is_array($s['contract']??null)) $s['contractVersions'][]=$s['contract'];
