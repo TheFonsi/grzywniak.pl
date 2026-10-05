@@ -11,7 +11,8 @@ require 'api/bootstrap.php';require 'api/offer-agreement.php';require 'api/offer
 $id=bin2hex(random_bytes(16));$s=['id'=>$id,'projectState'=>[],'internalAnalysis'=>['status'=>'COMPLETED','version'=>1,'missingInformation'=>[]], 'adminDecisions'=>[], 'contract'=>['version'=>1,'status'=>'SIGNED','pdfBase64'=>'original-pdf']];
 $facts=contractSamplePackageFacts();$a=[];foreach(offerAgreementFields() as $key=>$field)$a[$key]=$facts[$key]??'Agreed conditions';$a['publicationDestination']='agency';$a['ipMode']='transfer';$a['rightsTerms']='';$a['dataRole']='none';
 $s['offer']=['status'=>'ACCEPTED','version'=>3,'analysisVersion'=>1,'offerId'=>'OF-TEST','pricing'=>['net'=>2000,'vatRate'=>23,'gross'=>2460],'payment'=>['depositRate'=>10],'agreement'=>$a,'sections'=>[['title'=>'Zakres realizacji','items'=>['Strona one page']]],'verification'=>'HUMAN_REVIEWED','acceptedAt'=>time()];
-$s['offer']=offerExpandOptional($s['offer']);$s['offer']['sourceHash']=hash('sha256',json_encode([$s['projectState'],$s['internalAnalysis'],$s['adminDecisions']],JSON_UNESCAPED_UNICODE));
+$s['internalAnalysis']['sourceRefs']=['brief'=>documentBriefSource($s)];
+$s['offer']=offerExpandOptional($s['offer']);$s['offer']['sourceRefs']=documentOfferSources($s);$s['offer']['sourceHash']=hash('sha256',json_encode([$s['projectState'],$s['internalAnalysis'],$s['adminDecisions']],JSON_UNESCAPED_UNICODE));
 writeSession($s);file_put_contents('seed.json',json_encode(['id'=>$id,'session'=>$s]));
 """
 subprocess.run(['php','-r',seed],cwd=work,env=env,check=True)
@@ -30,6 +31,7 @@ try:
         try:code,meta=call(extra='&format=agreement');break
         except urllib.error.URLError:time.sleep(.1)
     assert code==200
+    assert call()[1]['offer']['status']=='ACCEPTED','Archive metadata added at write must not make the current offer stale'
     assert len(before['offer']['sections'][1]['items'])==5
     body={'action':'promoteOptional','expectedVersion':3,'csrf':meta['csrf'],'section':1,'item':0,'text':idea}
     assert call(dict(body,csrf='wrong'))[0]==403
@@ -47,6 +49,17 @@ try:
     assert idea not in restored[1]['offer']['sections'][1]['items'],'Already promoted idea must not return as optional'
     stored=json.loads(subprocess.check_output(['php','-r',"require 'api/bootstrap.php'; echo json_encode(readSession('"+sid+"'));"],cwd=work,env=env))
     assert stored['contract']==before['contract'],'Signed contract must remain unchanged'
+    changed="require 'api/bootstrap.php'; $s=readSession('"+sid+"'); $s['internalAnalysis']['version']=2; $s['internalAnalysis']['summary']='Really changed analysis'; writeSession($s);"
+    subprocess.run(['php','-r',changed],cwd=work,env=env,check=True)
+    old=call()[1]['offer'];assert old['status']=='OUTDATED' and 'v2' in old['outdatedReason']
+    stale_body=dict(body,expectedVersion=old['version'],item=0,text=old['sections'][1]['items'][0])
+    moved=call(stale_body);assert moved[0]==200 and moved[1]['offer']['status']=='OUTDATED', moved
+    assert moved[1]['offer']['sourceRefs']==old['sourceRefs'],'Editing a stale offer must not claim the new analysis as its source'
+    edit={'action':'updateText','expectedVersion':moved[1]['offer']['version'],'csrf':meta['csrf'],'summary':'Manually edited stale draft'}
+    assert call(dict(edit,expectedVersion=1))[0]==409
+    edited=call(edit);assert edited[0]==200 and edited[1]['offer']['status']=='OUTDATED',edited
+    assert edited[1]['offer']['summary']=='Manually edited stale draft'
+    assert call({'action':'review'})[0]==409,'Real analysis changes still block approval'
     print('Optional scope HTTP passed: five ideas, promotion, CSRF, conflict protection, preserved price/archive/contract and required review.')
 finally:
     server.terminate();server.wait(timeout=10);log.close()

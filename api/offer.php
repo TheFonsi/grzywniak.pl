@@ -7,6 +7,7 @@ require_once __DIR__ . '/offer-readiness.php';
 require_once __DIR__.'/offer-agreement.php';
 require_once __DIR__.'/offer-pdf.php';
 require_once __DIR__.'/offer-scope.php';
+require_once __DIR__.'/offer-source.php';
 
 $user = getenv('ADMIN_USERNAME') ?: '';
 $pass = getenv('ADMIN_PASSWORD') ?: '';
@@ -33,8 +34,8 @@ if (normalizeSessionData($session) && $_SERVER['REQUEST_METHOD'] === 'POST') fil
 $analysisReady = (($session['internalAnalysis']['status'] ?? '') === 'COMPLETED');
 if(is_array($session['offer']??null)) $session['offer']['decisionCoverage']=offerDecisionCoverage($session,$session['offer']['decisionCoverage']??[]);
 $requestedVersion = max(0, (int) ($_GET['version'] ?? 0));
-function offerSourceHash(array $session): string { return hash('sha256', json_encode([$session['projectState'] ?? [], $session['internalAnalysis'] ?? [], $session['adminDecisions'] ?? []], JSON_UNESCAPED_UNICODE)); }
-if (is_array($session['offer'] ?? null) && ($session['offer']['sourceHash'] ?? '') !== offerSourceHash($session)) $session['offer']['status'] = 'OUTDATED';
+function offerSourceHash(array $session): string { return offerStableSourceHash($session); }
+if (is_array($session['offer'] ?? null)) offerReconcileSource($session);
 if ($requestedVersion > 0 && $_SERVER['REQUEST_METHOD'] !== 'GET') { http_response_code(409); echo json_encode(['message' => 'Archiwalna oferta jest tylko do odczytu.']); exit; }
 $selectedOffer = $session['offer'] ?? null;
 if ($requestedVersion > 0 && (int) ($session['offer']['version'] ?? 0) !== $requestedVersion) {
@@ -164,7 +165,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (($session['internalAnalysis']['readiness'] ?? '') === 'NOT_A_FIT') { http_response_code(409); echo json_encode(['message' => 'Analiza oznacza projekt jako poza zakresem usług. Po potwierdzeniu ustaleń ponów analizę przed przygotowaniem oferty.']); exit; }
         if (!missingInformationManuallyConfirmed($session)) { http_response_code(409); echo json_encode(['message' => 'Brakuje ręcznie zatwierdzonej odpowiedzi na co najmniej jedno pytanie analizy. Otwórz analizę, zapisz odpowiedź administratora i spróbuj ponownie.'], JSON_UNESCAPED_UNICODE); exit; }
     }
-    if ($action !== 'generate' && ($session['offer']['status'] ?? '') === 'OUTDATED') { http_response_code(409); echo json_encode(['message' => 'Oferta jest nieaktualna. Przygotuj nową wersję z aktualnej analizy.']); exit; }
+    if (!in_array($action,['generate','updateText','promoteOptional','expandOptional'],true) && ($session['offer']['status'] ?? '') === 'OUTDATED') { http_response_code(409); echo json_encode(['message' => ($session['offer']['outdatedReason']??'Oferta jest nieaktualna.').' Odśwież ofertę na podstawie bieżącej analizy przed akceptacją.'],JSON_UNESCAPED_UNICODE); exit; }
 }
 if($_SERVER['REQUEST_METHOD']==='POST'&&in_array($body['action']??'',['promoteOptional','expandOptional'],true)) {
     if(!hash_equals(contractToken(),(string)($body['csrf']??''))) {http_response_code(403);echo json_encode(['message'=>'Odśwież sesję formularza.']);exit;}
@@ -176,10 +177,10 @@ if($_SERVER['REQUEST_METHOD']==='POST'&&in_array($body['action']??'',['promoteOp
     if($offer['sections']===$previous['sections']) {echo json_encode(['offer'=>$previous],JSON_UNESCAPED_UNICODE);exit;}
     $session['offerVersions'][]=$previous;
     $offer['version']=(int)$previous['version']+1;$offer['offerId']='OF-'.strtoupper(substr(hash('sha256',$id.'-'.$offer['version']),0,10));
-    $offer['status']='DRAFT';$offer['needsHumanReview']=true;$offer['updatedAt']=time();
+    $offer['status']=($previous['status']??'')==='OUTDATED'?'OUTDATED':'DRAFT';$offer['needsHumanReview']=true;$offer['updatedAt']=time();
     unset($offer['reviewedAt'],$offer['verification'],$offer['acceptedAt'],$offer['acceptedBy'],$offer['sentAt'],$offer['sentTo'],$offer['commercialSnapshot']);
     offerMarkDependentReview($previous,$offer);
-    $offer['changeLog']=offerTextChanges($previous,$offer);$offer['sourceRefs']=documentOfferSources($session);
+    $offer['changeLog']=offerTextChanges($previous,$offer);if($offer['status']!=='OUTDATED') $offer['sourceRefs']=documentOfferSources($session);
     $session['offer']=$offer;writeSession($session);
     echo json_encode(['offer'=>$offer],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);exit;
 }
@@ -371,6 +372,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($body['action'] ?? '') === 'update
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($body['action'] ?? '') === 'updateText') {
     $offer = is_array($session['offer'] ?? null) ? $session['offer'] : null;
     if ($offer === null) { http_response_code(404); echo json_encode(['message' => 'Najpierw przygotuj ofertę.']); exit; }
+    if(isset($body['expectedVersion'])) {
+        if(!hash_equals(contractToken(),(string)($body['csrf']??''))) {http_response_code(403);echo json_encode(['message'=>'Odśwież sesję formularza.']);exit;}
+        if((int)$body['expectedVersion']!==(int)$offer['version']) {http_response_code(409);echo json_encode(['message'=>'Oferta zmieniła się. Zachowano Twoje wpisy; odśwież ofertę przed ponownym zapisem.']);exit;}
+    }
+    $outdated=($offer['status']??'')==='OUTDATED';
     $session['offerVersions'] = is_array($session['offerVersions'] ?? null) ? $session['offerVersions'] : [];
     $session['offerVersions'][] = $offer;
     $offer['version'] = max(1, (int) ($offer['version'] ?? 1) + 1);
@@ -382,8 +388,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($body['action'] ?? '') === 'update
             return ['title' => trim((string) ($section['title'] ?? 'Sekcja')), 'items' => array_values(array_filter(array_map(static fn($item) => trim((string) $item), is_array($section['items'] ?? null) ? $section['items'] : []), static fn($item) => $item !== ''))];
         }, $body['sections']));
     }
-    $offer['status'] = 'DRAFT';
-    unset($offer['reviewedAt'], $offer['verification'], $offer['sentAt'], $offer['sentTo']);
+    $offer['status'] = $outdated?'OUTDATED':'DRAFT';
+    unset($offer['reviewedAt'], $offer['verification'], $offer['sentAt'], $offer['sentTo'],$offer['acceptedAt'],$offer['acceptedBy'],$offer['commercialSnapshot']);
     $offer['changeLog'] = [];
     $offer['needsHumanReview'] = true;
     $offer['updatedAt'] = time();

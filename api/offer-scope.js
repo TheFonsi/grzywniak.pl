@@ -27,10 +27,10 @@
       [...(part.querySelector('ul')?.children||[])].filter(li=>li.tagName==='LI'&&!li.hasAttribute('data-change-control')).forEach((li,item)=>{
         if(!section.items?.[item]) return;
         const button=document.createElement('button');button.type='button';button.className='button';button.dataset.optionalControl='';button.contentEditable='false';button.style.cssText='display:block;margin-top:8px;border-color:#3a9477;color:#b9f4dc';button.textContent='Przenieś do zakresu realizacji';
-        button.disabled=offer.status==='OUTDATED';button.onclick=()=>change('promoteOptional',{section:offer.sections.indexOf(section),item,text:section.items[item]},button);li.append(button);
+        button.onclick=()=>change('promoteOptional',{section:offer.sections.indexOf(section),item,text:section.items[item]},button);li.append(button);
       });
       if((section.items||[]).length<3) {
-        const button=document.createElement('button');button.type='button';button.className='button';button.dataset.optionalControl='';button.textContent='Uzupełnij pomysły rozbudowy';button.disabled=offer.status==='OUTDATED';button.onclick=()=>change('expandOptional',{},button);part.append(button);
+        const button=document.createElement('button');button.type='button';button.className='button';button.dataset.optionalControl='';button.textContent='Uzupełnij pomysły rozbudowy';button.onclick=()=>change('expandOptional',{},button);part.append(button);
       }
     });
   }
