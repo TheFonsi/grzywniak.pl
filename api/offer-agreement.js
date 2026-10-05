@@ -1,9 +1,17 @@
 (() => {
+  // On MyDevil the API files are served at /, locally they live under /api/.
+  // External scripts are not transformed by PHP's apiRewritePaths().
+  const script=document.currentScript;
+  const endpoint=script?.src ? new URL('offer.php',script.src).pathname : location.pathname.startsWith('/api/') ? '/api/offer.php' : '/offer.php';
+  async function readResponse(response) {
+    try {return await response.json();}
+    catch {throw new Error(`Serwer nie zwrócił danych formularza (HTTP ${response.status}). Odśwież panel; jeśli błąd pozostaje, sprawdź wdrożenie API.`);}
+  }
   async function mount(container,offer,sessionId,onSave) {
     const box=document.createElement('details');box.style.cssText='margin:18px 0;padding:16px;border:1px solid #465474;border-radius:12px';
     const heading=document.createElement('summary');heading.textContent='Warunki realizacji i dane do umowy';heading.style.cursor='pointer';box.append(heading);container.append(box);
     try {
-      const response=await fetch('/api/offer.php?session='+encodeURIComponent(sessionId)+'&format=agreement');const data=await response.json();if(!response.ok) throw new Error(data.message||'Nie udało się pobrać ustaleń.');
+      const response=await fetch(endpoint+'?session='+encodeURIComponent(sessionId)+'&format=agreement');const data=await readResponse(response);if(!response.ok) throw new Error(data.message||'Nie udało się pobrać ustaleń.');
       if(!box.isConnected) return;
       const form=document.createElement('form');form.className='contract-form offer-agreement-form';form.style.cssText='display:grid;gap:14px;margin-top:16px';box.append(form);
       const note=document.createElement('p');note.textContent='Te warunki pokażemy klientowi w PDF i przeniesiemy do umowy po akceptacji oferty. Zapis tworzy nową wersję do weryfikacji. Nieznane dane wymagają uzgodnienia.';form.append(note);
@@ -55,7 +63,7 @@
       const status=document.createElement('p');status.setAttribute('role','status');status.textContent=data.missing.length?'Do uzgodnienia: '+data.missing.join(' · '):'Sprawdź ustalenia przed weryfikacją oferty.';form.append(status);
       const save=document.createElement('button');save.type='submit';save.className='button';save.textContent='Zapisz warunki i utwórz nową wersję oferty';form.append(save);
       form.onsubmit=async event=>{event.preventDefault();save.disabled=true;
-        try {const agreement=Object.fromEntries(Object.entries(controls).map(([key,input])=>[key,input.value]));const reviewedDependencies=Object.fromEntries(Object.entries(dependencies).map(([key,input])=>[key,input.checked]));const targets=Object.fromEntries(Object.entries(decisionTargets).map(([key,input])=>[key,input.value]));const result=await fetch('/api/offer.php?session='+encodeURIComponent(sessionId),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'updateAgreement',expectedVersion:offer.version,csrf:data.csrf,agreement,reviewedDependencies,decisionTargets:targets})});const payload=await result.json();if(!result.ok) throw new Error(payload.message||'Nie udało się zapisać.');onSave(payload.offer);}
+        try {const agreement=Object.fromEntries(Object.entries(controls).map(([key,input])=>[key,input.value]));const reviewedDependencies=Object.fromEntries(Object.entries(dependencies).map(([key,input])=>[key,input.checked]));const targets=Object.fromEntries(Object.entries(decisionTargets).map(([key,input])=>[key,input.value]));const result=await fetch(endpoint+'?session='+encodeURIComponent(sessionId),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'updateAgreement',expectedVersion:offer.version,csrf:data.csrf,agreement,reviewedDependencies,decisionTargets:targets})});const payload=await readResponse(result);if(!result.ok) throw new Error(payload.message||'Nie udało się zapisać.');onSave(payload.offer);}
         catch(error) {status.textContent=error.message;save.disabled=false;}
       };
     }catch(error) {const message=document.createElement('p');message.textContent=error.message;box.append(message);}

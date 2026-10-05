@@ -29,8 +29,9 @@ log=open(work/'server.log','w')
 server=subprocess.Popen(['php','-S',f'127.0.0.1:{port}','-t',str(work)],cwd=work,env=env,stdout=log,stderr=log)
 def read():
     return json.loads(subprocess.check_output(['php','-r',f"require 'api/bootstrap.php'; echo json_encode(readSession('{sid}'));"],cwd=work,env=env,text=True))
-def request(auth=True):
+def request(auth=True, origin=None):
     headers={'Content-Type':'application/json'}
+    if origin: headers['Origin']=origin
     if auth: headers['Authorization']='Basic '+base64.b64encode(b'retry-test:test-password').decode()
     req=urllib.request.Request(f'http://127.0.0.1:{port}/api/discovery.php?action=retryAnalysis&sessionId={sid}',data=b'{}',headers=headers)
     try:
@@ -43,14 +44,16 @@ try:
             break
         except urllib.error.URLError: time.sleep(.1)
     else: raise RuntimeError('Server unavailable')
+    assert request(False, 'https://api.grzywniak.pl')[0]==401, 'Production panel origin does not bypass admin authentication'
+    assert request(True, 'https://untrusted.example')[0]==403, 'Untrusted origins remain blocked'
     before=read(); (work/'api'/'fail-test').touch()
-    status,data=request()
+    status,data=request(origin='https://api.grzywniak.pl')
     assert status==502 and data['analysisStatus']=='FAILED' and 'limit' in data['message'],data
     failed=read()
     for field in ('internalAnalysis','offer','contract','summary'): assert failed[field]==before[field],field
     assert failed['analysisLastAttempt']['reference']==data['reference']
     (work/'api'/'fail-test').unlink()
-    assert request()[0]==200
+    assert request(origin='https://api.grzywniak.pl')[0]==200
     after=read()
     assert after['internalAnalysis']['version']==8 and after['offer']['status']=='OUTDATED'
     assert after['analysisVersions']==[before['internalAnalysis']]

@@ -38,4 +38,29 @@ assert.equal(saved.agreement.cooperationTerms,'Agreed materials');assert.equal(u
 assert.equal(saved.decisionTargets.decision1,'cooperationTerms');
 assert.equal(saved.reviewedDependencies.cooperationTerms,true);
 assert.equal(saved.reviewedDependencies.pricing,false);
-console.log('Offer agreement UI passed: route fields, numeric days and versioned save.');
+// Production has a flat API document root; local development uses /api/.
+for(const [page,source,expected] of [
+  ['https://api.grzywniak.pl/admin.php','/offer-agreement.js','/offer.php'],
+  ['http://localhost:8443/api/admin.php','/api/offer-agreement.js','/api/offer.php'],
+]) {
+  const routing=new JSDOM('<div id="offer"></div>',{runScripts:'outside-only',url:page});
+  const external=routing.window.document.createElement('script');external.src=source;
+  Object.defineProperty(routing.window.document,'currentScript',{value:external});
+  const requests=[];
+  routing.window.fetch=async(url,options)=>{requests.push(url);return {ok:true,json:async()=>options?{offer:{version:2,status:'DRAFT'}}:fixture};};
+  routing.window.eval(readFileSync('api/offer-agreement.js','utf8'));
+  await routing.window.offerAgreement.mount(routing.window.document.querySelector('#offer'),{version:1},'abcdef',()=>{});
+  const routedForm=routing.window.document.querySelector('form');assert.ok(routedForm);
+  routedForm.dispatchEvent(new routing.window.Event('submit',{bubbles:true,cancelable:true}));
+  await new Promise(resolve=>setTimeout(resolve,0));
+  assert.deepEqual(requests,[expected+'?session=abcdef&format=agreement',expected+'?session=abcdef'],'GET and POST must use the actual API document root');
+  routing.window.close();
+}
+const errorDom=new JSDOM('<div id="offer"></div>',{runScripts:'outside-only',url:'https://api.grzywniak.pl/admin.php'});
+errorDom.window.fetch=async()=>({ok:false,status:404,json:async()=>{throw new SyntaxError('Unexpected token <');}});
+errorDom.window.eval(readFileSync('api/offer-agreement.js','utf8'));
+await errorDom.window.offerAgreement.mount(errorDom.window.document.querySelector('#offer'),{version:1},'abcdef',()=>{});
+assert.match(errorDom.window.document.body.textContent,/HTTP 404/);
+assert.doesNotMatch(errorDom.window.document.body.textContent,/Unexpected token/);
+errorDom.window.close();
+console.log('Offer agreement UI passed: fields, versioned save, production/local API routes and readable HTML response errors.');
