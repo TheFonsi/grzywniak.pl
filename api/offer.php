@@ -150,7 +150,8 @@ function pdfFontObject(): string {
 function offerSlug(string $value): string { $value = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', trim($value)) ?: trim($value); $value = strtolower((string) preg_replace('/[^a-zA-Z0-9]+/', '-', $value)); return trim($value, '-') ?: 'klient'; }
 function sendOfferPdf(array $offer): never { sendOfferPdfFixed($offer,''); }
 function sendOfferPdfFixed(array $offer,string $sessionId): never {
-    $pdf=offerPdf($offer);
+    $pdf=($offer['status']??'')==='ACCEPTED'&&!empty($offer['acceptedPdfBase64'])?base64_decode($offer['acceptedPdfBase64'],true):((($offer['status']??'')==='SENT'&&(int)($offer['sentPdfVersion']??0)===(int)($offer['version']??1))?base64_decode($offer['sentPdfBase64'],true):offerPdf($offer));
+    if(!is_string($pdf)) throw new RuntimeException('Niepoprawny zapis PDF zaakceptowanej oferty.');
     header('Content-Type: application/pdf');
     header('Content-Disposition: attachment; filename="oferta-'.preg_replace('/[^A-Za-z0-9-]/','',$offer['offerId']??'OF').'-v'.(int)($offer['version']??1).'.pdf"');
     header('Content-Length: '.strlen($pdf));echo $pdf;exit;
@@ -242,12 +243,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($body['action'] ?? '') === 'send')
     $bodyText = "Dzień dobry,\n\nprzesyłamy wstępny dokument zakresu realizacji i wyceny projektu.\n\n" . ($offer['project'] ?? 'Projekt cyfrowy') . "\n\n" . ($offer['summary'] ?? '') . "\n\nWycena: " . number_format((float)($p['net'] ?? 0), 2, ',', ' ') . " zł netto / " . number_format((float)($p['gross'] ?? 0), 2, ',', ' ') . " zł brutto.\nSzacowany nakład: " . (int)($p['hours'] ?? 0) . " h.\nZaliczka: " . (int)($payment['depositRate'] ?? 0) . "%.\n\nDokument ma charakter wstępny i wymaga wspólnego potwierdzenia zakresu przed umową.\n\nPozdrawiamy,\nGrzywniak.pl";
     $bodyText = "Klient: " . ((string) ($offer['contact']['name'] ?? '') ?: 'Klient') . "\nData dokumentu: " . date('Y-m-d H:i', (int) ($offer['updatedAt'] ?? time())) . "\nNumer oferty: " . ($offer['offerId'] ?? '') . "\n\n" . $bodyText;
     $boundary='grzywniak-offer-'.bin2hex(random_bytes(16));
+    $attachment=base64_encode(offerPdf($offer));
     $headers='From: Grzywniak.pl <'.$sender.">\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=\"".$boundary.'"';
     $bodyText='--'.$boundary."\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n".chunk_split(base64_encode($bodyText))
-        .'--'.$boundary."\r\nContent-Type: application/pdf\r\nContent-Disposition: attachment; filename=\"oferta-v".(int)($offer['version']??1).".pdf\"\r\nContent-Transfer-Encoding: base64\r\n\r\n".chunk_split(base64_encode(offerPdf($offer))).'--'.$boundary."--\r\n";
+        .'--'.$boundary."\r\nContent-Type: application/pdf\r\nContent-Disposition: attachment; filename=\"oferta-v".(int)($offer['version']??1).".pdf\"\r\nContent-Transfer-Encoding: base64\r\n\r\n".chunk_split($attachment).'--'.$boundary."--\r\n";
     if (getenv('DISCOVERY_MAIL_MOCK') !== 'true' && !@mail($recipient, 'Wstępny zakres realizacji i wycena — Grzywniak.pl', $bodyText, $headers)) { http_response_code(502); echo json_encode(['message' => 'Nie udało się wysłać wiadomości. Sprawdź konfigurację poczty.']); exit; }
     $sentAt = time();
     $offer['sentAt'] = $sentAt; $offer['sentTo'] = $recipient; $offer['status'] = 'SENT'; $offer['updatedAt'] = $sentAt;
+    $offer['sentPdfBase64']=$attachment;$offer['sentPdfVersion']=(int)($offer['version']??1);
     $offer['deliveryLog'] = is_array($offer['deliveryLog'] ?? null) ? $offer['deliveryLog'] : [];
     $offer['deliveryLog'][] = ['status' => 'SENT', 'to' => $recipient, 'version' => (int) ($offer['version'] ?? 1), 'at' => $sentAt];
     $session['offer'] = $offer;
@@ -264,6 +267,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($body['action'] ?? '') === 'accept
     $offer = $session['offer'];
     if (!in_array(($offer['status'] ?? ''), ['REVIEWED', 'SENT'], true)) { http_response_code(409); echo json_encode(['message' => 'Najpierw zweryfikuj ofertę.'], JSON_UNESCAPED_UNICODE); exit; }
     if($missing=offerAgreementMissing($offer)) {http_response_code(422);echo json_encode(['message'=>'Uzupełnij warunki przed akceptacją: '.implode(', ',$missing)],JSON_UNESCAPED_UNICODE);exit;}
+    $offer['acceptedPdfBase64']=($offer['status']==='SENT'&&(int)($offer['sentPdfVersion']??0)===(int)($offer['version']??1))?$offer['sentPdfBase64']:base64_encode(offerPdf($offer));
     $offer['status'] = 'ACCEPTED'; $offer['acceptedAt'] = time(); $offer['acceptedBy'] = (string) ($_SERVER['PHP_AUTH_USER'] ?? 'admin');
     $snapshotSession=$session; $snapshotSession['offer']=$offer; $offer['commercialSnapshot']=contractCommercialSnapshot($snapshotSession);
     $note = trim((string) ($body['clientMessage'] ?? '')); if ($note !== '') { $offer['clientMessage'] = $note; $offer['clientMessageAt'] = time(); }

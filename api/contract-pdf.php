@@ -156,5 +156,11 @@ function contractPdf(array $contract): string {
         $layout->pageBreak(); $layout->title($doc['title']);
         foreach($doc['sections'] as $label=>$text) { $compact=in_array($doc['id'],['privacy','hosting'],true); $layout->section($label,$text,$compact?10:10.5,$compact); }
     }
-    return $layout->output();
+    $pdf=$layout->output();
+    if(!empty($contract['commercialSnapshot']['offerPdfBase64'])) {
+        $offerPdf=base64_decode($contract['commercialSnapshot']['offerPdfBase64'],true);
+        if(!is_string($offerPdf)||!hash_equals($contract['commercialSnapshot']['offerPdfSha256']??'',hash('sha256',$offerPdf))) throw new RuntimeException('PDF załącznika nie odpowiada zaakceptowanej ofercie.');
+        require_once __DIR__.'/pdf-append.php';$pdf=appendGeneratedPdf($pdf,$offerPdf);
+    }
+    return $pdf;
 }

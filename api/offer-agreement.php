@@ -117,7 +117,11 @@ function offerAgreementSections(array $offer):array {
         if($key==='acceptanceDays'&&$value!=='') $value.=' dni kalendarzowych od skutecznego zawiadomienia i otrzymania dostępu do wskazanej wersji.';
         $sections[]=['title'=>$field['label'],'items'=>[$value?:'Do uzgodnienia przed akceptacją oferty.']];
     }
-    foreach($offer['decisionCoverage']??[] as $id=>$decision) if(($decision['target']??'')!=='') $sections[]=['title'=>'Ustalenie '.substr($id,0,8).' — '.($decision['targetLabel']??$decision['target']),'items'=>[$decision['question'],$decision['answer']]];
+    $number=0;
+    foreach($offer['decisionCoverage']??[] as $id=>$decision) if(($decision['target']??'')!=='') {
+        $answer=preg_replace('/^\s*Hipoteza do zatwierdzenia:\s*/iu','',(string)($decision['answer']??''));
+        $sections[]=['title'=>'Ustalenie '.(++$number).' — '.($decision['targetLabel']??$decision['target']),'items'=>['Dotyczy: '.$decision['question'],'Proponowane warunki: '.$answer]];
+    }
     return $sections;
 }
 function offerAgreementSuggestions(string $key):array {

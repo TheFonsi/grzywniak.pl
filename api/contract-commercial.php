@@ -25,6 +25,12 @@ function contractCommercialSnapshot(array $session): array {
     $data=['policy'=>'2026-10-05.1','offerVersion'=>(int)($offer['version']??0),'offerId'=>$offer['offerId']??'',
         'scope'=>$scope,'exclusions'=>$exclusions,'pricing'=>['currency'=>'PLN','netCents'=>(int)round($net*100),'vatRate'=>$vatRate,'vatCents'=>(int)round(($gross-$net)*100),'grossCents'=>(int)round($gross*100)],
         'payment'=>['depositRate'=>$depositRate,'depositGrossCents'=>(int)round($gross*$depositRate)],'agreement'=>$agreement,'additionalTerms'=>(string)($offer['contractTerms']??''),'decisions'=>$decisions,'fields'=>$fields];
+    if(($offer['status']??'')==='ACCEPTED'&&!empty($offer['acceptedPdfBase64'])) {
+        $pdf=base64_decode($offer['acceptedPdfBase64'],true);
+        if(!is_string($pdf)||!str_starts_with($pdf,'%PDF-')) throw new RuntimeException('Niepoprawny PDF zaakceptowanej oferty.');
+        $data['offerPdfBase64']=$offer['acceptedPdfBase64'];$data['offerPdfSha256']=hash('sha256',$pdf);
+        $data['fields']['scope'].="\nZakres i warunki realizacji określa także zaakceptowana oferta ".($offer['offerId']??'').' v'.(int)($offer['version']??0).', stanowiąca Załącznik 1 do umowy.';
+    }
     $data['hash']=hash('sha256',json_encode($data,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR));
     return $data;
 }
@@ -51,6 +57,7 @@ function contractCommercialDifferences(array $session,array $fields,array $facts
 function contractCommercialSections(array $snapshot): array {
     require_once __DIR__.'/offer-agreement.php';
     $sections=['Źródło'=>'Zaakceptowana oferta '.($snapshot['offerId']??'').' v'.($snapshot['offerVersion']??0).'. Identyfikator uzgodnień: '.($snapshot['hash']??'')];
+    if(!empty($snapshot['offerPdfSha256'])) $sections['Oryginalna oferta — załącznik do umowy']='PDF zaakceptowanej oferty dołączony na końcu pakietu. SHA-256: '.$snapshot['offerPdfSha256'].'. Umowa opiera się na wskazanym numerze i wersji oferty, nie na późniejszych zmianach szkicu.';
     foreach(['scope'=>'Zakres realizacji','price'=>'Wynagrodzenie','deposit'=>'Płatności','deadline'=>'Harmonogram'] as $key=>$label) $sections[$label]=$snapshot['fields'][$key]??'';
     $outside=[]; foreach($snapshot['exclusions']??[] as $s) $outside[]=($s['title']??'Wyłączenia').":\n- ".implode("\n- ",$s['items']??[]);
     $sections['Poza bieżącym zakresem']=implode("\n",$outside)?:'Elementy niewymienione w zamawianym zakresie wymagają osobnego uzgodnienia.';
@@ -61,7 +68,8 @@ function contractCommercialSections(array $snapshot): array {
         if(!offerAgreementApplicable($key,$snapshot['agreement'])) continue;
         $sections[$field['label']]=$field['options'][$value]??$value;
     }
-    foreach($snapshot['decisions']??[] as $id=>$entry) $sections['Ustalenie '.substr($id,0,8).' — '.($entry['targetLabel']??$entry['target'])]=($entry['question']??'')."\n".($entry['answer']??'');
+    $number=0;
+    foreach($snapshot['decisions']??[] as $id=>$entry) $sections['Ustalenie '.(++$number).' — '.($entry['targetLabel']??$entry['target'])]=($entry['question']??'')."\n".preg_replace('/^\s*Hipoteza do zatwierdzenia:\s*/iu','',(string)($entry['answer']??''));
     return $sections;
 }
 function contractCommercialEditor(array $snapshot, array $saved, string $sessionId): string {

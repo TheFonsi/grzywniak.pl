@@ -116,6 +116,8 @@ try:
     accepted = request(offer_path, {"action": "accept"})
     assert accepted[0] == 200, accepted
     assert accepted[1]["offer"]["status"] == "ACCEPTED"
+    assert accepted[1]['offer']['acceptedPdfBase64']==mock_send[1]['offer']['sentPdfBase64'],'Acceptance freezes the same PDF that was sent to the client'
+    assert accepted[1]['offer']['commercialSnapshot']['offerPdfBase64']==accepted[1]['offer']['acceptedPdfBase64'],'Contract source carries the original offer PDF'
     assert accepted[1]["offer"]["acceptedBy"] == "gate-test"
 
     stale_contract = request(project_path, {"action": "confirm_contract", "evidence": "Test agreement evidence"}, csrf)

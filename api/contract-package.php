@@ -107,7 +107,16 @@ function contractPackageBuild(array $contract): array {
         'service'=>'Wypowiedzenie i rozliczenie usług następuje na zasadach art. 750 w związku z art. 746 KC, z uwzględnieniem wydatków, wykonanych czynności oraz przyczyny wypowiedzenia. Nie wyłącza się prawa wypowiedzenia z ważnych powodów. Niewykorzystana zaliczka podlega zwrotowi po rozliczeniu.',
         default=>'Zakres rozdziela rezultaty i usługi. Rozliczenie każdej części odpowiada jej charakterowi: art. 644 KC dla dzieła, art. 750 i 746 KC dla usług. Nie nalicza się podwójnie kosztów tej samej czynności. Ustawowe prawa odstąpienia pozostają zachowane.'
     };
-    if(isset($contract['commercialSnapshot'])) $add('commercial','Załącznik 1. Uzgodnione warunki zaakceptowanej oferty',contractCommercialSections($contract['commercialSnapshot']));
+    if(isset($contract['commercialSnapshot'])) {
+        $snapshot=$contract['commercialSnapshot'];
+        $sections=contractCommercialSections($snapshot);
+        if(!empty($snapshot['offerPdfBase64'])) $sections=[
+            'Zaakceptowana wersja'=>'Oferta '.($snapshot['offerId']??'').' v'.(int)($snapshot['offerVersion']??0).'.',
+            'Oferta jako podstawa umowy'=>'Zaakceptowana oferta określa zakres, cenę, płatności i warunki realizacji. Jej oryginalne strony są dołączone na końcu tego pakietu, z zachowaniem własnego numeru oraz numeracji stron. Późniejsza zmiana szkicu oferty nie zastępuje tego załącznika.',
+            'Identyfikator oryginalnego PDF'=>'SHA-256: '.$snapshot['offerPdfSha256'],
+        ];
+        $add('commercial','Załącznik 1. Zaakceptowana oferta realizacji projektu',$sections);
+    }
     $add('specification','Załącznik 1. Zakres, współpraca i protokół odbioru',[
         'Zakres i terminy'=>$contract['scope']."\n".$contract['deadline'],
         'Kryteria odbioru'=>$f['acceptanceCriteria'],
