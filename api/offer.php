@@ -221,7 +221,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($body['action'] ?? '') === 'review
     $offer = is_array($session['offer'] ?? null) ? $session['offer'] : null;
     if ($offer === null) { http_response_code(404); echo json_encode(['message' => 'Najpierw przygotuj ofertę.']); exit; }
     if (!missingInformationManuallyConfirmed($session)) { http_response_code(409); echo json_encode(['message' => 'Brakuje ręcznie zatwierdzonej odpowiedzi na co najmniej jedno pytanie analizy. Otwórz analizę, zapisz odpowiedź administratora i spróbuj ponownie.'], JSON_UNESCAPED_UNICODE); exit; }
-    if($missing=offerAgreementMissing($offer)) { http_response_code(422); echo json_encode(['message'=>'Uzupełnij warunki oferty przed weryfikacją: '.implode(', ',$missing)],JSON_UNESCAPED_UNICODE); exit; }
+    if($missing=offerAgreementMissing($offer)) { http_response_code(422); echo json_encode(['message'=>'Uzupełnij warunki oferty przed weryfikacją: '.implode(', ',$missing),'missing'=>$missing],JSON_UNESCAPED_UNICODE); exit; }
     $offer['status'] = 'REVIEWED';
     $offer['reviewedAt'] = time();
     $offer['verification'] = 'HUMAN_REVIEWED';

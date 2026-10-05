@@ -11,6 +11,9 @@ dom.window.fetch=async (url,options)=>({ok:true,json:async()=>options?(saved=JSO
 dom.window.eval(readFileSync('api/offer-agreement.js','utf8'));
 await dom.window.offerAgreement.mount(dom.window.document.querySelector('#offer'),{version:1},'abcdef',offer=>{updated=offer;});
 const form=dom.window.document.querySelector('form');assert.ok(form);
+assert.equal(form.closest('details').open,true,'Pending requirements must be visible without searching in a collapsed section');
+assert.match(form.textContent,/Uzupełniony tekst nie zastępuje potwierdzenia/);
+assert.equal(form.querySelectorAll('[data-pending-review]').length,3,'Two missing reviews and one unassigned decision are marked');
 assert.equal(form.matches('.contract-form:not(.offer-agreement-form)'),false,'Admin contract handler must not intercept offer saves');
 const materialsCheck=form.querySelector('[data-dependency="cooperationTerms"]');
 materialsCheck.checked=true;

@@ -9,12 +9,21 @@
   }
   async function mount(container,offer,sessionId,onSave) {
     const box=document.createElement('details');box.style.cssText='margin:18px 0;padding:16px;border:1px solid #465474;border-radius:12px';
+    box.dataset.offerAgreement='1';
     const heading=document.createElement('summary');heading.textContent='Warunki realizacji i dane do umowy';heading.style.cursor='pointer';box.append(heading);container.append(box);
     try {
       const response=await fetch(endpoint+'?session='+encodeURIComponent(sessionId)+'&format=agreement');const data=await readResponse(response);if(!response.ok) throw new Error(data.message||'Nie udało się pobrać ustaleń.');
       if(!box.isConnected) return;
       const form=document.createElement('form');form.className='contract-form offer-agreement-form';form.style.cssText='display:grid;gap:14px;margin-top:16px';box.append(form);
       const note=document.createElement('p');note.textContent='Te warunki pokażemy klientowi w PDF i przeniesiemy do umowy po akceptacji oferty. Zapis tworzy nową wersję do weryfikacji. Nieznane dane wymagają uzgodnienia.';form.append(note);
+      const pendingReviews=Object.values(data.dependencyReview||{}).filter(value=>value!==true).length;
+      const pendingDecisions=Object.values(data.decisions||{}).filter(decision=>!decision.target).length;
+      if(data.missing.length || pendingReviews || pendingDecisions) {
+        box.open=true;
+        heading.textContent=`Warunki realizacji i dane do umowy — do sprawdzenia: ${Math.max(data.missing.length,pendingReviews+pendingDecisions)}`;
+        const guide=document.createElement('p');guide.setAttribute('role','status');guide.style.cssText='padding:12px;border:1px solid #d7a83e;border-radius:8px';
+        guide.textContent=`Uzupełniony tekst nie zastępuje potwierdzenia. Pozostało: ${pendingReviews} potwierdzeń po zmianie zakresu lub ceny i ${pendingDecisions} przypisań ustaleń z analizy. Sprawdź wskazane warunki, zaznacz ich potwierdzenia, przypisz ustalenia, następnie zapisz ten formularz.`;form.append(guide);
+      }
       const controls={};const labels={};const dependencies={};const decisionTargets={};
       for(const [key,field] of Object.entries(data.fields)) {
         const label=document.createElement('label');label.textContent=field.label;label.style.cssText='display:grid;gap:7px';labels[key]=label;
@@ -33,12 +42,14 @@
         if(Object.hasOwn(data.dependencyReview||{},key)) {
           const check=document.createElement('input');check.type='checkbox';check.checked=data.dependencyReview[key]===true;check.dataset.dependency=key;dependencies[key]=check;
           const review=document.createElement('label');review.style.display='block';review.append(check,' Sprawdziłem te warunki po zmianie zakresu / ceny.');label.append(review);
+          if(!check.checked) {check.dataset.pendingReview='1';review.style.color='#f1cc77';}
           input.addEventListener('input',()=>{check.checked=false;});input.addEventListener('change',()=>{check.checked=false;});
         }
       }
       if(Object.hasOwn(data.dependencyReview||{},'pricing')) {
         const label=document.createElement('label');const check=document.createElement('input');check.type='checkbox';check.checked=data.dependencyReview.pricing===true;check.dataset.dependency='pricing';dependencies.pricing=check;
         label.append(check,` Sprawdziłem wpływ zakresu na wycenę (${Number(data.pricing?.gross||0).toLocaleString('pl-PL')} zł brutto) i zaliczkę.`);form.append(label);
+        if(!check.checked) {check.dataset.pendingReview='1';label.style.color='#f1cc77';}
       }
       for(const [id,decision] of Object.entries(data.decisions||{})) {
         const card=document.createElement('section');card.style.cssText='padding:12px;border:1px solid #465474;border-radius:8px';
@@ -49,6 +60,7 @@
         for(const [value,label] of Object.entries(data.decisionTargets||{})) {const option=document.createElement('option');option.value=value;option.textContent=label;select.append(option);}
         const provenance=document.createElement('small');provenance.textContent=`Ustalenie ${id} · wersja ${decision.version} · autor: ${decision.author}`;
         select.value=decision.target||'';decisionTargets[id]=select;card.append(title,provenance,answer,select);form.append(card);
+        if(!select.value) {select.dataset.pendingReview='1';card.style.borderColor='#d7a83e';}
       }
       const refresh=()=>{const destination=controls.publicationDestination.value;for(const [key,field] of Object.entries(data.fields)) {
         let visible=true;

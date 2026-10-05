@@ -81,7 +81,9 @@ function offerDecisionCoverage(array $session,array $previous=[],?array $submitt
 function offerMarkDependentReview(array $previous,array &$offer):void {
     unset($offer['commercialSnapshot']);
     if(!$previous) return;
-    if(($previous['sections']??[])!==($offer['sections']??[])||($previous['pricing']??[])!==($offer['pricing']??[])||($previous['sourceHash']??'')!==($offer['sourceHash']??'')) {
+    // Ideas outside the order do not change delivery obligations or pricing.
+    $committedSections=static fn(array $document):array=>array_values(array_filter($document['sections']??[],static fn(array $section):bool=>preg_match('/poza.*zakres|możliwe później|opcjonal|optional|out of scope/iu',$section['title']??'')!==1));
+    if($committedSections($previous)!==$committedSections($offer)||($previous['pricing']??[])!==($offer['pricing']??[])||($previous['sourceHash']??'')!==($offer['sourceHash']??'')) {
         $offer['dependencyReview']=['pricing'=>false];
         foreach(offerAgreementFields() as $key=>$field) if(offerAgreementApplicable($key,$offer['agreement']??[])) $offer['dependencyReview'][$key]=false;
     }
