@@ -339,7 +339,15 @@ register_shutdown_function(static function(): void {
     if (offer.sentAt) { const sent = document.createElement('p'); sent.className = 'muted'; sent.textContent = 'Wysłano klientowi: ' + (offer.sentTo || '') + ' · ' + new Date(offer.sentAt * 1000).toLocaleString('pl-PL'); documentBox.append(sent); }
     const currentQuestions = new Set([...document.querySelectorAll('.analysis-grid .analysis-item:nth-child(2) li[data-question]')].map((li) => li.dataset.question.trim()));
     const seenChanges = new Set();
-    const changeLog = Array.isArray(offer.changeLog) ? offer.changeLog : [];
+    const optionalTitle = title => /poza.*zakres|możliwe później|opcjonal|optional|out of scope/i.test(title || '');
+    const optionalChange = change => {
+      const path = change.path || [];
+      if (path[0] !== 'sections' || !optionalTitle(offer.sections?.[path[1]]?.title)) return false;
+      return path[2] === 'items' || (path[2] === 'title' && (!change.previousValue || optionalTitle(change.previousValue)));
+    };
+    const allChanges = Array.isArray(offer.changeLog) ? offer.changeLog : [];
+    const changeLog = allChanges.filter(change => !optionalChange(change));
+    if (allChanges.some(change => optionalChange(change) && !change.restored)) { const notice = document.createElement('p'); notice.dataset.optionalInfo = '1'; notice.style.cssText = 'padding:10px;border:1px solid #354563;border-radius:8px;background:#172239;color:#cbd4e9'; notice.textContent = 'Uzupełniono pomysły na później. Nie wymagają osobnego zatwierdzenia i nie zmieniają zakresu ani ceny. Możesz kontynuować weryfikację całej oferty.'; documentBox.append(notice); }
     const pendingChanges = changeLog.filter((change) => !change.confirmed).length;
     if (pendingChanges) { const notice = document.createElement('p'); notice.className = 'muted'; notice.textContent = 'Zmienione fragmenty: ' + pendingChanges + '. Rozwiń poprzednią treść, zatwierdź zmianę lub przywróć poprzednią. Przywrócenie dotyczy oferty, nie zmienia ustaleń analizy.'; documentBox.append(notice); }
     (offer.sections || []).filter((section) => !/zatwierdzone ustalenia|zmiany do potwierdzenia/i.test(section.title || '')).forEach((section) => { const part = document.createElement('section'); part.dataset.offerSection = '1'; const heading = document.createElement('h4'); heading.textContent = section.title; heading.style.margin = '15px 0 5px'; const list = document.createElement('ul'); (section.items || []).filter(Boolean).forEach((item) => { const li = document.createElement('li'); li.textContent = String(item).replace(/ponieważ budżet do ([^,.;]+), w ramach budżetu do \1/iu, 'Przy budżecie do $1'); list.append(li); }); if (!list.children.length) { const li = document.createElement('li'); li.textContent = 'Do ustalenia'; list.append(li); } part.append(heading, list); documentBox.append(part); });

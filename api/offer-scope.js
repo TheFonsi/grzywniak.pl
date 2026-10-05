@@ -23,7 +23,7 @@
     visible.forEach((section,index)=>{
       if(!optional(section.title)) return;
       const part=parts[index];if(!part) return;
-      const note=document.createElement('p');note.className='muted';note.dataset.optionalControl='';note.contentEditable='false';note.textContent='Pomysły rozbudowy — poza obecną ceną. Po ustaleniu z klientem przenieś wybrany punkt do realizacji i sprawdź wycenę.';part.insertBefore(note,part.querySelector('ul'));
+      const note=document.createElement('p');note.className='muted';note.dataset.optionalControl='';note.contentEditable='false';note.textContent='Opcjonalne pomysły na później — bez osobnej akceptacji, poza zakresem i ceną. Aby zamówić wybrany punkt, przenieś go do realizacji i sprawdź wycenę.';part.insertBefore(note,part.querySelector('ul'));
       [...(part.querySelector('ul')?.children||[])].filter(li=>li.tagName==='LI'&&!li.hasAttribute('data-change-control')).forEach((li,item)=>{
         if(!section.items?.[item]) return;
         const button=document.createElement('button');button.type='button';button.className='button';button.dataset.optionalControl='';button.contentEditable='false';button.style.cssText='display:block;margin-top:8px;border-color:#3a9477;color:#b9f4dc';button.textContent='Przenieś do zakresu realizacji';

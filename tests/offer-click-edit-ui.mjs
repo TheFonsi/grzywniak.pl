@@ -7,10 +7,18 @@ for(const status of ['DRAFT','ACCEPTED','OUTDATED']) {
   const dom=new JSDOM('<section class="panel"><div id="offer"></div></section>',{runScripts:'outside-only',url:'https://api.grzywniak.pl/admin.php'});
   let payload;let fail=false;
   const offer={status,version:7,project:'Firma',summary:'Opis firmy',sections:[{title:'Zakres realizacji',items:['Strona firmy']},{title:'Poza obecnym zakresem / możliwe później',items:['Galeria']}],pricing:{net:1000,vatRate:23,gross:1230},_versions:[{version:6}]};
+  offer.changeLog=[
+    {key:'optional-new',path:['sections',1,'items',0],previousValue:null,currentValue:'Galeria',previous:'',current:'Galeria',confirmed:false},
+    {key:'scope-new',path:['sections',0,'items',0],previousValue:null,currentValue:'Strona firmy',previous:'',current:'Strona firmy',confirmed:false}
+  ];
   dom.window.confirm=()=>true;dom.window.alert=message=>{throw new Error(message);};
   dom.window.fetch=async(url,options)=>({ok:!fail,status:fail?409:200,json:async()=>{if(options)payload=JSON.parse(options.body);return fail?{message:'Oferta zmieniła się. Zachowano Twoje wpisy.'}:options?{offer:{...offer,version:8,summary:payload.summary,status:status==='OUTDATED'?'OUTDATED':'DRAFT'}}:{csrf:'test-csrf'};}});
   dom.window.eval(source+'window.renderOffer=renderOfferPreview;');
   const container=dom.window.document.querySelector('#offer');dom.window.renderOffer(container,offer,'abcdef');
+  assert.equal(container.querySelectorAll('[data-offer-change]').length,1,'Only a real scope change gets confirmation controls');
+  assert.match(container.querySelector('[data-optional-info]').textContent,/Nie wymagają osobnego zatwierdzenia/);
+  const optionalItem=container.querySelectorAll('[data-offer-section]')[1].querySelector('li');
+  assert.equal(optionalItem.style.background,'','Optional proposals must not look pending');
   const summary=[...container.querySelectorAll('p')].find(p=>p.textContent==='Opis firmy');summary.click();
   assert.equal(summary.contentEditable,'true',status+' supports click editing');
   const save=[...container.querySelectorAll('button')].find(b=>b.textContent==='Zapisz zmiany');assert.ok(save && !save.parentElement.hidden);
