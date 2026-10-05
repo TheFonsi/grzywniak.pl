@@ -24,6 +24,7 @@ $session=['id'=>$id,'status'=>'COMPLETED','createdAt'=>time(),'updatedAt'=>time(
   'internalAnalysis'=>['status'=>'COMPLETED','version'=>1,'missingInformation'=>[]],
   'adminDecisions'=>[],
   'offer'=>['status'=>'DRAFT','version'=>1,'analysisVersion'=>1,'offerId'=>'OF-SIM-1',
+    'pricing'=>['net'=>1500,'vatRate'=>23,'gross'=>1845],
     'contact'=>['name'=>'Jar-Bud test','email'=>'client@example.invalid'],'project'=>'Portfolio testowy'],
   'contract'=>['version'=>1,'offerVersion'=>99,'status'=>'DRAFT','pdfBase64'=>base64_encode("%PDF-1.4\nsimulated")]];
 $session['offer']['sourceHash']=hash('sha256',json_encode([$session['projectState'],$session['internalAnalysis'],$session['adminDecisions']],JSON_UNESCAPED_UNICODE));
@@ -99,6 +100,12 @@ try:
     accept_draft = request(offer_path, {"action": "accept"})
     assert start_before[0] == 409 and confirm_before[0] == 409 and accept_draft[0] == 409, (start_before,confirm_before,accept_draft)
 
+    assert request(offer_path, {"action": "review"})[0] == 422, 'Legacy offer needs complete terms before new review'
+    agreement_meta = request(offer_path + '&format=agreement')[1]
+    initial_terms = {key: ('agency' if field.get('options') else 'Agreed terms for this project') for key,field in agreement_meta['fields'].items()}
+    initial_terms.update(ipMode='transfer', rightsTerms='', dataRole='none', acceptanceDays='7', productionDomain='example.test')
+    filled = request(offer_path, {'action':'updateAgreement','expectedVersion':1,'csrf':agreement_meta['csrf'],'agreement':initial_terms})
+    assert filled[0] == 200, filled
     review = request(offer_path, {"action": "review"})
     mock_send = request(offer_path, {"action": "send"})
     assert review[0] == 200 and review[1]["offer"]["status"] == "REVIEWED", review
@@ -152,23 +159,24 @@ $session['contract']['offerVersion']=$session['offer']['version']; writeSession(
     db.close()
     assert repo_state and repo_state[0] == "failed" and "GitHub App ID" in repo_state[1], repo_state
 
-    # Add commercial terms to a legacy offer; all writes stay in this disposable DB.
+    # Editing terms creates new versions and incomplete edits block review.
     code, editor = request(offer_path+"&format=agreement")
     assert code == 200, (code, editor)
     (tmp_root / 'offer-agreement-ui-fixture.json').write_text(json.dumps(editor,ensure_ascii=False),encoding='utf-8')
     assert request(offer_path,dict(action='updateAgreement',expectedVersion=1,csrf='wrong',agreement={}))[0] == 403
     assert request(offer_path,dict(action='updateAgreement',expectedVersion=99,csrf=editor['csrf'],agreement={}))[0] == 409
-    saved=request(offer_path,dict(action='updateAgreement',expectedVersion=1,csrf=editor['csrf'],agreement={}))
-    assert saved[0] == 200 and saved[1]['offer']['version'] == 2 and saved[1]['offer']['status'] == 'DRAFT',saved
+    saved=request(offer_path,dict(action='updateAgreement',expectedVersion=2,csrf=editor['csrf'],agreement={}))
+    assert saved[0] == 200 and saved[1]['offer']['version'] == 3 and saved[1]['offer']['status'] == 'DRAFT',saved
     assert request(offer_path,dict(action='review'))[0] == 422,'Missing offer terms must block review'
     terms={key:('agency' if field.get('options') else 'Fictional agreed terms') for key,field in editor['fields'].items()}
     terms['acceptanceDays']='14';terms['productionDomain']='example.test'
-    saved=request(offer_path,dict(action='updateAgreement',expectedVersion=2,csrf=editor['csrf'],agreement=terms))
-    assert saved[0] == 200 and saved[1]['offer']['version'] == 3,saved
+    terms['ipMode']='transfer';terms['dataRole']='none';terms['rightsTerms']=''
+    saved=request(offer_path,dict(action='updateAgreement',expectedVersion=3,csrf=editor['csrf'],agreement=terms))
+    assert saved[0] == 200 and saved[1]['offer']['version'] == 4,saved
     reviewed=request(offer_path,dict(action='review'));assert reviewed[0] == 200,reviewed
     accepted=request(offer_path,dict(action='accept'));assert accepted[0] == 200,accepted
     assert accepted[1]['offer']['agreement']['acceptanceDays'] == '14'
-    assert len(request(offer_path)[1]['offerVersions']) == 2,'Prior versions must remain available'
+    assert len(request(offer_path)[1]['offerVersions']) == 3,'Prior versions must remain available'
     print('HTTP workflow and offer agreement gates passed, including CSRF, version conflicts, missing terms and acceptance snapshot.')
 finally:
     server.terminate()

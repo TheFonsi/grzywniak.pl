@@ -10,7 +10,7 @@ for p in (root/'api').glob('*.php'): shutil.copy2(p,work/'api'/p.name)
 shutil.copy2(root/'api'/'contract-review.js',work/'api'/'contract-review.js')
 env=dict(os.environ,ADMIN_USERNAME='contract-test',ADMIN_PASSWORD='test-password',DISCOVERY_MAIL_MOCK='true',CONTRACT_AI_MOCK='true')
 sid='abcdef0123456789abcdef0123456789'
-seed="require 'api/bootstrap.php'; writeSession(['id'=>'"+sid+"','status'=>'COMPLETED','messages'=>[['role'=>'user','content'=>'test']],'offer'=>['status'=>'ACCEPTED','version'=>3,'contact'=>['name'=>'Client','email'=>'test@example.com'],'pricing'=>['net'=>100,'vatRate'=>8]],'projectState'=>[]]);"
+seed="require 'api/bootstrap.php'; require 'api/offer-agreement.php'; $facts=contractSamplePackageFacts(); $a=[]; foreach(offerAgreementFields() as $key=>$field) $a[$key]=$facts[$key]??'Agreed conditions'; $a['ipMode']='transfer'; $a['rightsTerms']=''; $a['dataRole']='none'; $a['publicationDestination']='agency'; $a['productionDomain']=''; writeSession(['id'=>'"+sid+"','status'=>'COMPLETED','messages'=>[['role'=>'user','content'=>'test']],'offer'=>['status'=>'ACCEPTED','version'=>3,'contact'=>['name'=>'Client','email'=>'test@example.com'],'sections'=>[['title'=>'Zakres realizacji','items'=>['Strona z kontaktem']]],'pricing'=>['net'=>100,'vatRate'=>8],'agreement'=>$a],'projectState'=>['deadline'=>'20 dni od otrzymania materiałów']]);"
 subprocess.run(['php','-r',seed],cwd=work,env=env,check=True)
 sock=socket.socket();sock.bind(('127.0.0.1',0));port=sock.getsockname()[1];sock.close()
 log=open(work/'server.log','w')
@@ -51,6 +51,11 @@ try:
     fields=re.findall(rb'<textarea name="([^"]+)"',html)
     review_keys=[key.decode() for key in re.findall(rb'<(?:textarea|input|select)[^>]*name="([^"]+)"',html)]
     body={k.decode():'Example text' for k in fields}
+    for key in ['scope','price','deposit','deadline']:
+        value=re.search(rb'<textarea[^>]*name="'+key.encode()+rb'"[^>]*>(.*?)</textarea>',html,re.S)[1].decode()
+        import html as html_module
+        body[key]=html_module.unescape(value)
+    body['commercialHash']=re.search(rb'name="commercialHash" value="([^"]+)"',html)[1].decode()
     body.update(csrf=token,contract_session=sid,expectedVersion=0,templateVersion=0,profileVersion=1,action='generate',clientType='business',ipMode='transfer',signing='qualified',dataRole='none',clientAddress='Testowa 2, Warszawa',clientTaxId='',clientRepresentative='Jan Test',contractDate='2026-09-15',publicationDestination='agency')
     body.update(json.loads(subprocess.check_output(['php','-r',"require 'api/contract-model.php'; echo json_encode(contractSamplePackageFacts());"],cwd=work,env=env)))
     assert b'name="ipPayment"' not in html and b'data-license-terms hidden' in html
@@ -65,7 +70,7 @@ try:
     subprocess.run(['php','-r',seed_brief],cwd=work,env=env,check=True)
     code,data=request('/api/contract.php',dict(body,action='brief-fill',cooperationTerms=''))
     assert code==200,(code,data)
-    assert json.loads(data)['facts']['cooperationTerms']=='Client supplies logo by agreed date.'
+    assert json.loads(data)['facts']['cooperationTerms']==body['cooperationTerms'], 'Accepted offer terms take priority over a later brief edit'
     code,data=request('/api/contract.php',dict(body,action='brief-fill',cooperationTerms='Admin edit'))
     assert code==200 and 'cooperationTerms' not in json.loads(data)['facts']
     assert json.loads(request('/api/contract.php?session='+sid)[1])['contract'] is None,'Brief fill must not persist a contract'
@@ -82,7 +87,7 @@ try:
     assert request('/api/contract.php',body)[0]==409
     assert request('/api/contract.php',dict(body,expectedVersion=1,action='send'))[0]==409
     current=json.loads(request('/api/contract.php?session='+sid)[1])['contract']
-    assert len(current['package']['documents'])==4
+    assert len(current['package']['documents'])==5
     approve=dict(csrf=token,contract_session=sid,expectedVersion=1,action='legal-review',packageHash=current['package']['hash'],reviewer='Test legal reviewer',evidence='Isolated test only: fictional legal review evidence')
     assert request('/api/contract.php',dict(approve,packageHash='stale'))[0]==409
     assert request('/api/contract.php',approve)[0]==200

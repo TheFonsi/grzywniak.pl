@@ -1,5 +1,17 @@
 # Umowy aplikacji i stron — ustalenia PL / UE
 
+## Spójność oferty i umowy
+
+Zakres, cena netto/VAT/brutto, zaliczka i harmonogram pochodzą z zaakceptowanego pakietu oferty. W umowie są tylko do odczytu. Zmianę negocjuj w ofercie, a następnie użyj **„Wczytaj aktualne ustalenia oferty i sprawdź różnice”**. Przycisk wypełnia formularz, pokazuje poprzednie i nowe wartości oraz cofa akceptację zastąpionych pól; sam nie zapisuje ani nie wysyła dokumentu. PDF jest zablokowany przy niezgodności treści lub identyfikatora pakietu. Starszy niesynchronizowany szkic zachowuje poprzednie źródła.
+
+Pełny załącznik handlowy zawiera także wyłączenia, płatności, wsparcie, prawa, dodatkowe koszty, dane, materiały, odbiór, hosting i publikację. Wczytanie innego wzoru zmienia wyłącznie klauzule prawne. W starych szkicach usuń jawnie nieaktualne fragmenty oznaczone „Ustalenia zaakceptowanej oferty:” — bieżące warunki są w załączniku. Podpisane/archiwalne PDF-y pozostają bez zmian.
+
+Ręczne odpowiedzi mają trwałą ewidencję niezależną od pytań kolejnej analizy. W **„Warunki realizacji i dane do umowy”** przypisz każde ustalenie do zakresu, wyłączeń, informacji organizacyjnej albo konkretnego warunku. Nieprzypisane lub zmienione ustalenie blokuje akceptację. Po zmianie zakresu/ceny/analizy potwierdź ponownie zależne warunki i wycenę; zachowany tekst nie oznacza potwierdzenia jego aktualności. Starsza oferta bez pakietu wymaga uzupełnienia przed przygotowaniem nowego PDF umowy.
+
+Pakiet i przypisania są widoczne w archiwum konkretnej wersji. Agenci realizacji otrzymują warunki z potwierdzonego pakietu umowy, wraz z wyłączeniami i ograniczeniami kosztów; informacja organizacyjna nie jest nową funkcją do wykonania. AI umowy otrzymuje warunki oferty i raport różnic, lecz zgodność podstawowych faktów kontroluje serwer.
+
+Regresje audytu: `php tests/document-flow.php`, `python tests/document-flow-http.py`, `node tests/contract-review-ui.mjs`, `node tests/offer-agreement-ui.mjs`. Szczegółowa lista wykonanych napraw: `AUDIT-DOCUMENT-FLOW.md`.
+
 ## Przyciski ponownego przygotowania dokumentów
 
 Kolejność: rozmowa → brief → analiza → oferta → akceptacja oferty → umowa.

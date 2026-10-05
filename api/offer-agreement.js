@@ -5,9 +5,9 @@
     try {
       const response=await fetch('/api/offer.php?session='+encodeURIComponent(sessionId)+'&format=agreement');const data=await response.json();if(!response.ok) throw new Error(data.message||'Nie udało się pobrać ustaleń.');
       if(!box.isConnected) return;
-      const form=document.createElement('form');form.className='contract-form';form.style.cssText='display:grid;gap:14px;margin-top:16px';box.append(form);
+      const form=document.createElement('form');form.className='contract-form offer-agreement-form';form.style.cssText='display:grid;gap:14px;margin-top:16px';box.append(form);
       const note=document.createElement('p');note.textContent='Te warunki pokażemy klientowi w PDF i przeniesiemy do umowy po akceptacji oferty. Zapis tworzy nową wersję do weryfikacji. Nieznane dane wymagają uzgodnienia.';form.append(note);
-      const controls={};const labels={};
+      const controls={};const labels={};const dependencies={};const decisionTargets={};
       for(const [key,field] of Object.entries(data.fields)) {
         const label=document.createElement('label');label.textContent=field.label;label.style.cssText='display:grid;gap:7px';labels[key]=label;
         const input=document.createElement(field.options?'select':key==='acceptanceDays'?'input':'textarea');input.name=key;
@@ -19,9 +19,28 @@
         if(Object.keys(examples).length) {
           const choices=document.createElement('select');choices.setAttribute('aria-label','Gotowe propozycje: '+field.label);const empty=document.createElement('option');empty.value='';empty.textContent='Gotowe propozycje — wybierz';choices.append(empty);
           for(const title of Object.keys(examples)) {const option=document.createElement('option');option.value=title;option.textContent=title;choices.append(option);}
-          choices.onchange=()=>{const title=choices.value;if(title&&(!input.value.trim()||confirm('Zastąpić wpisaną treść propozycją?'))) input.value=examples[title];choices.value='';};label.append(choices);
+          choices.onchange=()=>{const title=choices.value;if(title&&(!input.value.trim()||confirm('Zastąpić wpisaną treść propozycją?'))) {input.value=examples[title];input.dispatchEvent(new Event('input',{bubbles:true}));}choices.value='';};label.append(choices);
         }
-        if(key==='acceptanceDays') {const days=document.createElement('div');for(const n of [3,7,14,30]) {const button=document.createElement('button');button.type='button';button.className='button';button.textContent=n+' dni';button.onclick=()=>{input.value=String(n);};days.append(button);}label.append(days);}
+        if(key==='acceptanceDays') {const days=document.createElement('div');for(const n of [3,7,14,30]) {const button=document.createElement('button');button.type='button';button.className='button';button.textContent=n+' dni';button.onclick=()=>{input.value=String(n);input.dispatchEvent(new Event('input',{bubbles:true}));};days.append(button);}label.append(days);}
+        if(Object.hasOwn(data.dependencyReview||{},key)) {
+          const check=document.createElement('input');check.type='checkbox';check.checked=data.dependencyReview[key]===true;check.dataset.dependency=key;dependencies[key]=check;
+          const review=document.createElement('label');review.style.display='block';review.append(check,' Sprawdziłem te warunki po zmianie zakresu / ceny.');label.append(review);
+          input.addEventListener('input',()=>{check.checked=false;});input.addEventListener('change',()=>{check.checked=false;});
+        }
+      }
+      if(Object.hasOwn(data.dependencyReview||{},'pricing')) {
+        const label=document.createElement('label');const check=document.createElement('input');check.type='checkbox';check.checked=data.dependencyReview.pricing===true;check.dataset.dependency='pricing';dependencies.pricing=check;
+        label.append(check,` Sprawdziłem wpływ zakresu na wycenę (${Number(data.pricing?.gross||0).toLocaleString('pl-PL')} zł brutto) i zaliczkę.`);form.append(label);
+      }
+      for(const [id,decision] of Object.entries(data.decisions||{})) {
+        const card=document.createElement('section');card.style.cssText='padding:12px;border:1px solid #465474;border-radius:8px';
+        const title=document.createElement('strong');title.textContent='Ustalenie: '+decision.question;
+        const answer=document.createElement('p');answer.textContent=decision.answer;
+        const select=document.createElement('select');select.dataset.decisionTarget=id;select.setAttribute('aria-label','Przypisanie ustalenia: '+decision.question);
+        const empty=document.createElement('option');empty.value='';empty.textContent='Wybierz miejsce w ofercie i umowie';select.append(empty);
+        for(const [value,label] of Object.entries(data.decisionTargets||{})) {const option=document.createElement('option');option.value=value;option.textContent=label;select.append(option);}
+        const provenance=document.createElement('small');provenance.textContent=`Ustalenie ${id} · wersja ${decision.version} · autor: ${decision.author}`;
+        select.value=decision.target||'';decisionTargets[id]=select;card.append(title,provenance,answer,select);form.append(card);
       }
       const refresh=()=>{const destination=controls.publicationDestination.value;for(const [key,field] of Object.entries(data.fields)) {
         let visible=true;
@@ -29,13 +48,14 @@
         if(field.module==='domain_purchase') visible=destination==='agency_purchase';
         if(['productionDomain','domainRegistrar'].includes(key)) visible=['client_handoff','agency_purchase'].includes(destination);
         if(['domainOwnershipTerms','productionHosting','serverTarget','backupResponsibility','dnsTlsResponsibility'].includes(key)) visible=destination==='client_handoff';
+        if(key==='rightsTerms') visible=['exclusive','nonexclusive'].includes(controls.ipMode.value);
         labels[key].hidden=!visible;
         labels[key].style.display=visible?'grid':'none';
-      }};controls.publicationDestination.onchange=refresh;refresh();
+      }};controls.publicationDestination.addEventListener('change',refresh);controls.ipMode.addEventListener('change',refresh);refresh();
       const status=document.createElement('p');status.setAttribute('role','status');status.textContent=data.missing.length?'Do uzgodnienia: '+data.missing.join(' · '):'Sprawdź ustalenia przed weryfikacją oferty.';form.append(status);
       const save=document.createElement('button');save.type='submit';save.className='button';save.textContent='Zapisz warunki i utwórz nową wersję oferty';form.append(save);
       form.onsubmit=async event=>{event.preventDefault();save.disabled=true;
-        try {const agreement=Object.fromEntries(Object.entries(controls).map(([key,input])=>[key,input.value]));const result=await fetch('/api/offer.php?session='+encodeURIComponent(sessionId),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'updateAgreement',expectedVersion:offer.version,csrf:data.csrf,agreement})});const payload=await result.json();if(!result.ok) throw new Error(payload.message||'Nie udało się zapisać.');onSave(payload.offer);}
+        try {const agreement=Object.fromEntries(Object.entries(controls).map(([key,input])=>[key,input.value]));const reviewedDependencies=Object.fromEntries(Object.entries(dependencies).map(([key,input])=>[key,input.checked]));const targets=Object.fromEntries(Object.entries(decisionTargets).map(([key,input])=>[key,input.value]));const result=await fetch('/api/offer.php?session='+encodeURIComponent(sessionId),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'updateAgreement',expectedVersion:offer.version,csrf:data.csrf,agreement,reviewedDependencies,decisionTargets:targets})});const payload=await result.json();if(!result.ok) throw new Error(payload.message||'Nie udało się zapisać.');onSave(payload.offer);}
         catch(error) {status.textContent=error.message;save.disabled=false;}
       };
     }catch(error) {const message=document.createElement('p');message.textContent=error.message;box.append(message);}

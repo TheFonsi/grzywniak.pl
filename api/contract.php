@@ -5,6 +5,7 @@ require_once __DIR__.'/contract-model.php';
 require_once __DIR__.'/contract-pdf.php';
 require_once __DIR__.'/contract-ai.php';
 require_once __DIR__.'/contract-review.php';
+require_once __DIR__.'/offer-agreement.php';
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 $user=getenv('ADMIN_USERNAME')?:''; $password=getenv('ADMIN_PASSWORD')?:'';
@@ -24,7 +25,7 @@ if($method==='POST') {
     $body=array_replace($body,$_POST);
     if(!hash_equals(contractToken(),(string)($body['csrf']??''))) contractError(403,'Sesja formularza wygasła. Odśwież panel.');
     // AI only fills the browser form; do not hold a SQLite write lock during HTTP.
-    if(!in_array($body['action']??$body['contract_action']??'',['ai-fill','apply-template','brief-fill'],true)) sessionDb()->exec('BEGIN IMMEDIATE');
+    if(!in_array($body['action']??$body['contract_action']??'',['ai-fill','apply-template','brief-fill','sync-offer'],true)) sessionDb()->exec('BEGIN IMMEDIATE');
 }
 $action=(string)($body['action']??$body['contract_action']??'');
 if($action==='save-profile') {
@@ -109,6 +110,13 @@ if($action==='brief-fill') {
         echo json_encode(['fields'=>[], 'facts'=>$proposal['facts'],'sources'=>$proposal['sources'],'missing'=>contractFactsMissing(array_replace($facts,$proposal['facts']))],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR); exit;
     } catch(InvalidArgumentException $error) { contractError(422,$error->getMessage()); }
 }
+if($action==='sync-offer') {
+    $snapshot=contractCommercialSnapshot($s);
+    $facts=[]; foreach($snapshot['agreement'] as $key=>$value) if(isset(contractFacts()[$key])) $facts[$key]=$value;
+    $diff=[];
+    foreach($snapshot['fields']+$facts as $key=>$value) if(trim((string)($body[$key]??''))!==trim((string)$value)) $diff[]=['label'=>contractFields()[$key]??contractFacts()[$key]['label'],'previous'=>(string)($body[$key]??''),'current'=>$value];
+    echo json_encode(['fields'=>$snapshot['fields'],'facts'=>$facts,'replaceCommercial'=>true,'commercialHash'=>$snapshot['hash'],'commercialSections'=>contractCommercialSections($snapshot),'differences'=>$diff,'missing'=>[]],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR); exit;
+}
 if($action==='ai-fill') {
     $profile=contractProfile();
     if(!isset($s['contract']) && (int)($body['profileVersion']??-1)!==(int)$profile['version']) contractError(409,'Dane wykonawcy zmieniły się. Odśwież formularz, aby pobrać aktualne dane.');
@@ -129,7 +137,7 @@ if($action==='ai-fill') {
         // terms are copied exactly; only absent negotiable terms can be proposed.
         foreach(['provider','party'] as $key) $result['fields'][$key]=trim($draft[$key])!==''?$draft[$key]:'[DO UZUPEŁNIENIA: '.contractFields()[$key].']';
         $result['fields']['paymentDetails']=trim($draft['paymentDetails'])!==''?$draft['paymentDetails']:'Płatność przelewem na rachunek wskazany na fakturze.';
-        foreach(['price','deposit','deadline'] as $key) if(trim($draft[$key])!=='') $result['fields'][$key]=$draft[$key];
+        foreach(['scope','price','deposit','deadline'] as $key) $result['fields'][$key]=$draft[$key];
         if(trim($draft['price'])==='') $result['fields']['price']='[DO UZUPEŁNIENIA: wynagrodzenie zgodne z ofertą]';
         foreach(['clientAddress','clientTaxId','clientRepresentative','clientType','dataRole','publicationDestination','productionDomain','domainRegistrar','domainOwnershipTerms','productionHosting','serverTarget','backupResponsibility','dnsTlsResponsibility','consumerDocuments','dataProcessingTerms','ipMode','signing','contractDate'] as $key) $result['facts'][$key]=$facts[$key];
         foreach($facts as $key=>$value) if($value!=='' && !($key==='rightsTerms'&&$facts['ipMode']==='')) $result['facts'][$key]=$value;
@@ -138,7 +146,7 @@ if($action==='ai-fill') {
         foreach($accepted as $key=>$value) { if(array_key_exists($key,$result['fields'])) $result['fields'][$key]=$value; elseif(array_key_exists($key,$result['facts'])) $result['facts'][$key]=$value; }
         $latest=readSession($id);
         if(!$latest || ($latest['offer']['status']??'')!=='ACCEPTED' || ($latest['offer']??[])!==$s['offer'] || (int)($latest['contract']['version']??0)!==(int)($s['contract']['version']??0)) contractError(409,'Oferta lub umowa zmieniła się podczas generowania. Odśwież panel.');
-        $result['missing']=array_values(array_unique(array_merge(contractFactsMissing($result['facts']),$result['missing'])));
+        $result['missing']=array_values(array_unique(array_merge(contractFactsMissing($result['facts']),$result['missing'],contractCommercialDifferences($s,$draft,$facts,(string)($body['commercialHash']??'')))));
         echo json_encode($result,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR); exit;
     } catch(InvalidArgumentException $error) { contractError(422,$error->getMessage()); }
     catch(Throwable $error) { contractError(502,$error instanceof RuntimeException?$error->getMessage():'Nie udało się przygotować projektu AI.'); }
@@ -155,6 +163,8 @@ if(in_array($action,['save','generate'],true)) {
     try { $review=contractReviewState($body['reviewState']??null,$c,$facts,$s['contract']['review']??[]); } catch(InvalidArgumentException $error) { contractError(422,$error->getMessage()); }
     if($action==='generate') foreach(['provider','party','scope','price','deadline','ip'] as $key) if($c[$key]==='') contractError(422,'Uzupełnij: '.contractFields()[$key]);
     if($action==='generate') {
+        if($missing=offerAgreementMissing($s['offer'])) contractError(422,'Zaakceptowana oferta wymaga uzupełnienia / ponownego przeglądu: '.implode(', ',$missing));
+        if($differences=contractCommercialDifferences($s,$c,$facts,(string)($body['commercialHash']??''))) contractError(422,'Umowa jest niespójna z zaakceptowaną ofertą: '.implode(', ',$differences).'. Wczytaj aktualne ustalenia oferty; zmianę warunków uzgodnij w nowej ofercie.');
         if($differences=contractOfferFactDifferences($s,$facts)) contractError(422,'Ustalenia różnią się od zaakceptowanej oferty: '.implode(', ',$differences).'. Zaktualizuj ofertę i potwierdź nową wersję z klientem albo przywróć jej ustalenia.');
         if($templateId!=='legacy') foreach(contractRequiredReview($c,$facts) as $key) {
             if(!isset($review[$key])) $review[$key]=['value'=>(string)($c[$key]??$facts[$key]??''),'accepted'=>false];
@@ -165,9 +175,13 @@ if(in_array($action,['save','generate'],true)) {
         if($missing) contractError(422,'Uzupełnij ustalenia umowy: '.implode(', ',$missing));
         foreach(array_merge($c,$facts) as $value) if(preg_match('/\[DO (UZUPEŁNIENIA|UZGODNIENIA):/iu',$value)) contractError(422,'Uzupełnij oznaczone braki danych przed wygenerowaniem PDF. Projekt możesz zapisać w obecnej postaci.');
     }
-    $c+=['number'=>$s['contract']['number']??'UM-'.date('Y').'-'.strtoupper(substr(hash('sha256',$id),0,8)), 'version'=>(int)($s['contract']['version']??0)+1, 'createdAt'=>time(), 'templateVersion'=>(int)($s['contract']['templateVersion']??$body['templateVersion']??0), 'offerVersion'=>(int)($s['offer']['version']??1), 'status'=>'DRAFT'];
+    $snapshot=contractCommercialSnapshot($s);
+    $bound=hash_equals($snapshot['hash'],(string)($body['commercialHash']??''));
+    $c+=['number'=>$s['contract']['number']??'UM-'.date('Y').'-'.strtoupper(substr(hash('sha256',$id),0,8)), 'version'=>(int)($s['contract']['version']??0)+1, 'createdAt'=>time(), 'templateVersion'=>(int)($s['contract']['templateVersion']??$body['templateVersion']??0), 'offerVersion'=>$bound?$snapshot['offerVersion']:(int)($s['contract']['offerVersion']??0), 'status'=>'DRAFT'];
     $c['facts']=$facts;
-    $c['sourceRefs']=documentContractSources($s);
+    $c['sourceRefs']=$bound?documentContractSources($s):($s['contract']['sourceRefs']??[]);
+    if($bound) $c['commercialSnapshot']=$snapshot;
+    elseif(isset($s['contract']['commercialSnapshot'])) $c['commercialSnapshot']=$s['contract']['commercialSnapshot'];
     $sameTemplate=isset($s['contract']) && ($s['contract']['templateId']??'legacy')===$templateId && (int)($body['templateVersion']??$s['contract']['templateVersion']??0)===(int)($s['contract']['templateVersion']??0) && (int)($body['templateRevision']??$s['contract']['templateRevision']??0)===(int)($s['contract']['templateRevision']??0);
     if(!$sameTemplate && ((int)($body['templateVersion']??0)!==(int)$activeTemplate['version'] || (isset($body['templateRevision']) && (int)$body['templateRevision']!==(int)($activeTemplate['revision']??0)))) contractError(409,'Wybrany wzór zmienił się. Wczytaj go ponownie przed zapisem.');
     $c['templateId']=$templateId;

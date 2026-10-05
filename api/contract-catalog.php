@@ -11,7 +11,7 @@ function contractCatalog(): array {
 }
 function contractSelectTemplate(array $offer): array {
     // Only accepted project scope, never personal identifiers, determines selection.
-    $text=mb_strtolower(json_encode([$offer['project']??'', $offer['sections']??[]], JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR));
+    $text=mb_strtolower(json_encode(contractOfferScopeSections($offer), JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR));
     if(preg_match('/sklep|e.?commerce|koszyk|zamówieni|checkout/u',$text)) return ['id'=>'ecommerce','reason'=>'Zakres zawiera sprzedaż internetową lub obsługę zamówień.'];
     if(preg_match('/aplikacj|system|panel|logowani|kont[ao] użytkownik|baz[ay] danych|integracj/u',$text)) return ['id'=>'webapp','reason'=>'Zakres zawiera funkcje aplikacji, konta lub integracje.'];
     return ['id'=>'website','reason'=>'Zakres odpowiada stronie prezentującej firmę lub ofertę.'];

@@ -109,4 +109,15 @@ assert.equal(card('productionHosting').hidden,true,'Customer server details excl
 form.elements.publicationDestination.value='agency';
 form.elements.publicationDestination.dispatchEvent(new dom.window.Event('change',{bubbles:true}));
 assert.equal(card('domainRegistrant').hidden,true,'Domain procurement hidden for agency subdomain');
-console.log('Contract UI checks passed, including managed domain purchase visibility.');
+const oldSupport=form.elements.support.value;
+api.apply(form,{replaceCommercial:true,commercialHash:'new-offer-hash',fields:{scope:'NEW AGREED SCOPE',price:'9 000,00 zł netto'},facts:{},commercialSections:{Wsparcie:'Support from accepted offer'},differences:[{label:'Zakres',previous:'OLD',current:'NEW AGREED SCOPE'}]});
+assert.equal(form.elements.scope.value,'NEW AGREED SCOPE');
+assert.equal(form.elements.commercialHash.value,'new-offer-hash');
+assert.equal(JSON.parse(form.elements.reviewState.value).scope.accepted,false,'Reconciliation requires explicit review');
+assert.equal(form.elements.support.value,oldSupport,'Commercial sync preserves legal clauses');
+assert.match(form.querySelector('[data-commercial-diff]').textContent,/OLD/);
+api.apply(form,{replaceTemplate:true,fields:{support:'Another legal template'},facts:{}});
+assert.equal(form.elements.commercialHash.value,'new-offer-hash');
+assert.equal(form.elements.scope.value,'NEW AGREED SCOPE');
+assert.match(form.querySelector('[data-commercial-preview]').textContent,/Support from accepted offer/);
+console.log('Contract UI checks passed, including explicit commercial reconciliation and template isolation.');

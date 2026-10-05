@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__.'/document-history-model.php';
+require_once __DIR__.'/decision-ledger.php';
 
 ini_set('display_errors', '0');
 ini_set('log_errors', '1');
@@ -46,17 +47,19 @@ function apiRewritePaths(string $html): string {
 }
 function sessionDb(): PDO { static $db; if ($db instanceof PDO) return $db; $db = new PDO('sqlite:' . storage() . '/sessions.sqlite', null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]); $db->exec('PRAGMA busy_timeout=15000'); try { $db->query('PRAGMA journal_mode=WAL')->fetchColumn(); } catch (PDOException $error) { if (!str_contains(strtolower($error->getMessage()), 'locked') && !str_contains(strtolower($error->getMessage()), 'busy')) throw $error; } $db->exec('CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, data TEXT NOT NULL, updated_at INTEGER NOT NULL)'); return $db; }
 function readSession(string $id): ?array { $stmt = sessionDb()->prepare('SELECT data FROM sessions WHERE id=:id'); $stmt->execute([':id'=>$id]); $row = $stmt->fetch(PDO::FETCH_ASSOC); if (!$row) return null; $data = json_decode((string)$row['data'], true); return is_array($data) ? $data : null; }
-function writeSession(array $session): void { $id = (string) ($session['id'] ?? ''); if (!preg_match('/^[a-f0-9]{32}$/', $id)) throw new RuntimeException('Invalid session id'); documentArchiveCurrent($session); $session['updatedAt'] = time(); $json = json_encode($session, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR); $stmt = sessionDb()->prepare('INSERT INTO sessions (id,data,updated_at) VALUES (:id,:data,:updated) ON CONFLICT(id) DO UPDATE SET data=excluded.data,updated_at=excluded.updated_at'); $stmt->execute([':id'=>$id, ':data'=>$json, ':updated'=>$session['updatedAt']]); }
+function writeSession(array $session): void { $id = (string) ($session['id'] ?? ''); if (!preg_match('/^[a-f0-9]{32}$/', $id)) throw new RuntimeException('Invalid session id'); decisionLedgerSync($session); documentArchiveCurrent($session); $session['updatedAt'] = time(); $json = json_encode($session, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR); $stmt = sessionDb()->prepare('INSERT INTO sessions (id,data,updated_at) VALUES (:id,:data,:updated) ON CONFLICT(id) DO UPDATE SET data=excluded.data,updated_at=excluded.updated_at'); $stmt->execute([':id'=>$id, ':data'=>$json, ':updated'=>$session['updatedAt']]); }
 function importLegacySessions(): void { $db=sessionDb(); $stmt=$db->prepare('INSERT OR IGNORE INTO sessions (id,data,updated_at) VALUES (:id,:data,:updated)'); foreach(glob(__DIR__.'/storage/*.json')?:[] as $file){$data=json_decode((string)@file_get_contents($file),true);if(is_array($data)&&preg_match('/^[a-f0-9]{32}$/',(string)($data['id']??'')))$stmt->execute([':id'=>$data['id'],':data'=>json_encode($data,JSON_UNESCAPED_UNICODE),':updated'=>(int)($data['updatedAt']??time())]);} }
 function allSessions(): array { importLegacySessions(); $rows = sessionDb()->query('SELECT data FROM sessions ORDER BY updated_at DESC')->fetchAll(PDO::FETCH_COLUMN); $items=[]; foreach($rows as $json){$data=json_decode((string)$json,true);if(is_array($data))$items[]=$data;} return $items; }
 function deleteSession(string $id): void { $stmt=sessionDb()->prepare('DELETE FROM sessions WHERE id=:id'); $stmt->execute([':id'=>$id]); }
 function normalizeSessionData(array &$session): bool {
     $changed = false;
+    $ledger=$session['decisionLedger']??[]; decisionLedgerSync($session);
+    if($ledger!==($session['decisionLedger']??[])) $changed=true;
     $analysis = is_array($session['internalAnalysis'] ?? null) ? $session['internalAnalysis'] : [];
     if (($analysis['status'] ?? '') === 'COMPLETED' && (int) ($analysis['version'] ?? 0) < 1) { $analysis['version'] = 1; $analysis['runId'] = substr(hash('sha256', (string) ($session['id'] ?? '') . '-analysis-1'), 0, 16); $session['internalAnalysis'] = $analysis; $changed = true; }
     $version = (int) ($analysis['version'] ?? 0);
     $questions = array_fill_keys(array_map('trim', is_array($analysis['missingInformation'] ?? null) ? $analysis['missingInformation'] : []), true);
-    foreach (['adminDecisions','adminProposals'] as $key) if (is_array($session[$key] ?? null)) { $filtered = []; foreach ($session[$key] as $question => $value) if (isset($questions[trim((string) $question)])) { if (is_array($value)) $value['analysisVersion'] = $version; $filtered[(string) $question] = $value; } if ($filtered !== $session[$key]) { $session[$key] = $filtered; $changed = true; } }
+    foreach (['adminDecisions','adminProposals'] as $key) if (is_array($session[$key] ?? null)) { $filtered = []; foreach ($session[$key] as $question => $value) if (isset($questions[trim((string) $question)])||($key==='adminDecisions'&&is_array($value)&&($value['source']??'')==='HUMAN')) { $filtered[(string) $question] = $value; } if ($filtered !== $session[$key]) { $session[$key] = $filtered; $changed = true; } }
     if (is_array($session['offer'] ?? null) && $version > 0 && (int) ($session['offer']['analysisVersion'] ?? 0) !== $version) { $session['offer']['status'] = 'OUTDATED'; $session['offer']['outdatedAt'] = time(); $changed = true; }
     return $changed;
 }

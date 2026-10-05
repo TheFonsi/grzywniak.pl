@@ -3,13 +3,23 @@
 Data: 5 października 2026, Europe/Warsaw. Badany commit: `34fb8f6`.
 Zakres: kompletność przepływu danych, regeneracja, ręczne ustalenia, wzory, PDF i archiwalne źródła. Raport dotyczy zachowania kodu; nie wydaje opinii o ważności umów ani prawnej poprawności konkretnych klauzul.
 
-## Wynik
+## Wynik po naprawach
 
-**Nie wszystkie istotne ustalenia mają dziś zagwarantowane przeniesienie do końcowej umowy.** Pierwszy formularz umowy kopiuje wiele danych prawidłowo, ale kolejne wersje, zmiana wzoru i brak pełnej kontroli zgodności mogą pozostawić starą treść albo usunąć uzgodnione warunki. Przypisanie numeru oferty i jej archiwalnego źródła nie jest dowodem zgodności treści umowy.
+**Wszystkie 7 usterek z audytu zostały naprawione i zweryfikowane lokalnie.** Poniższe opisy problemów zachowują stan badanego commita `34fb8f6` jako materiał porównawczy. Nie stanowią opisu obecnego działania.
 
-Potwierdzono 7 problemów. Nie modyfikowano danych produkcyjnych, nie wysyłano wiadomości klientom i nie korzystano z płatnego AI. Wykonano scenariusze na odrębnej bazie, z atrapami AI i poczty.
+### Lista wykonanych napraw
 
-## Co działa
+- [x] **1. Zgodność wersji i treści umowy:** strukturalny pakiet oferty, kwoty w groszach, blokada różnic zakresu/ceny/VAT/zaliczki/terminu oraz jawny przycisk uzgodnienia. Niezsynchronizowany szkic zachowuje poprzednie źródła. Archiwalny PDF pozostaje identyczny bajtowo.
+- [x] **2. Pełne warunki handlowe:** wszystkie sześć wcześniej pomijanych ustaleń, wyłączenia, dodatkowe `contractTerms` i przypisane decyzje w utrwalonym załączniku. Prawa i rola danych mają osobne pola oraz kontrolę zgodności. Brak pakietu starszej oferty blokuje nowy PDF.
+- [x] **3. Odporność na zmianę wzoru:** klauzule prawne są oddzielone od pakietu handlowego. Wczytanie wzoru zachowuje pakiet. Stare automatycznie dopisane fragmenty warunków wymagają jawnego uporządkowania przed nowym PDF.
+- [x] **4. Trwałe ręczne ustalenia:** ewidencja z identyfikatorem, autorem, wersją i historią odpowiedzi; normalizacja i ponowna analiza nie usuwają decyzji. Ewidencja jest widoczna w panelu. Każde ustalenie wymaga przypisania do oferty/umowy; zmiana odpowiedzi cofa wcześniejsze przypisanie.
+- [x] **5. Przegląd po zmianie zakresu:** zachowany tekst administratora, ale zależne warunki i wycena wymagają ponownego potwierdzenia przed weryfikacją/akceptacją oferty. Zmiana pola lub wybór gotowca cofa jego potwierdzenie.
+- [x] **6. Właściwy dobór wzoru:** wybór wyłącznie z zamawianego zakresu. Sklep wymieniony jako opcjonalny lub wyłączony nie zmienia umowy strony w umowę sklepu.
+- [x] **7. Pełny kontekst AI:** zaakceptowane `agreement`, przypisane ustalenia, pakiet handlowy i raport różnic. Kopiowanie faktów i blokady działają poza modelem; dane wykonawcy i rachunek są pomijane w kontekście.
+
+Nowe dokumenty mają ślad **brief → analiza i ręczne ustalenia → oferta → pakiet handlowy → umowa/PDF → instrukcje agentów**. W archiwum można odczytać pakiet oraz przypisania z konkretnej wersji. Potwierdzenie treści, rozstrzygnięcie sprzecznych opisów i weryfikacja prawna nadal są decyzjami administratora.
+
+## Przepływ przed naprawami (stan audytowany)
 
 | Informacja | Obecny przepływ | Ograniczenie |
 | --- | --- | --- |
@@ -112,10 +122,23 @@ Poprawka: przekazywać pełne właściwe uzgodnienia handlowe aktualnej oferty o
 
 Docelowo każda istotna decyzja powinna mieć widoczny ślad: **ustalenie → punkt oferty → paragraf / załącznik umowy**. Brak mapowania lub konflikt powinien być pokazany przed wygenerowaniem PDF, a nie dopiero zauważony podczas czytania dokumentu.
 
-## Weryfikacja
+## Weryfikacja napraw
 
-Dotychczasowe scenariusze HTTP umów przeszły: autoryzacja, CSRF, wersje, manualny przegląd, wymagane fakty, PDF, mock wysyłki, historie, wzory i start realizacji. Dodatkowe próby wykazały opisane luki mimo przejścia podstawowych testów.
+Testy korzystają z fikcyjnych danych. Scenariusze HTTP tworzą odrębne kopie API i bazy SQLite, używają atrap AI i poczty. Nie zmieniano danych produkcyjnych ani nie wysyłano wiadomości klientom.
 
-Lokalny, izolowany scenariusz audytu: `tmp/contract-audit-http.py`, przygotowany przez `tmp/prepare-contract-audit.py`. Oba pliki są robocze i ignorowane przez Git. Raport opisuje wejścia i obserwacje pozwalające odtworzyć problemy. Testy audytowe używają odrębnej bazy i fikcyjnych danych, nie kont produkcyjnych.
+| Wymaganie | Dowód |
+| --- | --- |
+| 1: stara treść, jawne uzgodnienie, archiwalny PDF | `tests/document-flow-http.py`: HTTP 422 dla starej treści, 200 po synchronizacji i ręcznej akceptacji; archiwalny PDF zgodny bajtowo |
+| 2: pełne warunki i blokady | `tests/document-flow.php`, `tests/document-flow-http.py`, `tests/offer-agreement.php`: sześć ustaleń, decyzja, kwoty brutto/zaliczka, konflikty praw/danych i brak pakietu |
+| 3: zmiana wzoru | `tests/document-flow-http.py`, `tests/contract-review-ui.mjs`: pakiet i powiązanie oferty zachowane; stare dopisane warunki blokowane |
+| 4: trwałość decyzji | `tests/document-flow.php`, `tests/document-flow-http.py`: ponowna analiza, rewizja odpowiedzi, zachowana historia; obowiązkowe przypisanie |
+| 5: zależności | `tests/document-flow-http.py`, `tests/offer-agreement-ui.mjs`: zachowanie tekstu, blokada przeglądu, potwierdzenia i cofnięcie po edycji/gotowcu |
+| 6: opcjonalny sklep | `tests/document-flow.php`: wybrany wzór `website` |
+| 7: kontekst AI | `tests/document-flow.php`: pełne warunki i różnice, bez danych wykonawcy i rachunku |
+| Przekazanie warunków agentom | `tests/document-flow.php`: podpisany pakiet przekazuje wsparcie, koszty i ręczną decyzję; nie rozszerza zakresu o wyłączenia |
 
-Ten audyt nie wdraża napraw. Nie zbadano treści konkretnej podpisanej umowy klienta; do ustalenia, czy błąd już wystąpił w rzeczywistej sprawie, należy porównać jej archiwalny PDF z dokładną zaakceptowaną ofertą.
+Przeszły również: `contract-workflow.php`, `contract-package.php`, `contract-brief.php`, `contract-samples.php`, `offer-workflow.php`, `offer-readiness.php`, `document-history.php`, `contract-http.py`, `project-gates-http.py`, `analysis-retry-http.py`, `contract-review-ui.mjs` oraz `offer-agreement-ui.mjs`.
+
+PDF sprawdzono na fikcyjnym pakiecie: 15 stron, załącznik handlowy od strony 7. Wszystkie strony wyrenderowano i obejrzano; strony 7 i 9 sprawdzono także w pełnej rozdzielczości. Brak nakładania treści i obciętych nagłówków.
+
+Zmiany są w repozytorium lokalnym. Wdrożenie wymaga pusha uruchamiającego istniejące CI/CD; nie trzeba nowych tokenów ani zmian VPS. Istniejących podpisanych umów nie przepisuje się automatycznie. Audyt i poprawki dotyczą przepływu danych, nie stanowią opinii prawnej o konkretnej umowie.

@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__.'/decision-ledger.php';
 
 /** Immutable, session-local snapshots. Sources always identify captured content, never live data. */
 function documentArchivePut(array &$session, string $kind, array $data, array $sources = [], ?int $version = null): string {
@@ -26,6 +27,7 @@ function documentOfferSources(array &$session): array {
     // Capture both actual inputs of this generation, including manual decisions in the analysis snapshot.
     $analysis=$session['internalAnalysis']??[];
     $analysis['confirmedDecisions']=$session['adminDecisions']??[];
+    $analysis['decisionLedger']=decisionLedgerActive($session);
     return ['brief'=>documentBriefSource($session),'analysis'=>documentArchivePut($session,'analysis',$analysis,$analysis['sourceRefs']??[])];
 }
 function documentContractSources(array &$session): array {

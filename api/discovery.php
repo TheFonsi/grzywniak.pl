@@ -125,8 +125,8 @@ require_once __DIR__ . '/internal-analysis.php';
 function limited(string $key, int $max, int $window): bool { $file = sys_get_temp_dir() . '/grzywniak-discovery-' . hash('sha256', $key); $h = fopen($file, 'c+'); if (!$h || !flock($h, LOCK_EX)) return false; $now=time(); $items=json_decode(stream_get_contents($h) ?: '[]', true); $items=is_array($items)?array_values(array_filter($items, fn($v)=>is_int($v)&&$v>$now-$window)):[]; $ok=count($items)<$max; if($ok)$items[]=$now; rewind($h); ftruncate($h,0); fwrite($h,json_encode($items)); flock($h,LOCK_UN); fclose($h); return !$ok; }
 function keepCurrentAnalysisDecisions(array &$session): void {
   $questions = array_fill_keys(array_map('trim', is_array($session['internalAnalysis']['missingInformation'] ?? null) ? $session['internalAnalysis']['missingInformation'] : []), true);
-  if (!$questions) { $session['adminDecisions'] = []; $session['adminProposals'] = []; return; }
-  foreach (['adminDecisions','adminProposals'] as $key) if (is_array($session[$key] ?? null)) $session[$key] = array_intersect_key($session[$key], $questions);
+  $session['adminProposals']=array_intersect_key($session['adminProposals']??[],$questions);
+  decisionLedgerSync($session);
 }
 function fallbackDiscoveryResult(string $message, string $language, array $state = []): array {
   $contact = contactFromMessage($message);

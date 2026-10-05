@@ -30,6 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') register_shutdown_function(static fun
 if (is_resource($sessionLock)) register_shutdown_function(static function() use ($sessionLock): void { flock($sessionLock,LOCK_UN); fclose($sessionLock); });
 if (normalizeSessionData($session) && $_SERVER['REQUEST_METHOD'] === 'POST') file_put_contents($file, json_encode($session, JSON_UNESCAPED_UNICODE), LOCK_EX);
 $analysisReady = (($session['internalAnalysis']['status'] ?? '') === 'COMPLETED');
+if(is_array($session['offer']??null)) $session['offer']['decisionCoverage']=offerDecisionCoverage($session,$session['offer']['decisionCoverage']??[]);
 $requestedVersion = max(0, (int) ($_GET['version'] ?? 0));
 function offerSourceHash(array $session): string { return hash('sha256', json_encode([$session['projectState'] ?? [], $session['internalAnalysis'] ?? [], $session['adminDecisions'] ?? []], JSON_UNESCAPED_UNICODE)); }
 if (is_array($session['offer'] ?? null) && ($session['offer']['sourceHash'] ?? '') !== offerSourceHash($session)) $session['offer']['status'] = 'OUTDATED';
@@ -175,6 +176,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($body['action'] ?? '') === 'restor
     $restored['status'] = 'DRAFT'; $restored['needsHumanReview'] = true; $restored['updatedAt'] = time();
     unset($restored['reviewedAt'], $restored['verification'], $restored['sentAt'], $restored['sentTo']);
     $session['offer'] = $restored;
+    offerMarkDependentReview($offer,$session['offer']);
     file_put_contents($file, json_encode($session, JSON_UNESCAPED_UNICODE), LOCK_EX);
     echo json_encode(['offer'=>$restored], JSON_UNESCAPED_UNICODE); exit;
 }
@@ -244,6 +246,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($body['action'] ?? '') === 'accept
     if (!in_array(($offer['status'] ?? ''), ['REVIEWED', 'SENT'], true)) { http_response_code(409); echo json_encode(['message' => 'Najpierw zweryfikuj ofertę.'], JSON_UNESCAPED_UNICODE); exit; }
     if($missing=offerAgreementMissing($offer)) {http_response_code(422);echo json_encode(['message'=>'Uzupełnij warunki przed akceptacją: '.implode(', ',$missing)],JSON_UNESCAPED_UNICODE);exit;}
     $offer['status'] = 'ACCEPTED'; $offer['acceptedAt'] = time(); $offer['acceptedBy'] = (string) ($_SERVER['PHP_AUTH_USER'] ?? 'admin');
+    $snapshotSession=$session; $snapshotSession['offer']=$offer; $offer['commercialSnapshot']=contractCommercialSnapshot($snapshotSession);
     $note = trim((string) ($body['clientMessage'] ?? '')); if ($note !== '') { $offer['clientMessage'] = $note; $offer['clientMessageAt'] = time(); }
     $session['offer'] = $offer; file_put_contents($file, json_encode($session, JSON_UNESCAPED_UNICODE), LOCK_EX); echo json_encode(['offer' => $offer], JSON_UNESCAPED_UNICODE); exit;
 }
@@ -285,11 +288,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($body['action'] ?? '') === 'genera
     $nextVersion = max(1, (int) ($previous['version'] ?? 0) + 1);
     $offer = $updatedOffer ?? offerDocument($session, (float) (getenv('OFFER_HOURLY_RATE_NET') ?: 150), (float) (getenv('OFFER_VAT_RATE') ?: 23), $nextVersion);
     $offer['agreement']=offerAgreementDraft($session,$offer['agreement']??[]);
+    $offer['decisionCoverage']=offerDecisionCoverage($session,$previous['decisionCoverage']??[]);
     $offer['provider']=array_intersect_key(contractProfile(),array_flip(['legalName','address','taxId','email','phone']));
     $offer['version'] = $nextVersion;
     $offer['offerId'] = 'OF-' . strtoupper(substr(hash('sha256', $id . '-' . $nextVersion), 0, 10));
     $offer['updatedAt'] = time();
     $offer['sourceHash'] = offerSourceHash($session);
+    offerMarkDependentReview($previous,$offer);
     $offer['sourceSnapshot'] = ['projectState' => $session['projectState'] ?? [], 'adminDecisions' => $session['adminDecisions'] ?? []];
     $offer['sourceRefs']=documentOfferSources($session);
     $offer['sourceRefs']['preparation']=documentArchivePut($session,'analysis',$preparation,$offer['sourceRefs'],(int)$offer['version']);
@@ -340,6 +345,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($body['action'] ?? '') === 'update
     $offer['needsHumanReview'] = true;
     unset($offer['reviewedAt'], $offer['verification'], $offer['sentAt'], $offer['sentTo']);
     $offer['updatedAt'] = time();
+    offerMarkDependentReview($session['offer'],$offer);
     $session['offer'] = $offer;
     file_put_contents($file, json_encode($session, JSON_UNESCAPED_UNICODE), LOCK_EX);
 }
@@ -362,6 +368,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($body['action'] ?? '') === 'update
     $offer['changeLog'] = [];
     $offer['needsHumanReview'] = true;
     $offer['updatedAt'] = time();
+    offerMarkDependentReview($session['offer'],$offer);
     $session['offer'] = $offer;
     file_put_contents($file, json_encode($session, JSON_UNESCAPED_UNICODE), LOCK_EX);
     echo json_encode(['offer' => $offer], JSON_UNESCAPED_UNICODE); exit;
@@ -370,20 +377,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($body['action'] ?? '') === 'update
     if(!hash_equals(contractToken(),(string)($body['csrf']??''))) { http_response_code(403); echo json_encode(['message'=>'Odśwież sesję formularza.']);exit; }
     $offer=$session['offer']??null;
     if(!is_array($offer)||(int)($body['expectedVersion']??-1)!==(int)($offer['version']??0)) {http_response_code(409);echo json_encode(['message'=>'Oferta zmieniła się. Odśwież panel.']);exit;}
-    try { if(!is_array($body['agreement']??null)) throw new InvalidArgumentException('Niepoprawny formularz ustaleń.');$agreement=offerAgreementRead($body['agreement']); }
+    try {
+        if(!is_array($body['agreement']??null)) throw new InvalidArgumentException('Niepoprawny formularz ustaleń.');
+        $agreement=offerAgreementRead($body['agreement']);
+        $coverage=offerDecisionCoverage($session,$offer['decisionCoverage']??[],is_array($body['decisionTargets']??null)?$body['decisionTargets']:null);
+    }
     catch(InvalidArgumentException $e) {http_response_code(422);echo json_encode(['message'=>$e->getMessage()],JSON_UNESCAPED_UNICODE);exit;}
     $session['offerVersions'][]=$offer;
     $offer['version']=(int)$offer['version']+1;$offer['offerId']='OF-'.strtoupper(substr(hash('sha256',$id.'-'.$offer['version']),0,10));
     $offer['agreement']=$agreement;$offer['status']='DRAFT';$offer['needsHumanReview']=true;$offer['updatedAt']=time();$offer['changeLog']=[];
+    $offer['decisionCoverage']=$coverage;
+    foreach($offer['dependencyReview']??[] as $key=>$value) {
+        if($key!=='pricing'&&!offerAgreementApplicable($key,$agreement)) unset($offer['dependencyReview'][$key]);
+        else $offer['dependencyReview'][$key]=($body['reviewedDependencies'][$key]??false)===true;
+    }
     if(!isset($offer['provider'])) $offer['provider']=array_intersect_key(contractProfile(),array_flip(['legalName','address','taxId','email','phone']));
-    unset($offer['reviewedAt'],$offer['verification'],$offer['sentAt'],$offer['sentTo'],$offer['acceptedAt']);
+    unset($offer['reviewedAt'],$offer['verification'],$offer['sentAt'],$offer['sentTo'],$offer['acceptedAt'],$offer['commercialSnapshot']);
     $session['offer']=$offer;writeSession($session);
     echo json_encode(['offer'=>$offer],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);exit;
 }
 if(($_GET['format']??'')==='agreement') {
     $offer=$session['offer']??[];
     $suggestions=[];foreach(offerAgreementFields() as $key=>$field) $suggestions[$key]=offerAgreementSuggestions($key);
-    echo json_encode(['fields'=>offerAgreementFields(),'values'=>$offer['agreement']??offerAgreementDraft($session),'suggestions'=>$suggestions,'csrf'=>contractToken(),'missing'=>offerAgreementMissing($offer)],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);exit;
+    echo json_encode(['fields'=>offerAgreementFields(),'values'=>$offer['agreement']??offerAgreementDraft($session),'suggestions'=>$suggestions,'csrf'=>contractToken(),'missing'=>offerAgreementMissing($offer),'dependencyReview'=>$offer['dependencyReview']??[],'decisions'=>offerDecisionCoverage($session,$offer['decisionCoverage']??[]),'decisionTargets'=>offerDecisionTargets(),'pricing'=>$offer['pricing']??[]],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);exit;
 }
 if (($_GET['format'] ?? '') === 'pdf') { $offerForPdf = $requestedVersion > 0 ? $selectedOffer : ($session['offer'] ?? null); if (!is_array($offerForPdf)) { http_response_code(404); echo json_encode(['message' => 'Najpierw przygotuj ofertę.']); exit; } sendOfferPdfFixed($offerForPdf, $id); }
 $visibleOffer = $analysisReady ? ($requestedVersion > 0 ? $selectedOffer : ($session['offer'] ?? null)) : null;

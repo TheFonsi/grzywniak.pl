@@ -56,8 +56,8 @@ foreach($doc['summary']['sections']??[] as $part): ?><section><h2><?=historyEsca
 <?php else:
 $fields=match($kind) {
     'analysis'=>['summary'=>'Podsumowanie','readiness'=>'Gotowość','missingInformation'=>'Brakujące informacje','risks'=>'Ryzyka','recommendedScope'=>'Rekomendowany zakres','optionalScope'=>'Opcjonalnie później','questionsForClient'=>'Pytania klienta','nextStep'=>'Następny krok','confirmedDecisions'=>'Ustalenia administratora','sections'=>'Zmiany opracowane dla oferty'],
-    'offer'=>['project'=>'Projekt','summary'=>'Podsumowanie','sections'=>'Zakres oferty','pricing'=>'Wycena','payment'=>'Płatności','agreement'=>'Warunki realizacji','contact'=>'Kontakt klienta'],
-    'contract'=>contractFields()+['facts'=>'Uzgodnione dane i warunki'],
+    'offer'=>['project'=>'Projekt','summary'=>'Podsumowanie','sections'=>'Zakres oferty','pricing'=>'Wycena','payment'=>'Płatności','agreement'=>'Warunki realizacji','decisionCoverage'=>'Przypisane ustalenia administratora','dependencyReview'=>'Przegląd po zmianie zakresu','contact'=>'Kontakt klienta'],
+    'contract'=>contractFields()+['facts'=>'Uzgodnione dane i warunki','commercialSnapshot'=>'Pakiet warunków zaakceptowanej oferty'],
     default=>[],
 };
 foreach($fields as $key=>$label) if(isset($doc[$key])): ?><section><h2><?=historyEscape($label)?></h2><?=historyValue($doc[$key])?></section><?php endif;

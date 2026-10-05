@@ -2,6 +2,14 @@
 declare(strict_types=1);
 
 function contractAiKeys(): array { return array_keys(contractFields()); }
+function contractAiContext(array $offer,array $draft,array $facts,array $template,array $accepted): array {
+    $private=array_merge(['provider','party','paymentDetails','clientAddress','clientTaxId','clientRepresentative'],array_keys(contractPackageFields()));
+    $session=['offer'=>$offer]; $commercial=contractCommercialSnapshot($session);
+    return ['today'=>date('Y-m-d'),'offer'=>array_intersect_key($offer,array_flip(['project','sections','pricing','payment','contractTerms','agreement','decisionCoverage'])),
+        'commercialSnapshot'=>$commercial,'conflicts'=>contractCommercialDifferences($session,$draft,$facts,$commercial['hash']),
+        'draft'=>array_diff_key($draft,array_flip($private)),'facts'=>array_diff_key($facts,array_flip($private)),
+        'template'=>array_diff_key($template,array_flip(['provider'])),'accepted'=>array_diff_key($accepted,array_flip($private))];
+}
 function contractAiValidate(mixed $result): array {
     if(!is_array($result)||!is_array($result['fields']??null)||!is_array($result['facts']??null)||!is_array($result['missing']??null)) throw new RuntimeException('AI zwróciło niepełną odpowiedź. Spróbuj ponownie.');
     $fields=[];
@@ -40,8 +48,7 @@ Ustalenia dotyczące domeny, hostingu, DNS, TLS i kopii zapasowych zachowaj bez 
 
 PROMPT;
     // Only contract-relevant data: no conversation history, credentials or bank account.
-    $private=array_merge(['provider','party','paymentDetails','clientAddress','clientTaxId','clientRepresentative'],array_keys(contractPackageFields()));
-    $input=['today'=>date('Y-m-d'),'offer'=>array_intersect_key($offer,array_flip(['project','sections','pricing','payment','contractTerms'])), 'draft'=>array_diff_key($draft,array_flip($private)), 'facts'=>array_diff_key($facts,array_flip($private)), 'template'=>array_diff_key($template,array_flip(['provider'])), 'accepted'=>array_diff_key($accepted,array_flip($private))];
+    $input=contractAiContext($offer,$draft,$facts,$template,$accepted);
     $payload=['model'=>getenv('OPENAI_CONTRACT_MODEL')?:getenv('OPENAI_MODEL')?:'gpt-6-luna','store'=>false,'max_output_tokens'=>8000,'input'=>[['role'=>'system','content'=>$prompt],['role'=>'user','content'=>json_encode($input,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR)]],'text'=>['format'=>['type'=>'json_schema','name'=>'contract_draft','strict'=>true,'schema'=>$schema]]];
     @set_time_limit(100);
     $ch=curl_init('https://api.openai.com/v1/responses');

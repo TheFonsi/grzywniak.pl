@@ -172,9 +172,20 @@
     for(const [name,value] of Object.entries({...result.fields,...result.facts})) {
       const input=form.elements.namedItem(name); if(!input || typeof value!=='string') continue;
       // Re-running AI never overwrites an accepted value.
-      if(!result.replaceTemplate && state[name]?.accepted && state[name].value.trim()===input.value.trim()) continue;
+      if(!result.replaceTemplate && !result.replaceCommercial && state[name]?.accepted && state[name].value.trim()===input.value.trim()) continue;
       input.value=value; state[name]={value,accepted:optional.has(name)&&!value.trim()};
       if(input.dataset.inventoryReady) input.dispatchEvent(new Event('contract-inventory-refresh'));
+    }
+    if(result.replaceCommercial) {
+      form.elements.commercialHash.value=result.commercialHash;
+      const preview=form.querySelector('[data-commercial-preview]');
+      if(preview) { preview.replaceChildren(); for(const [label,text] of Object.entries(result.commercialSections||{})) {const title=document.createElement('h5');title.textContent=label;const p=document.createElement('p');p.style.whiteSpace='pre-wrap';p.textContent=text;preview.append(title,p);} }
+      form.querySelector('[data-commercial-warning]')?.remove();
+      const diff=form.querySelector('[data-commercial-diff]');
+      if(diff) {
+        diff.replaceChildren(); const note=document.createElement('p');note.textContent='Wczytano warunki aktualnej oferty. Sprawdź zmienione pola i zaakceptuj je przed PDF. Poprzednia umowa pozostaje w historii.';diff.append(note);
+        for(const change of result.differences||[]) {const detail=document.createElement('details');const title=document.createElement('summary');title.textContent=change.label;const old=document.createElement('p');old.textContent='Poprzednio: '+change.previous;const next=document.createElement('p');next.textContent='Aktualna oferta: '+change.current;detail.append(title,old,next);diff.append(detail);}
+      }
     }
     if(result.template) {
       form.elements.templateId.value=result.template.id;
