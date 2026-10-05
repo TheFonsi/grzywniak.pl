@@ -3,7 +3,7 @@ import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
 const fixture=JSON.parse(readFileSync('tmp/offer-agreement-ui-fixture.json','utf8'));
 fixture.dependencyReview={pricing:false,cooperationTerms:false,acceptanceDays:true};
-fixture.decisions={decision1:{question:'Kto dostarcza zdjęcia?',answer:'Klient w 7 dni',version:2,author:'owner',target:''}};
+fixture.decisions={decision1:{question:'Kto dostarcza zdjęcia?',answer:'Klient w 7 dni',version:2,author:'owner',target:'',suggestedTarget:'cooperationTerms'}};
 fixture.decisionTargets={cooperationTerms:'Materiały'};
 const dom=new JSDOM('<div id="offer"></div>',{runScripts:'outside-only'});
 let saved;let updated;
@@ -14,6 +14,7 @@ const form=dom.window.document.querySelector('form');assert.ok(form);
 assert.equal(form.closest('details').open,true,'Pending requirements must be visible without searching in a collapsed section');
 assert.match(form.textContent,/Uzupełniony tekst nie zastępuje potwierdzenia/);
 assert.equal(form.querySelectorAll('[data-pending-review]').length,3,'Two missing reviews and one unassigned decision are marked');
+assert.equal(form.querySelector('[data-decision-target]').value,'cooperationTerms','Automatic proposal is selected, ready for review');
 assert.equal(form.matches('.contract-form:not(.offer-agreement-form)'),false,'Admin contract handler must not intercept offer saves');
 const materialsCheck=form.querySelector('[data-dependency="cooperationTerms"]');
 materialsCheck.checked=true;
@@ -41,6 +42,22 @@ assert.equal(saved.agreement.cooperationTerms,'Agreed materials');assert.equal(u
 assert.equal(saved.decisionTargets.decision1,'cooperationTerms');
 assert.equal(saved.reviewedDependencies.cooperationTerms,true);
 assert.equal(saved.reviewedDependencies.pricing,false);
+// One explicit approval submits proposed mappings and all review confirmations together.
+const fast=new JSDOM('<div id="offer"></div>',{runScripts:'outside-only'});
+let fastSaved;let fastOffer;let rejected=true;
+fast.window.fetch=async(url,options)=>({ok:!options||!rejected,json:async()=>options?(fastSaved=JSON.parse(options.body),rejected?{message:'Brakuje danych — nie zatwierdzono.'}:{offer:{version:2,status:'REVIEWED'}}):fixture});
+fast.window.eval(readFileSync('api/offer-agreement.js','utf8'));
+await fast.window.offerAgreement.mount(fast.window.document.querySelector('#offer'),{version:1},'abcdef',offer=>{fastOffer=offer;});
+const fastForm=fast.window.document.querySelector('form');const fastButton=fastForm.querySelector('[data-approve-agreement]');
+fastForm.elements.cooperationTerms.value='Moja korekta materiałów';fastButton.click();
+await new Promise(resolve=>setTimeout(resolve,0));
+assert.equal(fastSaved.action,'approveAgreement');assert.equal(fastSaved.decisionTargets.decision1,'cooperationTerms');
+assert.ok(Object.values(fastSaved.reviewedDependencies).every(value=>value===true));
+assert.equal(fastSaved.agreement.cooperationTerms,'Moja korekta materiałów');
+assert.equal(fastSaved.csrf,fixture.csrf);assert.equal(fastSaved.expectedVersion,1);
+assert.equal(fastOffer,undefined);assert.equal(fastButton.disabled,false);assert.match(fastForm.textContent,/nie zatwierdzono/);
+assert.equal(fastForm.elements.cooperationTerms.value,'Moja korekta materiałów','Rejected approval retains manual edits');
+rejected=false;fastButton.click();await new Promise(resolve=>setTimeout(resolve,0));assert.equal(fastOffer.status,'REVIEWED');fast.window.close();
 // Production has a flat API document root; local development uses /api/.
 for(const [page,source,expected] of [
   ['https://api.grzywniak.pl/admin.php','/offer-agreement.js','/offer.php'],

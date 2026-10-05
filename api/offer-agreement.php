@@ -67,6 +67,24 @@ function offerDecisionTargets(): array {
     foreach(offerAgreementFields() as $key=>$field) $out[$key]=$field['label'];
     return $out;
 }
+function offerDecisionSuggestion(array $decision):array {
+    $question=mb_strtolower((string)($decision['question']??''));
+    $rules=[
+        'rightsSummary'=>'praw.*(zdję|foto|materiał)|zg[oó]d|licenc|autorsk',
+        'dataPlan'=>'danych osobow|rodo|powierzeni|administrator.*danych',
+        'paymentSchedule'=>'zaliczk|płatno|faktur|rozliczen',
+        'externalCosts'=>'budże.*(domen|hosting|wdroż)|koszt|dodatkow.*opłat',
+        'publicationDestination'=>'domen|hosting|serwer|publikac|wdroż',
+        'cooperationTerms'=>'dostarcz|materiał|tekst|logo|zdję|współprac',
+        'acceptanceDays'=>'dni.*(odbior|sprawdze)|termin.*sprawdze',
+        'acceptanceCriteria'=>'kryteri|test|odbior|akceptac',
+        'deliverySchedule'=>'termin|harmonogram|rozpoczę',
+        'supportPlan'=>'wsparci|utrzyman|serwis|gwaranc',
+        'scope'=>'szablon|projekt.*graficzn|usług|funkcj|telefon|kontakt|zakres|stron',
+    ];
+    foreach($rules as $target=>$pattern) if(preg_match('/'.$pattern.'/u',$question)) return ['target'=>$target,'reason'=>'Dopasowano temat ustalenia do sekcji: '.offerDecisionTargets()[$target].'.'];
+    return ['target'=>'scope','reason'=>'Ustalenie dotyczące projektu zachowamy w zakresie. Sprawdź, czy pasuje do bardziej szczegółowej sekcji.'];
+}
 function offerDecisionCoverage(array $session,array $previous=[],?array $submitted=null): array {
     $out=[];
     foreach(decisionLedgerActive($session) as $id=>$decision) {
@@ -74,7 +92,8 @@ function offerDecisionCoverage(array $session,array $previous=[],?array $submitt
         $target=($old['version']??0)===$decision['version']?($old['target']??''):'';
         if($submitted!==null) $target=$submitted[$id]??'';
         if(!is_string($target)||($target!==''&&!isset(offerDecisionTargets()[$target]))) throw new InvalidArgumentException('Niepoprawne przypisanie ustalenia do oferty.');
-        $out[$id]=$decision+['target'=>$target,'targetLabel'=>offerDecisionTargets()[$target]??'Nieprzypisane'];
+        $suggestion=offerDecisionSuggestion($decision);
+        $out[$id]=$decision+['target'=>$target,'targetLabel'=>offerDecisionTargets()[$target]??'Nieprzypisane','suggestedTarget'=>$suggestion['target'],'suggestionReason'=>$suggestion['reason']];
     }
     return $out;
 }

@@ -30,3 +30,13 @@ offerMarkDependentReview($offer,$updated);
 agreementAssert($updated['dependencyReview']['pricing']===false&&$updated['dependencyReview']['acceptanceCriteria']===false,'Promoted features still require price and delivery review');
 if(in_array('--sample',$argv,true)) {file_put_contents(__DIR__.'/../output/pdf/oferta-przyklad.pdf',$pdf);}
 echo "Offer agreement checks passed\n";
+foreach([
+    'Czy firma dostarczy teksty, logo i zdjęcia?'=>'cooperationTerms',
+    'Czy firma ma prawo do publikacji zdjęć realizacji i zgód osób?'=>'rightsSummary',
+    'Czy w budżecie mają się znaleźć domena i hosting?'=>'externalCosts',
+    'Czy klient akceptuje gotowy szablon?'=>'scope',
+    'Czy numer telefonu ma być jedyną formą kontaktu?'=>'scope',
+    'Jaki jest harmonogram płatności?'=>'paymentSchedule',
+    'Jaki termin sprawdzenia zgłoszonej wersji?'=>'acceptanceDays',
+    'Nietypowe ustalenie projektu'=>'scope',
+] as $question=>$target) agreementAssert(offerDecisionSuggestion(['question'=>$question])['target']===$target,'Automatic target: '.$question);

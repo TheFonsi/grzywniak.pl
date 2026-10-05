@@ -8,7 +8,7 @@ for file in (root/'api').glob('*.php'):shutil.copy2(file,work/'api'/file.name)
 env=dict(os.environ,ADMIN_USERNAME='scope-test',ADMIN_PASSWORD='test-password')
 seed=r"""
 require 'api/bootstrap.php';require 'api/offer-agreement.php';require 'api/offer-scope.php';
-$id=bin2hex(random_bytes(16));$s=['id'=>$id,'projectState'=>[],'internalAnalysis'=>['status'=>'COMPLETED','version'=>1,'missingInformation'=>[]], 'adminDecisions'=>[], 'contract'=>['version'=>1,'status'=>'SIGNED','pdfBase64'=>'original-pdf']];
+$id=bin2hex(random_bytes(16));$s=['id'=>$id,'projectState'=>[],'internalAnalysis'=>['status'=>'COMPLETED','version'=>1,'missingInformation'=>[]], 'adminDecisions'=>['Kto dostarczy zdjęcia?'=>['source'=>'HUMAN','answer'=>'Klient w 7 dni','at'=>100,'author'=>'owner']], 'contract'=>['version'=>1,'status'=>'SIGNED','pdfBase64'=>'original-pdf']];normalizeSessionData($s);
 $facts=contractSamplePackageFacts();$a=[];foreach(offerAgreementFields() as $key=>$field)$a[$key]=$facts[$key]??'Agreed conditions';$a['publicationDestination']='agency';$a['ipMode']='transfer';$a['rightsTerms']='';$a['dataRole']='none';
 $s['offer']=['status'=>'ACCEPTED','version'=>3,'analysisVersion'=>1,'offerId'=>'OF-TEST','pricing'=>['net'=>2000,'vatRate'=>23,'gross'=>2460],'payment'=>['depositRate'=>10],'agreement'=>$a,'sections'=>[['title'=>'Zakres realizacji','items'=>['Strona one page']]],'verification'=>'HUMAN_REVIEWED','acceptedAt'=>time()];
 $s['internalAnalysis']['sourceRefs']=['brief'=>documentBriefSource($s)];
@@ -49,6 +49,16 @@ try:
     assert idea not in restored[1]['offer']['sections'][1]['items'],'Already promoted idea must not return as optional'
     stored=json.loads(subprocess.check_output(['php','-r',"require 'api/bootstrap.php'; echo json_encode(readSession('"+sid+"'));"],cwd=work,env=env))
     assert stored['contract']==before['contract'],'Signed contract must remain unchanged'
+    metadata=call(extra='&format=agreement')[1]
+    approval={'action':'approveAgreement','expectedVersion':restored[1]['offer']['version'],'csrf':metadata['csrf'],'agreement':metadata['values'],'reviewedDependencies':{key:True for key in metadata['dependencyReview']},'decisionTargets':{key:value.get('suggestedTarget','scope') for key,value in metadata['decisions'].items()}}
+    assert call(dict(approval,csrf='wrong'))[0]==403
+    assert call(dict(approval,expectedVersion=1))[0]==409
+    assert call(dict(approval,agreement={}))[0]==422,'One click must not approve missing terms'
+    assert call()[1]['offer']['version']==approval['expectedVersion'],'Failed approval must not create a revision'
+    approved=call(approval);assert approved[0]==200,approved
+    assert approved[1]['offer']['status']=='REVIEWED' and approved[1]['offer']['verification']=='HUMAN_REVIEWED'
+    assert all(value['target']=='cooperationTerms' for value in approved[1]['offer']['decisionCoverage'].values()),'Proposed mappings are saved only by explicit approval'
+    assert 'acceptedAt' not in approved[1]['offer'] and 'sentAt' not in approved[1]['offer'],'Owner review does not send or accept for the client'
     changed="require 'api/bootstrap.php'; $s=readSession('"+sid+"'); $s['internalAnalysis']['version']=2; $s['internalAnalysis']['summary']='Really changed analysis'; writeSession($s);"
     subprocess.run(['php','-r',changed],cwd=work,env=env,check=True)
     old=call()[1]['offer'];assert old['status']=='OUTDATED' and 'v2' in old['outdatedReason']

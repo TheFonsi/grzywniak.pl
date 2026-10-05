@@ -398,7 +398,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($body['action'] ?? '') === 'update
     file_put_contents($file, json_encode($session, JSON_UNESCAPED_UNICODE), LOCK_EX);
     echo json_encode(['offer' => $offer], JSON_UNESCAPED_UNICODE); exit;
 }
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($body['action'] ?? '') === 'updateAgreement') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($body['action']??'',['updateAgreement','approveAgreement'],true)) {
     if(!hash_equals(contractToken(),(string)($body['csrf']??''))) { http_response_code(403); echo json_encode(['message'=>'Odśwież sesję formularza.']);exit; }
     $offer=$session['offer']??null;
     if(!is_array($offer)||(int)($body['expectedVersion']??-1)!==(int)($offer['version']??0)) {http_response_code(409);echo json_encode(['message'=>'Oferta zmieniła się. Odśwież panel.']);exit;}
@@ -408,7 +408,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($body['action'] ?? '') === 'update
         $coverage=offerDecisionCoverage($session,$offer['decisionCoverage']??[],is_array($body['decisionTargets']??null)?$body['decisionTargets']:null);
     }
     catch(InvalidArgumentException $e) {http_response_code(422);echo json_encode(['message'=>$e->getMessage()],JSON_UNESCAPED_UNICODE);exit;}
-    $session['offerVersions'][]=$offer;
+    $approve=($body['action']??'')==='approveAgreement';
+    if($approve&&!missingInformationManuallyConfirmed($session)) {http_response_code(409);echo json_encode(['message'=>'Najpierw potwierdź odpowiedzi na brakujące informacje w analizie.']);exit;}
+    $previous=$offer;
     $offer['version']=(int)$offer['version']+1;$offer['offerId']='OF-'.strtoupper(substr(hash('sha256',$id.'-'.$offer['version']),0,10));
     $offer['agreement']=$agreement;$offer['status']='DRAFT';$offer['needsHumanReview']=true;$offer['updatedAt']=time();$offer['changeLog']=[];
     $offer['decisionCoverage']=$coverage;
@@ -416,8 +418,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($body['action'] ?? '') === 'update
         if($key!=='pricing'&&!offerAgreementApplicable($key,$agreement)) unset($offer['dependencyReview'][$key]);
         else $offer['dependencyReview'][$key]=($body['reviewedDependencies'][$key]??false)===true;
     }
+    if($approve) {
+        if($missing=offerAgreementMissing($offer)) {http_response_code(422);echo json_encode(['message'=>'Nie można zatwierdzić całości: '.implode(' · ',$missing),'missing'=>$missing],JSON_UNESCAPED_UNICODE);exit;}
+        $offer['status']='REVIEWED';$offer['needsHumanReview']=false;
+    }
+    $session['offerVersions'][]=$previous;
     if(!isset($offer['provider'])) $offer['provider']=array_intersect_key(contractProfile(),array_flip(['legalName','address','taxId','email','phone']));
     unset($offer['reviewedAt'],$offer['verification'],$offer['sentAt'],$offer['sentTo'],$offer['acceptedAt'],$offer['commercialSnapshot']);
+    if($approve) {$offer['reviewedAt']=time();$offer['verification']='HUMAN_REVIEWED';}
     $session['offer']=$offer;writeSession($session);
     echo json_encode(['offer'=>$offer],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);exit;
 }

@@ -13,6 +13,7 @@ flowCheck($s['adminDecisions']!==[]&&$s['decisionLedger']===$ledger,'Resolved hu
 $s['adminDecisions']['Kto dostarczy zdjęcia?']['answer']='Klient przekazuje zdjęcia w ciągu 7 dni.';decisionLedgerSync($s);
 flowCheck($s['decisionLedger'][$id]['version']===2&&$s['decisionLedgerHistory'][0]['answer']==='Klient przekazuje zdjęcia w ciągu 5 dni.','Decision edits require immutable revisions');
 $coverage=offerDecisionCoverage($s);
+flowCheck($coverage[$id]['target']===''&&$coverage[$id]['suggestedTarget']==='cooperationTerms','Suggested mapping is prepared without silently approving it');
 flowCheck(offerAgreementMissing(['decisionCoverage'=>$coverage])!==[],'Unmapped human decision blocks offer review');
 $coverage=offerDecisionCoverage($s,$coverage,[$id=>'cooperationTerms']);
 flowCheck($coverage[$id]['targetLabel']===offerAgreementFields()['cooperationTerms']['label'],'Decision maps to specific offer and contract term');

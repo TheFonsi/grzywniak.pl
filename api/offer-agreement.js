@@ -16,13 +16,16 @@
       if(!box.isConnected) return;
       const form=document.createElement('form');form.className='contract-form offer-agreement-form';form.style.cssText='display:grid;gap:14px;margin-top:16px';box.append(form);
       const note=document.createElement('p');note.textContent='Te warunki pokażemy klientowi w PDF i przeniesiemy do umowy po akceptacji oferty. Zapis tworzy nową wersję do weryfikacji. Nieznane dane wymagają uzgodnienia.';form.append(note);
+      const fastNote=document.createElement('p');fastNote.textContent='Przypisania ustaleń są proponowane automatycznie. Przejrzyj treść i wycenę; możesz zmienić każde pole. Przycisk poniżej zapisze warunki, potwierdzi ich sprawdzenie i oznaczy całą ofertę jako zweryfikowaną. Nie wysyła jej klientowi.';form.append(fastNote);
+      let approveRequested=false;
+      const approve=document.createElement('button');approve.type='button';approve.className='button';approve.dataset.approveAgreement='1';approve.textContent='Przejrzałem — zatwierdź całą ofertę';approve.onclick=()=>{approveRequested=true;try{form.requestSubmit();}finally{approveRequested=false;}};form.append(approve);
       const pendingReviews=Object.values(data.dependencyReview||{}).filter(value=>value!==true).length;
       const pendingDecisions=Object.values(data.decisions||{}).filter(decision=>!decision.target).length;
       if(data.missing.length || pendingReviews || pendingDecisions) {
         box.open=true;
         heading.textContent=`Warunki realizacji i dane do umowy — do sprawdzenia: ${Math.max(data.missing.length,pendingReviews+pendingDecisions)}`;
         const guide=document.createElement('p');guide.setAttribute('role','status');guide.style.cssText='padding:12px;border:1px solid #d7a83e;border-radius:8px';
-        guide.textContent=`Uzupełniony tekst nie zastępuje potwierdzenia. Pozostało: ${pendingReviews} potwierdzeń po zmianie zakresu lub ceny i ${pendingDecisions} przypisań ustaleń z analizy. Sprawdź wskazane warunki, zaznacz ich potwierdzenia, przypisz ustalenia, następnie zapisz ten formularz.`;form.append(guide);
+        guide.textContent=`Uzupełniony tekst nie zastępuje potwierdzenia. Do przejrzenia: ${pendingReviews} warunków po zmianie zakresu lub ceny i ${pendingDecisions} automatycznych propozycji przypisania. Po sprawdzeniu możesz zatwierdzić całość jednym przyciskiem, bez zaznaczania każdego pola osobno.`;form.append(guide);
       }
       const controls={};const labels={};const dependencies={};const decisionTargets={};
       for(const [key,field] of Object.entries(data.fields)) {
@@ -59,8 +62,8 @@
         const empty=document.createElement('option');empty.value='';empty.textContent='Wybierz miejsce w ofercie i umowie';select.append(empty);
         for(const [value,label] of Object.entries(data.decisionTargets||{})) {const option=document.createElement('option');option.value=value;option.textContent=label;select.append(option);}
         const provenance=document.createElement('small');provenance.textContent=`Ustalenie ${id} · wersja ${decision.version} · autor: ${decision.author}`;
-        select.value=decision.target||'';decisionTargets[id]=select;card.append(title,provenance,answer,select);form.append(card);
-        if(!select.value) {select.dataset.pendingReview='1';card.style.borderColor='#d7a83e';}
+        select.value=decision.target||decision.suggestedTarget||'';decisionTargets[id]=select;card.append(title,provenance,answer,select);form.append(card);
+        if(!decision.target) {select.dataset.pendingReview='1';card.style.borderColor='#d7a83e';const suggestion=document.createElement('small');suggestion.textContent=select.value?'Propozycja do zatwierdzenia: '+(decision.suggestionReason||'Automatycznie dopasowana sekcja. Możesz ją zmienić.'):'Wybierz miejsce dla tego ustalenia.';card.append(suggestion);}
       }
       const refresh=()=>{const destination=controls.publicationDestination.value;for(const [key,field] of Object.entries(data.fields)) {
         let visible=true;
@@ -74,9 +77,9 @@
       }};controls.publicationDestination.addEventListener('change',refresh);controls.ipMode.addEventListener('change',refresh);refresh();
       const status=document.createElement('p');status.setAttribute('role','status');status.textContent=data.missing.length?'Do uzgodnienia: '+data.missing.join(' · '):'Sprawdź ustalenia przed weryfikacją oferty.';form.append(status);
       const save=document.createElement('button');save.type='submit';save.className='button';save.textContent='Zapisz warunki i utwórz nową wersję oferty';form.append(save);
-      form.onsubmit=async event=>{event.preventDefault();save.disabled=true;
-        try {const agreement=Object.fromEntries(Object.entries(controls).map(([key,input])=>[key,input.value]));const reviewedDependencies=Object.fromEntries(Object.entries(dependencies).map(([key,input])=>[key,input.checked]));const targets=Object.fromEntries(Object.entries(decisionTargets).map(([key,input])=>[key,input.value]));const result=await fetch(endpoint+'?session='+encodeURIComponent(sessionId),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'updateAgreement',expectedVersion:offer.version,csrf:data.csrf,agreement,reviewedDependencies,decisionTargets:targets})});const payload=await readResponse(result);if(!result.ok) throw new Error(payload.message||'Nie udało się zapisać.');onSave(payload.offer);}
-        catch(error) {status.textContent=error.message;save.disabled=false;}
+      form.onsubmit=async event=>{event.preventDefault();if(save.disabled) return;save.disabled=true;approve.disabled=true;const approveAll=approveRequested;
+        try {const agreement=Object.fromEntries(Object.entries(controls).map(([key,input])=>[key,input.value]));const reviewedDependencies=Object.fromEntries(Object.entries(dependencies).map(([key,input])=>[key,approveAll||input.checked]));const targets=Object.fromEntries(Object.entries(decisionTargets).map(([key,input])=>[key,input.value]));const result=await fetch(endpoint+'?session='+encodeURIComponent(sessionId),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:approveAll?'approveAgreement':'updateAgreement',expectedVersion:offer.version,csrf:data.csrf,agreement,reviewedDependencies,decisionTargets:targets})});const payload=await readResponse(result);if(!result.ok) throw new Error(payload.message||'Nie udało się zapisać.');onSave(payload.offer);}
+        catch(error) {status.textContent=error.message;save.disabled=false;approve.disabled=false;}
       };
     }catch(error) {const message=document.createElement('p');message.textContent=error.message;box.append(message);}
   }
