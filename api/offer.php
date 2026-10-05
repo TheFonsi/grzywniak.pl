@@ -114,7 +114,7 @@ function offerDocument(array $session, float $rate, float $vat, int $version = 1
         ],
         'pricing' => ['hours' => $hours, 'rate' => $rate, 'modules' => $modules, 'rationale' => $rationale, 'net' => $net, 'vatRate' => $vat, 'vat' => round($net * $vat / 100, 2), 'gross' => round($net * (1 + $vat / 100), 2)],
         'payment' => ['depositRate' => $depositRate, 'deposit' => round($net * $depositRate / 100, 2), 'note' => 'Pozostała część rozliczana zgodnie z harmonogramem ustalonym przed podpisaniem umowy.'],
-        'agreement'=>offerAgreementDraft($session),
+        'agreement'=>offerAgreementDraft($session,[],['sections'=>[['title'=>'Zakres realizacji','items'=>$scope]]]),
         'note' => 'Dokument ma charakter wstępny i stanowi podstawę do przygotowania umowy oraz finalnego harmonogramu.',
     ];
 }
@@ -306,7 +306,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($body['action'] ?? '') === 'genera
     if ($previous) { $session['offerVersions'] = is_array($session['offerVersions'] ?? null) ? $session['offerVersions'] : []; $session['offerVersions'][] = $previous; }
     $nextVersion = max(1, (int) ($previous['version'] ?? 0) + 1);
     $offer = $updatedOffer ?? offerDocument($session, (float) (getenv('OFFER_HOURLY_RATE_NET') ?: 150), (float) (getenv('OFFER_VAT_RATE') ?: 23), $nextVersion);
-    $offer['agreement']=offerAgreementDraft($session,$offer['agreement']??[]);
+    $offer['agreement']=offerAgreementDraft($session,$offer['agreement']??[],$offer);
     $offer['decisionCoverage']=offerDecisionCoverage($session,$previous['decisionCoverage']??[]);
     $offer['provider']=array_intersect_key(contractProfile(),array_flip(['legalName','address','taxId','email','phone']));
     $offer['version'] = $nextVersion;
@@ -431,8 +431,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($body['action']??'',['upda
 }
 if(($_GET['format']??'')==='agreement') {
     $offer=$session['offer']??[];
+    $prepared=offerAgreementPrepared($session,$offer['agreement']??offerAgreementDraft($session),$offer);
+    $proposalFields=[];foreach($prepared as $key=>$value) if($value!==($offer['agreement'][$key]??'')) $proposalFields[]=$key;
+    $preview=$offer;$preview['agreement']=$prepared;
     $suggestions=[];foreach(offerAgreementFields() as $key=>$field) $suggestions[$key]=offerAgreementSuggestions($key);
-    echo json_encode(['fields'=>offerAgreementFields(),'values'=>$offer['agreement']??offerAgreementDraft($session),'suggestions'=>$suggestions,'csrf'=>contractToken(),'missing'=>offerAgreementMissing($offer),'dependencyReview'=>$offer['dependencyReview']??[],'decisions'=>offerDecisionCoverage($session,$offer['decisionCoverage']??[]),'decisionTargets'=>offerDecisionTargets(),'pricing'=>$offer['pricing']??[]],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);exit;
+    echo json_encode(['fields'=>offerAgreementFields(),'values'=>$prepared,'proposalFields'=>$proposalFields,'suggestions'=>$suggestions,'csrf'=>contractToken(),'missing'=>offerAgreementMissing($preview),'dependencyReview'=>$offer['dependencyReview']??[],'decisions'=>offerDecisionCoverage($session,$offer['decisionCoverage']??[]),'decisionTargets'=>offerDecisionTargets(),'pricing'=>$offer['pricing']??[]],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);exit;
 }
 if (($_GET['format'] ?? '') === 'pdf') { $offerForPdf = $requestedVersion > 0 ? $selectedOffer : ($session['offer'] ?? null); if (!is_array($offerForPdf)) { http_response_code(404); echo json_encode(['message' => 'Najpierw przygotuj ofertę.']); exit; } sendOfferPdfFixed($offerForPdf, $id); }
 $visibleOffer = $analysisReady ? ($requestedVersion > 0 ? $selectedOffer : ($session['offer'] ?? null)) : null;

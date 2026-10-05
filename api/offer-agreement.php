@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__.'/contract-model.php';
+require_once __DIR__.'/offer-defaults.php';
 
 function offerAgreementFields():array {
     $facts=contractFacts();$out=[];
@@ -24,14 +25,14 @@ function offerAgreementRead(array $raw):array {
     if(!in_array($out['ipMode']??'',['exclusive','nonexclusive'],true)) $out['rightsTerms']='';
     return $out;
 }
-function offerAgreementDraft(array $session,array $previous=[]):array {
+function offerAgreementDraft(array $session,array $previous=[],array $offer=[]):array {
     $source=contractBriefProposal($session)['facts'];
     $scope=$session['offerAnalysis']['recommendedScope']??$session['internalAnalysis']['recommendedScope']??[];
     if($scope) $source['acceptanceCriteria']="Odbiór obejmuje elementy zakresu:\n- ".implode("\n- ",$scope)."\n[DO UZUPEŁNIENIA: konkretne scenariusze i mierzalne wyniki testów]";
     if(!empty($session['projectState']['deadline'])) $source['deliverySchedule']=$session['projectState']['deadline'];
     if(!empty($session['projectState']['supportExpectations'])) $source['supportPlan']=$session['projectState']['supportExpectations'];
-    $source['externalCosts']='Prace i usługi niewymienione w zakresie wymagają osobnej wyceny oraz akceptacji klienta przed ich zleceniem. Zmianę zakresu i wpływ na termin zapisujemy w nowej wersji ustaleń.';
-    return offerAgreementRead(array_replace($source,$previous));
+    $source['externalCosts']=offerAgreementDefaultPackage($session,$offer)['externalCosts'];
+    return offerAgreementPrepared($session,array_replace($source,$previous),$offer);
 }
 function offerAgreementMissing(array $offer):array {
     $pending=[]; foreach($offer['dependencyReview']??[] as $key=>$confirmed) if($confirmed!==true) $pending[]='Sprawdź ponownie: '.(offerAgreementFields()[$key]['label']??'wycena i wpływ zakresu na cenę');

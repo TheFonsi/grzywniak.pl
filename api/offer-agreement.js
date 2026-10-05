@@ -15,13 +15,13 @@
       const response=await fetch(endpoint+'?session='+encodeURIComponent(sessionId)+'&format=agreement');const data=await readResponse(response);if(!response.ok) throw new Error(data.message||'Nie udało się pobrać ustaleń.');
       if(!box.isConnected) return;
       const form=document.createElement('form');form.className='contract-form offer-agreement-form';form.style.cssText='display:grid;gap:14px;margin-top:16px';box.append(form);
-      const note=document.createElement('p');note.textContent='Te warunki pokażemy klientowi w PDF i przeniesiemy do umowy po akceptacji oferty. Zapis tworzy nową wersję do weryfikacji. Nieznane dane wymagają uzgodnienia.';form.append(note);
+      const note=document.createElement('p');note.textContent='Gotowy pakiet propozycji: zachowujemy zapisane ustalenia, a brakujące warunki uzupełniamy standardem o niskim koszcie realizacji. Możesz go zmienić po rozmowie z klientem. Po zatwierdzeniu warunki trafią do PDF oferty, a po jej akceptacji do umowy.';form.append(note);
       const fastNote=document.createElement('p');fastNote.textContent='Przypisania ustaleń są proponowane automatycznie. Przejrzyj treść i wycenę; możesz zmienić każde pole. Przycisk poniżej zapisze warunki, potwierdzi ich sprawdzenie i oznaczy całą ofertę jako zweryfikowaną. Nie wysyła jej klientowi.';form.append(fastNote);
       let approveRequested=false;
       const approve=document.createElement('button');approve.type='button';approve.className='button';approve.dataset.approveAgreement='1';approve.textContent='Przejrzałem — zatwierdź całą ofertę';approve.onclick=()=>{approveRequested=true;try{form.requestSubmit();}finally{approveRequested=false;}};form.append(approve);
       const pendingReviews=Object.values(data.dependencyReview||{}).filter(value=>value!==true).length;
       const pendingDecisions=Object.values(data.decisions||{}).filter(decision=>!decision.target).length;
-      if(data.missing.length || pendingReviews || pendingDecisions) {
+      if(pendingReviews || pendingDecisions) {
         box.open=true;
         heading.textContent=`Warunki realizacji i dane do umowy — do sprawdzenia: ${Math.max(data.missing.length,pendingReviews+pendingDecisions)}`;
         const guide=document.createElement('p');guide.setAttribute('role','status');guide.style.cssText='padding:12px;border:1px solid #d7a83e;border-radius:8px';
@@ -35,9 +35,10 @@
         else if(key==='acceptanceDays') {input.type='number';input.min='1';input.max='90';input.step='1';}
         else {input.rows=4;input.maxLength=20000;}
         input.value=data.values[key]||'';input.style.cssText='box-sizing:border-box;width:100%;padding:10px;background:#0d1220;color:#e1e7fa;border:1px solid #465474;border-radius:7px';controls[key]=input;label.append(input);form.append(label);
+        if(data.proposalFields?.includes(key)) {const origin=document.createElement('small');origin.textContent='Propozycja standardowa — do zatwierdzenia z całą ofertą.';label.append(origin);}
         const examples=data.suggestions[key]||{};
         if(Object.keys(examples).length) {
-          const choices=document.createElement('select');choices.setAttribute('aria-label','Gotowe propozycje: '+field.label);const empty=document.createElement('option');empty.value='';empty.textContent='Gotowe propozycje — wybierz';choices.append(empty);
+          const choices=document.createElement('select');choices.setAttribute('aria-label','Gotowe propozycje: '+field.label);const empty=document.createElement('option');empty.value='';empty.textContent='Zmień na inny wariant (opcjonalnie)';choices.append(empty);
           for(const title of Object.keys(examples)) {const option=document.createElement('option');option.value=title;option.textContent=title;choices.append(option);}
           choices.onchange=()=>{const title=choices.value;if(title&&(!input.value.trim()||confirm('Zastąpić wpisaną treść propozycją?'))) {input.value=examples[title];input.dispatchEvent(new Event('input',{bubbles:true}));}choices.value='';};label.append(choices);
         }
