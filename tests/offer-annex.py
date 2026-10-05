@@ -37,6 +37,10 @@ assert 'Wartość realizacji' not in first and 'Wartość realizacji' in offer[-
 assert 'Hipoteza do zatwierdzenia' not in text and 'internal-hash' not in text and 'Ustalenie 1' in text
 start=len(contract)-len(offer)
 assert start>0
+contract_text='\n'.join(page.get_text() for page in list(contract)[:start])
+assert 'Wynagrodzenie:' not in contract[0].get_text() and '1 600' not in contract[0].get_text()
+assert contract_text.index('Wynagrodzenie i płatności')>contract_text.index('Odpowiedzialność i postanowienia końcowe')
+assert contract_text.index('Wynagrodzenie i płatności')<contract_text.index('Podpisy stron')
 for i,page in enumerate(offer):
     original=page.get_pixmap();appended=contract[start+i].get_pixmap()
     assert (original.width,original.height,original.samples)==(appended.width,appended.height,appended.samples),'Appended page must be visually identical to accepted offer'

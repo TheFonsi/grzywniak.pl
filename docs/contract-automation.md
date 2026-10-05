@@ -10,6 +10,8 @@ PDF ma osobną stronę tytułową z podsumowaniem i danymi obu stron, numerowane
 
 Układ v3 używa szeryfowej typografii Times, z metrykami polskich znaków. Starszy niewysłany i niepodpisany szkic pokazuje aktualny układ przez osobny, tylko do odczytu endpoint `format=layout-preview`. Informacja przy podglądzie rozróżnia go od zapisanego pliku używanego do pobrania i wysyłki. PDF jest również widoczny w etapie „Umowa” na mapie. Podgląd nie zmienia treści, wersji, historii ani zatwierdzenia pakietu. Wysłane, podpisane i archiwalne wersje pokazują oryginalny plik.
 
+Układ v4 zaczyna od danych obu stron. Informacje o projekcie znajdują się po danych stron i nie zawierają ceny. Cały paragraf wynagrodzenia, zaliczki i płatności jest ostatnim paragrafem umowy, bezpośrednio przed podpisami. Kolejność i brak kwoty na okładce sprawdza test renderowania.
+
 Automatyczne uzupełnienie nie stanowi indywidualnej opinii prawnej. Forma podpisu i pola eksploatacji wymagają uwagi przy przeniesieniu praw ([PARP](https://www.parp.gov.pl/component/content/article/83261%3Aumowa-o-przeniesienie-autorskich-praw-majatkowych)); rzeczywiste powierzenie przetwarzania wymaga ustaleń odpowiadających art. 28 [RODO](https://eur-lex.europa.eu/eli/reg/2016/679/oj?locale=PL).
 
 Weryfikacja: `tests/contract-http.py`, `tests/document-flow-http.py`, `tests/contract-package.php`, `tests/contract-review-ui.mjs` oraz render wszystkich stron fikcyjnej umowy z `tests/offer-annex.py`. Testy używają osobnych baz i fikcyjnych danych.

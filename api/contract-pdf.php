@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 /** Proportional A4 layout with Polish glyphs, searchable text and measured wrapping. */
 final class ContractPdfLayout {
-    public const VERSION=3;
+    public const VERSION=4;
     private array $pages=[];
     private string $stream='';
     private float $y=92;
@@ -137,19 +137,17 @@ function contractPdf(array $contract): string {
     $layout->paragraph('Umowa określa zobowiązania stron wraz z zaakceptowaną ofertą i załącznikami wskazanymi w pakiecie.',10);
     $summary=[];
     if(!empty($contract['commercialSnapshot'])) $summary[]='Podstawa: oferta '.$contract['commercialSnapshot']['offerId'].' v'.$contract['commercialSnapshot']['offerVersion'].' — Załącznik 1.';
-    if(!empty($contract['price'])) $summary[]='Wynagrodzenie: '.$contract['price'];
     if(!empty($facts['acceptanceDays'])) $summary[]='Termin sprawdzenia wersji: '.$facts['acceptanceDays'].' dni kalendarzowych.';
     if(!empty($facts['publicationDestination'])) $summary[]='Publikacja: '.(contractFacts()['publicationDestination']['options'][$facts['publicationDestination']]??$facts['publicationDestination']);
-    $layout->panel('Najważniejsze ustalenia',implode("\n",$summary));
     $client=(string)($contract['party']??'');
     foreach(['clientAddress'=>'Adres','clientTaxId'=>'NIP','clientRepresentative'=>'Reprezentacja'] as $key=>$label) if(!empty($facts[$key])&&!str_contains($client,$facts[$key])) $client.="\n".$label.': '.$facts[$key];
     $layout->panel('Zamawiający',$client);$layout->panel('Wykonawca',(string)($contract['provider']??''));
     $layout->paragraph('W dalszej części dokumentu określeni odpowiednio jako „Zamawiający” i „Wykonawca”, łącznie „Strony”.',10);
+    $layout->panel('Informacje o projekcie',implode("\n",$summary));
     $layout->pageBreak();
     $groups=[
         ['Strony umowy',['party','provider'],['clientAddress','clientTaxId','clientRepresentative','clientType']],
         ['Przedmiot i zakres',['scope'],[]],
-        ['Wynagrodzenie i płatności',['price','deposit','paymentDetails'],[]],
         ['Harmonogram i współpraca',['deadline'],[]],
         ['Odbiór i przekazanie',['acceptance'],[]],
         ['Publikacja, domena i hosting',['deploymentTerms'],['publicationDestination','productionDomain','domainRegistrar','domainOwnershipTerms','productionHosting','serverTarget','backupResponsibility','dnsTlsResponsibility']],
@@ -158,10 +156,11 @@ function contractPdf(array $contract): string {
         ['Wady, wsparcie i utrzymanie',['support'],[]],
         ['Zmiany i koszty dodatkowe',['extras'],[]],
         ['Odpowiedzialność i postanowienia końcowe',['terms'],['dataRole','consumerDocuments','dataProcessingTerms']],
+        ['Wynagrodzenie i płatności',['price','deposit','paymentDetails'],[]],
     ];
     foreach($groups as $i=>[$label,$keys,$factKeys]) {
         if($i===0) {$layout->heading('§ 1. Strony i dokumenty umowy');$layout->paragraph('1. Stronami umowy są Zamawiający i Wykonawca wskazani na pierwszej stronie. Dane kontaktowe służą przekazywaniu ustaleń oraz zgłoszeń związanych z realizacją.');$layout->paragraph('2. Zakres, wynagrodzenie i warunki realizacji pochodzą z zaakceptowanej oferty wskazanej w umowie. Zmiany wymagają uzgodnienia stron; nie wynikają automatycznie z późniejszej edycji szkicu ani ze zgłoszenia uwagi.');continue;}
-        if($i===10&&!empty($contract['package'])) {
+        if($label==='Odpowiedzialność i postanowienia końcowe'&&!empty($contract['package'])) {
             $layout->heading('Pakiet dokumentów');
             $layout->paragraph('Załączniki poniżej stanowią część projektu umowy. Identyfikator wersji pakietu: '.$contract['package']['hash'],9);
             foreach($contract['package']['documents'] as $doc) $layout->paragraph($doc['title'],10);
@@ -172,7 +171,7 @@ function contractPdf(array $contract): string {
             if(count($keys)>1) $layout->paragraph(match($key){'party'=>'Zamawiający','provider'=>'Wykonawca','price'=>'Wynagrodzenie','deposit'=>'Zaliczka i etapy płatności',default=>'Sposób płatności'},10.5,true);
             $layout->paragraph($value,10.5,false,$key==='terms'?180:0);
         }
-        if($i===3&&!empty($contract['package'])&&in_array($facts['clientType']??'',['consumer','protected'],true)&&($facts['consumerChannel']??'')!=='premises') $layout->paragraph('Harmonogram rozpoczyna się po spełnieniu warunków startu oraz po upływie terminu odstąpienia wskazanego w informacji dla chronionego klienta. System nie przyjmuje domniemanej zgody na wcześniejsze świadczenie. Odmienne ustalenie wymaga odrębnego, zweryfikowanego prawnie dokumentu i rzeczywistych oświadczeń klienta.',10);
+        if($label==='Harmonogram i współpraca'&&!empty($contract['package'])&&in_array($facts['clientType']??'',['consumer','protected'],true)&&($facts['consumerChannel']??'')!=='premises') $layout->paragraph('Harmonogram rozpoczyna się po spełnieniu warunków startu oraz po upływie terminu odstąpienia wskazanego w informacji dla chronionego klienta. System nie przyjmuje domniemanej zgody na wcześniejsze świadczenie. Odmienne ustalenie wymaga odrębnego, zweryfikowanego prawnie dokumentu i rzeczywistych oświadczeń klienta.',10);
         foreach($factKeys as $key) if(trim((string)($facts[$key]??''))!=='') {
             if($key==='consumerDocuments' && !in_array($facts['clientType']??'',['consumer','protected'],true)) continue;
             if($key==='dataProcessingTerms' && ($facts['dataRole']??'')!=='processor') continue;
