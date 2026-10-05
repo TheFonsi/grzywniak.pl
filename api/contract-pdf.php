@@ -27,6 +27,7 @@ final class ContractPdfLayout {
     private function page(): void {
         if($this->stream!=='') $this->pages[]=$this->stream;
         $this->stream=''; $this->y=92;
+        if(($this->contract['documentType']??'')!=='offer') $this->stream.="0.16 0.29 0.46 rg 48 817 499 4 re f\n";
         $this->text('GRZYWNIAK / PROJEKTY CYFROWE',48,32,9,true,'0.16 0.29 0.46');
         $this->text((string)($this->contract['number']??'UM').'  /  v'.($this->contract['version']??1),365,33,8);
         $this->rule(59);
@@ -47,19 +48,20 @@ final class ContractPdfLayout {
         return $lines ?: [''];
     }
     public function paragraph(string $text,float $size=10.5,bool $bold=false,float $tailReserve=0): void {
-        $leading=$size<10.5?14:15;
+        $leading=($this->contract['documentType']??'')==='offer'?($size<10.5?14:15):max(15,$size*1.55);
         $paragraphs=explode("\n",rtrim(str_replace(["\r\n","\r"],"\n",$text)));
         foreach($paragraphs as $index=>$paragraph) {
             $paragraph=trim($paragraph);
             if($paragraph==='') { $this->y+=5; continue; }
             $subheading=mb_strtoupper($paragraph)===$paragraph && mb_strlen($paragraph)<60 && preg_match('/\p{L}/u',$paragraph);
             $isBold=$bold || (bool)$subheading;
-            $lines=$this->wrap($paragraph,499,$size,$isBold);
+            $numbered=($this->contract['documentType']??'')!=='offer'&&preg_match('/^(\d+\.)\s+(.+)$/u',$paragraph,$parts);
+            $lines=$this->wrap($numbered?$parts[2]:$paragraph,$numbered?481:499,$size,$isBold);
             $height=($isBold?55:min(count($lines),2)*15)+($subheading?20:0);
             if($tailReserve>0 && $index===count($paragraphs)-1) $height=max($height,min(count($lines)*15,674-$tailReserve)+$tailReserve);
             $this->ensure($height);
             if($subheading) $this->y+=6;
-            foreach($lines as $line) { $this->ensure($leading); $this->text($line,48,$this->y,$size,$isBold); $this->y+=$leading; }
+            foreach($lines as $lineIndex=>$line) { $this->ensure($leading);if($numbered&&$lineIndex===0)$this->text($parts[1],48,$this->y,$size,$isBold); $this->text($line,$numbered?66:48,$this->y,$size,$isBold); $this->y+=$leading; }
             $this->y+=6;
         }
     }
@@ -73,6 +75,16 @@ final class ContractPdfLayout {
         $height=($compact?33:43)+count($this->wrap($text,499,$size))*($size<10.5?14:15)+6;
         if($height<320) $this->ensure($height);
         $this->heading($label,$compact); $this->paragraph($text,$size);
+    }
+    public function panel(string $label,string $body):void {
+        $lines=[];foreach(explode("\n",str_replace("\r",'',$body)) as $paragraph) if(trim($paragraph)!=='') $lines=array_merge($lines,$this->wrap(trim($paragraph),475,10));
+        $height=42+count($lines)*15;
+        if($height>600){$this->section($label,$body);return;}
+        $this->ensure($height+12);
+        $this->stream.=sprintf("0.96 0.97 0.985 rg 48 %.2F 499 %.2F re f\n",842-$this->y-$height,$height);
+        $this->text($label,60,$this->y+11,10,true,'0.16 0.29 0.46');$this->y+=31;
+        foreach($lines as $line){$this->text($line,60,$this->y,10);$this->y+=15;}
+        $this->y+=23;
     }
     public function title(string $title): void {
         $this->text(($this->contract['documentType']??'')==='offer'?'OFERTA / ZAKRES I WARUNKI REALIZACJI':'PROJEKT UMOWY / DO PODPISANIA',48,$this->y,8,true,'0.38 0.45 0.54'); $this->y+=22;
@@ -117,6 +129,18 @@ final class ContractPdfLayout {
 function contractPdf(array $contract): string {
     $layout=new ContractPdfLayout($contract); $facts=$contract['facts']??[];
     $layout->title($contract['templateName']??'Umowa o realizację projektu cyfrowego');
+    $layout->paragraph('Umowa określa zobowiązania stron wraz z zaakceptowaną ofertą i załącznikami wskazanymi w pakiecie.',10);
+    $summary=[];
+    if(!empty($contract['commercialSnapshot'])) $summary[]='Podstawa: oferta '.$contract['commercialSnapshot']['offerId'].' v'.$contract['commercialSnapshot']['offerVersion'].' — Załącznik 1.';
+    if(!empty($contract['price'])) $summary[]='Wynagrodzenie: '.$contract['price'];
+    if(!empty($facts['acceptanceDays'])) $summary[]='Termin sprawdzenia wersji: '.$facts['acceptanceDays'].' dni kalendarzowych.';
+    if(!empty($facts['publicationDestination'])) $summary[]='Publikacja: '.(contractFacts()['publicationDestination']['options'][$facts['publicationDestination']]??$facts['publicationDestination']);
+    $layout->panel('Najważniejsze ustalenia',implode("\n",$summary));
+    $client=(string)($contract['party']??'');
+    foreach(['clientAddress'=>'Adres','clientTaxId'=>'NIP','clientRepresentative'=>'Reprezentacja'] as $key=>$label) if(!empty($facts[$key])&&!str_contains($client,$facts[$key])) $client.="\n".$label.': '.$facts[$key];
+    $layout->panel('Zamawiający',$client);$layout->panel('Wykonawca',(string)($contract['provider']??''));
+    $layout->paragraph('W dalszej części dokumentu określeni odpowiednio jako „Zamawiający” i „Wykonawca”, łącznie „Strony”.',10);
+    $layout->pageBreak();
     $groups=[
         ['Strony umowy',['party','provider'],['clientAddress','clientTaxId','clientRepresentative','clientType']],
         ['Przedmiot i zakres',['scope'],[]],
@@ -131,6 +155,7 @@ function contractPdf(array $contract): string {
         ['Odpowiedzialność i postanowienia końcowe',['terms'],['dataRole','consumerDocuments','dataProcessingTerms']],
     ];
     foreach($groups as $i=>[$label,$keys,$factKeys]) {
+        if($i===0) {$layout->heading('§ 1. Strony i dokumenty umowy');$layout->paragraph('1. Stronami umowy są Zamawiający i Wykonawca wskazani na pierwszej stronie. Dane kontaktowe służą przekazywaniu ustaleń oraz zgłoszeń związanych z realizacją.');$layout->paragraph('2. Zakres, wynagrodzenie i warunki realizacji pochodzą z zaakceptowanej oferty wskazanej w umowie. Zmiany wymagają uzgodnienia stron; nie wynikają automatycznie z późniejszej edycji szkicu ani ze zgłoszenia uwagi.');continue;}
         if($i===10&&!empty($contract['package'])) {
             $layout->heading('Pakiet dokumentów');
             $layout->paragraph('Załączniki poniżej stanowią część projektu umowy. Identyfikator wersji pakietu: '.$contract['package']['hash'],9);

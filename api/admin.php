@@ -66,9 +66,9 @@ register_shutdown_function(static function(): void {
     const buttons = [...form.querySelectorAll('button')]; buttons.forEach(button => button.disabled = true);
     let feedback = form.querySelector('[role="alert"]');
     if (!feedback) { feedback = document.createElement('p'); feedback.setAttribute('role','alert'); form.append(feedback); }
-    const aiFill = ['ai-fill','apply-template','brief-fill','sync-offer'].includes(data.contract_action);
+    const aiFill = ['ai-fill','apply-template','brief-fill','sync-offer','auto-prepare'].includes(data.contract_action);
     const previous = aiFill ? Object.fromEntries([...form.querySelectorAll('textarea,input,select')].map(input => [input.name,input.value])) : null;
-    feedback.textContent = data.contract_action==='sync-offer' ? 'Porównywanie z zaakceptowaną ofertą…' : data.contract_action==='brief-fill' ? 'Uzupełnianie ustaleń z briefu…' : data.contract_action==='apply-template' ? 'Wczytywanie wzoru…' : aiFill ? 'AI uzupełnia dane projektu. Może to potrwać około minuty…' : 'Zapisywanie…';
+    feedback.textContent = data.contract_action==='auto-prepare' ? 'Przygotowywanie umowy z zaakceptowanej oferty i aktualnego wzoru…' : data.contract_action==='sync-offer' ? 'Porównywanie z zaakceptowaną ofertą…' : data.contract_action==='brief-fill' ? 'Uzupełnianie ustaleń z briefu…' : data.contract_action==='apply-template' ? 'Wczytywanie wzoru…' : aiFill ? 'AI uzupełnia dane projektu. Może to potrwać około minuty…' : 'Zapisywanie…';
     try {
       const response = await fetch('/api/contract.php', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
       const result = await response.json();

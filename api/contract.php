@@ -6,6 +6,7 @@ require_once __DIR__.'/contract-pdf.php';
 require_once __DIR__.'/contract-ai.php';
 require_once __DIR__.'/contract-review.php';
 require_once __DIR__.'/offer-agreement.php';
+require_once __DIR__.'/contract-prepare.php';
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 $user=getenv('ADMIN_USERNAME')?:''; $password=getenv('ADMIN_PASSWORD')?:'';
@@ -25,7 +26,7 @@ if($method==='POST') {
     $body=array_replace($body,$_POST);
     if(!hash_equals(contractToken(),(string)($body['csrf']??''))) contractError(403,'Sesja formularza wygasła. Odśwież panel.');
     // AI only fills the browser form; do not hold a SQLite write lock during HTTP.
-    if(!in_array($body['action']??$body['contract_action']??'',['ai-fill','apply-template','brief-fill','sync-offer'],true)) sessionDb()->exec('BEGIN IMMEDIATE');
+    if(!in_array($body['action']??$body['contract_action']??'',['ai-fill','apply-template','brief-fill','sync-offer','auto-prepare'],true)) sessionDb()->exec('BEGIN IMMEDIATE');
 }
 $action=(string)($body['action']??$body['contract_action']??'');
 if($action==='save-profile') {
@@ -87,7 +88,7 @@ if($method==='GET') {
         if(isset($_GET['version']) && (int)$_GET['version']!==(int)($contract['version']??0)) { $contract=null; foreach($s['contractVersions']??[] as $old) if((int)$old['version']===(int)$_GET['version']) $contract=$old; }
         $pdf=base64_decode((string)($contract['pdfBase64']??''),true);
         if(!$pdf || !str_starts_with($pdf,'%PDF-')) contractError(404,'Ta wersja nie ma przygotowanego PDF.');
-        header('Content-Type: application/pdf'); header('Content-Disposition: attachment; filename="umowa-'.preg_replace('/[^A-Za-z0-9-]/','',$contract['number']).'-v'.(int)$contract['version'].'.pdf"'); header('Content-Length: '.strlen($pdf)); echo $pdf; exit;
+        header('Content-Type: application/pdf'); header('Content-Disposition: '.(($_GET['inline']??'')==='1'?'inline':'attachment').'; filename="umowa-'.preg_replace('/[^A-Za-z0-9-]/','',$contract['number']).'-v'.(int)$contract['version'].'.pdf"'); header('Content-Length: '.strlen($pdf)); echo $pdf; exit;
     }
     echo json_encode(['contract'=>$s['contract']??null,'contractVersions'=>$s['contractVersions']??[]],JSON_UNESCAPED_UNICODE); exit;
 }
@@ -102,6 +103,14 @@ if($action==='apply-template') {
         $facts=contractReadFacts($body,$s['contract']['facts']??[],$template);
         echo json_encode(['fields'=>contractTemplateProposal($template,$facts),'facts'=>[], 'replaceTemplate'=>true,'template'=>['id'=>$template['id'],'title'=>$template['title'],'revision'=>$template['revision'],'version'=>$template['version']], 'missing'=>contractFactsMissing($facts)],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR); exit;
     } catch(InvalidArgumentException $error) { contractError(422,$error->getMessage()); }
+}
+if($action==='auto-prepare') {
+    if(($s['contract']['status']??'')==='SIGNED') contractError(409,'Podpisana umowa zachowuje zaakceptowaną treść. Zmiany wymagają nowej wersji ustaleń.');
+    $selection=contractSelectTemplate($s['offer']);$template=contractCatalogTemplate($selection['id']);
+    $current=['facts'=>[]];foreach(contractFields() as $key=>$label) $current[$key]=(string)($body[$key]??'');
+    try {$current['facts']=contractReadFacts($body,$s['contract']['facts']??[],$template);$proposal=contractPreparedProposal($s,contractProfile(),$template,$current);}
+    catch(InvalidArgumentException $error){contractError(422,$error->getMessage());}
+    echo json_encode($proposal,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);exit;
 }
 if($action==='brief-fill') {
     try {
@@ -151,7 +160,8 @@ if($action==='ai-fill') {
     } catch(InvalidArgumentException $error) { contractError(422,$error->getMessage()); }
     catch(Throwable $error) { contractError(502,$error instanceof RuntimeException?$error->getMessage():'Nie udało się przygotować projektu AI.'); }
 }
-if(in_array($action,['save','generate'],true)) {
+if(in_array($action,['save','generate','approve-generate'],true)) {
+    $approveAll=$action==='approve-generate';if($approveAll) $action='generate';
     if(!is_array($s['contract']??null)) {
         $profile=contractProfile();
         if((int)($body['profileVersion']??0)!==(int)$profile['version']) contractError(409,'Dane wykonawcy zmieniły się. Odśwież formularz przed zapisem.');
@@ -160,6 +170,7 @@ if(in_array($action,['save','generate'],true)) {
     try { $facts=contractReadFacts($body,$s['contract']['facts']??[],$activeTemplate); } catch(InvalidArgumentException $error) { contractError(422,$error->getMessage()); }
     $c=[];
     foreach(contractFields() as $key=>$label) { if(!is_string($body[$key]??null)||mb_strlen($body[$key])>20000) contractError(422,'Niepoprawna treść pola: '.$label); $c[$key]=trim($body[$key]); }
+    if($approveAll) {$wholeReview=[];foreach(contractRequiredReview($c,$facts) as $key) $wholeReview[$key]=['value'=>(string)($c[$key]??$facts[$key]??''),'accepted'=>true];$body['reviewState']=$wholeReview;}
     try { $review=contractReviewState($body['reviewState']??null,$c,$facts,$s['contract']['review']??[]); } catch(InvalidArgumentException $error) { contractError(422,$error->getMessage()); }
     if($action==='generate') foreach(['provider','party','scope','price','deadline','ip'] as $key) if($c[$key]==='') contractError(422,'Uzupełnij: '.contractFields()[$key]);
     if($action==='generate') {

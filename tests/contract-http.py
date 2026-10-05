@@ -74,12 +74,19 @@ try:
     code,data=request('/api/contract.php',dict(body,action='brief-fill',cooperationTerms='Admin edit'))
     assert code==200 and 'cooperationTerms' not in json.loads(data)['facts']
     assert json.loads(request('/api/contract.php?session='+sid)[1])['contract'] is None,'Brief fill must not persist a contract'
+    code,prepared=request('/api/contract.php',dict(body,action='auto-prepare'));assert code==200,(code,prepared)
+    automatic=json.loads(prepared)
+    assert automatic['template']['id']=='website' and automatic['replaceTemplate'] and automatic['replaceCommercial']
+    assert automatic['fields']['scope']==body['scope'] and automatic['fields']['price']==body['price']
+    assert 'ODPOWIEDZIALNOŚĆ' in automatic['fields']['terms'] and 'pola eksploatacji' in automatic['fields']['ip']
+    assert json.loads(request('/api/contract.php?session='+sid)[1])['contract'] is None,'Preparing the automatic proposal does not persist or send it'
+    assert request('/api/contract.php',dict(body,action='approve-generate',clientAddress=''))[0]==422,'Whole approval cannot fabricate client data'
     assert request('/api/contract.php',dict(body,clientType='invented',action='ai-fill'))[0]==422
     assert request('/api/contract.php',dict(body,scope='[DO UZUPEŁNIENIA: brak danych]'))[0]==422
     assert request('/api/contract.php',dict(body,clientType=''))[0]==422
     assert request('/api/contract.php',dict(body,contractDate='2026-02-31'))[0]==422
     assert request('/api/contract.php',dict(body,csrf='bad'))[0]==403
-    code,data=request('/api/contract.php',body);assert code==200,(code,data)
+    code,data=request('/api/contract.php',dict(body,action='approve-generate'));assert code==200,(code,data)
     assert json.loads(data)['contract']['version']==1
     saved_facts=json.loads(data)['contract']['facts']
     assert 'pełnego wynagrodzenia' in saved_facts['rightsTerms'] and 'zawarte w cenie' in saved_facts['ipPayment']

@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 function contractProfileFields(): array {
-    return ['legalName'=>'Pełna nazwa (JDG: z imieniem i nazwiskiem; spółka: z formą prawną, np. sp. z o.o.)', 'address'=>'Pełny adres siedziby / działalności', 'taxId'=>'NIP (jeśli dotyczy)', 'representative'=>'Osoba podpisująca i podstawa reprezentacji', 'email'=>'E-mail do kontaktu i reklamacji', 'phone'=>'Telefon', 'bankAccount'=>'Rachunek bankowy / IBAN (opcjonalnie)', 'paymentTerms'=>'Domyślne zasady płatności (opcjonalnie)', 'complaintsAddress'=>'Adres reklamacji, jeśli inny (opcjonalnie)'];
+    return ['legalName'=>'Pełna nazwa (JDG: z imieniem i nazwiskiem; spółka: z formą prawną, np. sp. z o.o.)', 'address'=>'Pełny adres siedziby / działalności', 'taxId'=>'NIP (jeśli dotyczy)', 'representative'=>'Osoba podpisująca i podstawa reprezentacji', 'email'=>'E-mail do kontaktu i reklamacji', 'phone'=>'Telefon', 'bankAccount'=>'Rachunek bankowy / IBAN (opcjonalnie)', 'paymentTerms'=>'Domyślne zasady płatności (opcjonalnie)', 'complaintsAddress'=>'Adres reklamacji, jeśli inny (opcjonalnie)','privacyRecipients'=>'Stałe dane do umów: rzeczywiści odbiorcy i dostawcy danych kontaktowych, lokalizacje i transfery (uzupełnij raz)','privacyRetention'=>'Stałe dane do umów: okresy przechowania danych kontaktowych i umownych (opcjonalnie)'];
 }
 function contractProfile(): array {
     $db=sessionDb(); $db->exec('CREATE TABLE IF NOT EXISTS contract_profile (id INTEGER PRIMARY KEY CHECK(id=1), data TEXT NOT NULL)');
