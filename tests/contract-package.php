@@ -7,7 +7,7 @@ require_once __DIR__.'/../api/contract-review.php';
 function packageAssert(bool $ok,string $message): void { if(!$ok) throw new RuntimeException($message); }
 $site=contractSampleContract('website'); $app=contractSampleContract('webapp'); $shop=contractSampleContract('ecommerce');
 foreach(contractPackageFields() as $key=>$field) {
-    if(isset($field['options'])||$key==='acceptanceDays') continue;
+    if(isset($field['options'])||in_array($key,['acceptanceDays','customClauses'],true)) continue;
     $examples=contractFieldSuggestions($key);
     packageAssert(count($examples)>0,'Every package text/inventory field has ready-made proposals: '.$key);
     if(in_array($key,['rightsInventory','processingSubprocessors'],true)) foreach($examples as $raw) contractPackageJson($raw,$key==='rightsInventory'?'rights':'subprocessors');

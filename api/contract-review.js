@@ -1,11 +1,12 @@
 (() => {
-  const optional = new Set(['clientTaxId', 'paymentDetails', 'domainRegistrar', 'serverTarget','consumerDocuments','dataProcessingTerms']);
+  const optional = new Set(['clientTaxId', 'paymentDetails', 'domainRegistrar', 'serverTarget','consumerDocuments','dataProcessingTerms','customClauses']);
   const unresolved = value => /\[DO (UZUPEŁNIENIA|UZGODNIENIA):/iu.test(value);
   const read = form => { try { return JSON.parse(form.elements.reviewState.value) || {}; } catch { return {}; } };
   const write = (form, state) => { form.elements.reviewState.value = JSON.stringify(state); };
   function inventoryEditor(input,card) {
     const rights=input.name==='rightsInventory';
-    const labels=rights?{name:'Nazwa składnika',origin:'Pochodzenie',author:'Autor / dostawca',license:'Prawa lub warunki licencji',rightsBasis:'Podstawa dysponowania prawami',maintenanceRights:'Utrzymanie i modyfikacje przez inny zespół'}:{name:'Dostawca',service:'Usługa',location:'Lokalizacja danych'};
+    const custom=input.name==='customClauses';
+    const labels=custom?{title:'Tytuł postanowienia',text:'Treść uzgodnienia z klientem'}:rights?{name:'Nazwa składnika',origin:'Pochodzenie',author:'Autor / dostawca',license:'Prawa lub warunki licencji',rightsBasis:'Podstawa dysponowania prawami',maintenanceRights:'Utrzymanie i modyfikacje przez inny zespół'}:{name:'Dostawca',service:'Usługa',location:'Lokalizacja danych'};
     const origins={'':'Wybierz',own:'Własny utwór',reusable:'Wcześniejszy komponent',third_party:'Biblioteka / osoba trzecia',client:'Materiał klienta',ai:'Element z użyciem AI'};
     const editor=document.createElement('div'); editor.dataset.inventoryEditor=''; card.append(editor);
     const rows=document.createElement('div'); editor.append(rows);
@@ -21,19 +22,19 @@
         const heading=document.createElement('h5'); heading.textContent=`Pozycja ${index+1}`; row.append(heading);
         for(const [key,title] of Object.entries(labels)) {
           const label=document.createElement('label'); label.textContent=title;
-          const control=document.createElement(key==='origin'?'select':'input'); control.name=`_${input.name}_${index}_${key}`;
+          const control=document.createElement(key==='origin'?'select':custom&&key==='text'?'textarea':'input'); control.name=`_${input.name}_${index}_${key}`;
           if(key==='origin') for(const [value,text] of Object.entries(origins)) {const option=document.createElement('option');option.value=value;option.textContent=text;control.append(option);}
-          control.value=item[key]||''; control.maxLength=2000; control.setAttribute('aria-label',title);
+          control.value=item[key]||''; control.maxLength=custom?(key==='title'?200:5000):2000; control.setAttribute('aria-label',title);
           control.addEventListener('input',()=>{item[key]=control.value;sync();});
-          control.addEventListener('keydown',event=>{if(event.key==='Enter') event.preventDefault();});
+          control.addEventListener('keydown',event=>{if(event.key==='Enter'&&control.tagName!=='TEXTAREA') event.preventDefault();});
           label.append(control); row.append(label);
         }
         const remove=document.createElement('button');remove.type='button';remove.className='button';remove.textContent='Usuń pozycję';remove.onclick=()=>{items.splice(index,1);render();sync();}; row.append(remove);rows.append(row);
       });
     };
-    const add=document.createElement('button');add.type='button';add.className='button';add.textContent=rights?'Dodaj składnik':'Dodaj podwykonawcę';add.onclick=()=>{items.push(Object.fromEntries(Object.keys(labels).map(key=>[key,''])));render();sync();};editor.append(add);
-    input.addEventListener('contract-inventory-refresh',()=>{try { const value=JSON.parse(input.value); if(Array.isArray(value)) {items=value;render();} }catch{} });
-    if(!rights) {const none=document.createElement('button');none.type='button';none.className='button';none.textContent='Potwierdź brak podwykonawców';none.onclick=()=>{items=[];render();sync();};editor.append(none);}
+    const add=document.createElement('button');add.type='button';add.className='button';add.textContent=custom?'Dodaj własne postanowienie':rights?'Dodaj składnik':'Dodaj podwykonawcę';add.onclick=()=>{items.push(Object.fromEntries(Object.keys(labels).map(key=>[key,''])));render();sync();};editor.append(add);
+    input.addEventListener('contract-inventory-refresh',()=>{try { const value=input.value?JSON.parse(input.value):[]; if(Array.isArray(value)) {items=value;render();} }catch{} });
+    if(!rights&&!custom) {const none=document.createElement('button');none.type='button';none.className='button';none.textContent='Potwierdź brak podwykonawców';none.onclick=()=>{items=[];render();sync();};editor.append(none);}
     render();
   }
   function refresh(form) {
@@ -57,7 +58,9 @@
       const entry = state[name];
       const accepted = entry?.accepted && entry.value.trim() === input.value.trim();
       const invalidDays=name==='acceptanceDays' && (!/^\d+$/.test(input.value)||Number(input.value)<1||Number(input.value)>90);
-      const missing = (!input.value.trim() && !optional.has(name)) || unresolved(input.value) || invalidDays;
+      let invalidCustom=false;
+      if(name==='customClauses'&&input.value.trim()){try{const rows=JSON.parse(input.value);invalidCustom=!Array.isArray(rows)||rows.length>30||rows.some(row=>typeof row.title!=='string'||!row.title.trim()||row.title.length>200||typeof row.text!=='string'||!row.text.trim()||row.text.length>5000);}catch{invalidCustom=true;}}
+      const missing = (!input.value.trim() && !optional.has(name)) || unresolved(input.value) || invalidDays || invalidCustom;
       card.dataset.missing=missing?'1':'0';
       card.dataset.accepted = accepted ? '1' : '0';
       card.querySelector('[data-review-status]').textContent = accepted ? (!input.value.trim()&&optional.has(name)?'Nie dotyczy':'Zaakceptowano') : missing ? 'Uzupełnij dane' : entry ? 'Propozycja do akceptacji' : 'Dane do sprawdzenia';
@@ -68,14 +71,14 @@
       const edit = card.querySelector('[data-review-edit]');
       edit.disabled = !!form.dataset.saving;
       input.hidden = !!accepted || !!input.dataset.inventoryReady;
-      const inventory=card.querySelector('[data-inventory-editor]'); if(inventory) inventory.hidden=!!accepted;
+      const inventory=card.querySelector('[data-inventory-editor]'); if(inventory) inventory.hidden=!!accepted && !(name==='customClauses'&&(!input.value||input.value==='[]'));
       const choices=card.querySelector('[data-day-choices]'); if(choices) { choices.hidden=!!accepted; choices.querySelectorAll('button').forEach(button=>{button.disabled=!!form.dataset.saving;button.setAttribute('aria-pressed',String(button.dataset.days===input.value));}); }
       const suggestions=card.querySelector('[data-field-suggestions]'); if(suggestions) { suggestions.hidden=!!accepted; suggestions.querySelectorAll('select,button').forEach(control=>{control.disabled=!!form.dataset.saving;}); }
       const preview = card.querySelector('[data-review-preview]');
       preview.hidden = !accepted;
       preview.textContent = input.tagName === 'SELECT' ? input.selectedOptions[0]?.textContent || input.value : input.value || 'Nie dotyczy';
       if(input.dataset.inventoryReady && accepted) {
-        try {const rows=JSON.parse(input.value); preview.textContent=rows.length?rows.map((item,i)=>`${i+1}. ${Object.values(item).join(' · ')}`).join('\n'):'Potwierdzono brak podwykonawców.';preview.style.whiteSpace='pre-wrap';}catch{}
+        try {const rows=JSON.parse(input.value); preview.textContent=rows.length?rows.map((item,i)=>`${i+1}. ${Object.values(item).join(' · ')}`).join('\n'):name==='customClauses'?'Brak dodatkowych postanowień.':'Potwierdzono brak podwykonawców.';preview.style.whiteSpace='pre-wrap';}catch{}
       }
     });
     const pending = Object.entries(state).filter(([name,item]) => {
@@ -108,6 +111,7 @@
         skip.onclick=()=>{
           if(form.dataset.saving)return;
           input.value='';input.dispatchEvent(new Event('input',{bubbles:true}));
+          input.dispatchEvent(new Event('contract-inventory-refresh'));
           const state=read(form);state[input.name]={value:'',accepted:true};write(form,state);refresh(form);
         };
         card.append(skip);
@@ -145,7 +149,7 @@
         for(const days of [3,7,14,30]) { const button=document.createElement('button');button.type='button';button.className='button';button.dataset.days=String(days);button.textContent=`${days} dni`;button.onclick=()=>{input.value=String(days);change();input.focus();};choices.append(button); }
         label.after(choices);
       }
-      if(input.hasAttribute('data-contract-inventory')) inventoryEditor(input,card);
+      if(input.hasAttribute('data-contract-inventory')||input.name==='customClauses') inventoryEditor(input,card);
       if(input.dataset.contractSuggestions) {
         let examples={};try {examples=JSON.parse(input.dataset.contractSuggestions);}catch{}
         if(Object.keys(examples).length) {
@@ -221,6 +225,16 @@
     window.contractWorkspace?.refresh(form);
   }
   window.contractReview={init,apply,refresh};
+  document.addEventListener('submit',async event=>{
+    const form=event.target;if(!form.matches('.contract-archive-upload'))return;
+    event.preventDefault();if(form.dataset.saving)return;
+    const feedback=form.querySelector('[role="alert"]');const button=form.querySelector('button');
+    const file=form.elements.document.files[0];
+    if(!file||file.size>10*1024*1024){feedback.textContent='Wybierz PDF o rozmiarze do 10 MB.';feedback.style.color='#ffb4b4';return;}
+    form.dataset.saving='1';button.disabled=true;feedback.textContent='Zapisywanie dokumentu w archiwum…';
+    try{const response=await fetch(form.action,{method:'POST',headers:{Accept:'application/json'},body:new FormData(form)});const result=await response.json();if(!response.ok)throw new Error(result.message||'Nie udało się zapisać dokumentu.');location.reload();}
+    catch(error){feedback.textContent=error.message||'Nie udało się przesłać dokumentu.';feedback.style.color='#ffb4b4';button.disabled=false;delete form.dataset.saving;}
+  });
   document.addEventListener('click',event=>{
     const button=event.target.closest('[data-contract-reprepare]');if(!button)return;
     const panel=button.closest('#contract-panel');const form=panel?.querySelector('form.contract-form');

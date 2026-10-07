@@ -7,6 +7,7 @@ require_once __DIR__.'/contract-brief.php';
 require_once __DIR__.'/document-history-model.php';
 require_once __DIR__.'/contract-commercial.php';
 require_once __DIR__.'/contract-prepare.php';
+require_once __DIR__.'/contract-archive.php';
 
 function contractFields(): array {
     return ['deploymentTerms'=>'Domena, hosting, publikacja i przekazanie', 'provider'=>'Wykonawca — dane i reprezentacja', 'party'=>'Klient — dane i reprezentacja', 'paymentDetails'=>'Rachunek i zasady płatności', 'scope'=>'Przedmiot i zakres (aplikacja, strona, materiały)', 'price'=>'Wynagrodzenie, VAT i część za prawa IP', 'deposit'=>'Zaliczka i harmonogram płatności', 'deadline'=>'Termin i etapy', 'acceptance'=>'Odbiór i przekazanie kodu / dostępów', 'ip'=>'Prawa autorskie — zakres, pola eksploatacji i moment przejścia', 'exclusions'=>'Komponenty zewnętrzne, licencje i wyłączenia', 'support'=>'Usuwanie wad i wsparcie — okres, zakres, czasy reakcji', 'extras'=>'Dodatkowe płatne prace i koszty usług zewnętrznych', 'terms'=>'Pozostałe warunki, odpowiedzialność, rozwiązanie, dane osobowe'];
@@ -115,5 +116,6 @@ function contractEditor(array $session): string {
     $html.=documentSourceLinks($saved??[],$session['id']);
     $html.=contractPackageControls($saved??[],$session['id']);
     if (!empty($session['contractVersions'])) { $html.='<details><summary>Historia wersji</summary>'; foreach(array_reverse($session['contractVersions']) as $old) $html.='<p>Wersja '.(int)$old['version'].' · '.$e($old['status']??'DRAFT').(!empty($old['pdfBase64'])?' · <a href="'.$contractUrl.'?session='.$id.'&amp;format=pdf&amp;version='.(int)$old['version'].'">Pobierz PDF</a>':'').'</p>'; $html.='</details>'; }
+    $html.=contractArchiveEditor($session);
     return $html.'</section>';
 }

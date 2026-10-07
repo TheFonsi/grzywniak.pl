@@ -51,6 +51,7 @@ try:
     fields=re.findall(rb'<textarea name="([^"]+)"',html)
     review_keys=[key.decode() for key in re.findall(rb'<(?:textarea|input|select)[^>]*name="([^"]+)"',html)]
     body={k.decode():'Example text' for k in fields}
+    body['customClauses']=''
     for key in ['scope','price','deposit','deadline']:
         value=re.search(rb'<textarea[^>]*name="'+key.encode()+rb'"[^>]*>(.*?)</textarea>',html,re.S)[1].decode()
         import html as html_module
@@ -239,7 +240,31 @@ sessionDb()->prepare('INSERT INTO contract_delivery_outbox(session_id,version,pa
             assert code==409 and 'Start po terminie'.encode() in denied, (code,denied)
             snapshot=json.loads(request(path)[1])['project']
             assert snapshot['contract']['package']['earliestStart'] and not snapshot['jobs'], 'No agent job can escape withdrawal gate'
-    print('HTTP checks passed: profile, AI fill (mock), protected fields, no AI persistence, required facts, markers, snapshots, auth, CSRF, PDF, version conflict, mock send, history, templates, admin JavaScript.')
+    # Multipart archive uploads use authenticated, CSRF-protected requests and preserve exact bytes.
+    def upload_document(content,csrf=token,version=1,kind='signed'):
+        boundary='ContractArchiveTestBoundary'
+        params=dict(action='upload-contract-file',contract_session=sid,expectedVersion=json.loads(request('/api/contract.php?session='+sid)[1])['contract']['version'],contractVersion=version,kind=kind,csrf=csrf)
+        chunks=[]
+        for key,value in params.items():chunks.append(f'--{boundary}\r\nContent-Disposition: form-data; name="{key}"\r\n\r\n{value}\r\n'.encode())
+        chunks.append(f'--{boundary}\r\nContent-Disposition: form-data; name="document"; filename="signed.pdf"\r\nContent-Type: application/pdf\r\n\r\n'.encode()+content+b'\r\n')
+        chunks.append(f'--{boundary}--\r\n'.encode())
+        req=urllib.request.Request(f'http://127.0.0.1:{port}/api/contract.php',data=b''.join(chunks),headers={'Authorization':auth,'Content-Type':f'multipart/form-data; boundary={boundary}','Accept':'application/json'})
+        try:
+            with opener.open(req) as r:return r.status,r.read()
+        except urllib.error.HTTPError as e:return e.code,e.read()
+    before_upload=json.loads(request('/api/contract.php?session='+sid)[1])['contract']
+    assert upload_document(pdf,csrf='bad')[0]==403
+    assert upload_document(b'not a PDF')[0]==422
+    assert upload_document(pdf,version=999)[0]==422
+    code,uploaded=upload_document(pdf);assert code==200,(code,uploaded)
+    file_id=json.loads(uploaded)['fileId'];download='/api/contract.php?session='+sid+'&format=archive-file&file='+file_id
+    assert json.loads(upload_document(pdf)[1])['fileId']==file_id,'Retry must not duplicate the same document'
+    assert request(download)[1]==pdf,'Archived bytes must match uploaded PDF exactly'
+    assert request(download,authorized=False)[0]==401
+    assert request('/api/contract.php?session='+'1'*32+'&format=archive-file&file='+file_id)[0]==404,'No cross-project file access'
+    assert json.loads(request('/api/contract.php?session='+sid)[1])['contract']==before_upload,'Upload must not change signed status, version, PDF or legal approvals'
+    code,archive_editor=request('/api/contract.php?session='+sid+'&format=editor');assert code==200 and b'signed.pdf' in archive_editor and b'contract-archive-upload' in archive_editor
+    print('HTTP checks passed, including archive upload, exact downloads, CSRF, version binding and cross-project isolation.')
 finally:
     server.terminate();server.wait(timeout=10);log.close()
     # Only this disposable test database, never the live storage directory.

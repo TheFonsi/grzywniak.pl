@@ -54,3 +54,18 @@ assert.equal(form.querySelector('[data-review-field="processingPurpose"]').hidde
 form.elements.dataRole.value='processor';form.elements.dataRole.dispatchEvent(new dom.window.Event('change',{bubbles:true}));
 assert.equal(form.querySelector('[data-review-field="processingPurpose"]').hidden,false,'Required processing fields return when role changes');
 console.log('Optional exclusions and conditional processing fields passed.');
+const custom=form.querySelector('[data-review-field="customClauses"]');
+assert.equal(custom.querySelector('[data-inventory-editor]').hidden,false,'Adding own terms must be available for an empty optional field');
+custom.querySelector('[data-inventory-editor]>button').click();
+assert.equal(custom.dataset.missing,'1','An incomplete clause must block approval');
+const customTitle=custom.querySelector('input[aria-label="Tytuł postanowienia"]');const customText=custom.querySelector('textarea[aria-label="Treść uzgodnienia z klientem"]');
+customTitle.value='Additional agreement';customTitle.dispatchEvent(new dom.window.Event('input',{bubbles:true}));
+customText.value='Client requests an additional acceptance meeting.';customText.dispatchEvent(new dom.window.Event('input',{bubbles:true}));
+assert.equal(custom.dataset.missing,'0');
+form._selectContractPane('rights');form.querySelector('[data-contract-approve-pane]').click();
+assert.equal(JSON.parse(form.elements.reviewState.value).customClauses.accepted,true,'Custom terms are approved with the current tab');
+custom.querySelector('[data-review-edit]').click();customText.value='Revised agreement';customText.dispatchEvent(new dom.window.Event('input',{bubbles:true}));
+assert.equal(JSON.parse(form.elements.reviewState.value).customClauses.accepted,false,'Editing own terms requires approval again');
+custom.querySelector('[data-review-skip]').click();
+assert.equal(custom.querySelector('[data-inventory-editor] input'),null,'Clearing custom terms removes editable rows');
+console.log('Custom clause editor passed: add, edit, approval and clearing.');

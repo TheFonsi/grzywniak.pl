@@ -14,7 +14,7 @@ if($user==='' || $password==='' || !hash_equals($user,(string)($_SERVER['PHP_AUT
 function contractError(int $status,string $message): never { http_response_code($status); echo json_encode(['message'=>$message],JSON_UNESCAPED_UNICODE); exit; }
 function contractReply(array $data,string $location): never {
     sessionDb()->exec('COMMIT');
-    if (!str_contains((string)($_SERVER['CONTENT_TYPE']??''),'application/json')) { header('Location: '.$location,true,303); exit; }
+    if (!str_contains((string)($_SERVER['CONTENT_TYPE']??''),'application/json')&&!str_contains((string)($_SERVER['HTTP_ACCEPT']??''),'application/json')) { header('Location: '.$location,true,303); exit; }
     echo json_encode($data,JSON_UNESCAPED_UNICODE); exit;
 }
 $method=$_SERVER['REQUEST_METHOD']??'GET';
@@ -77,6 +77,12 @@ $s=readSession($id);
 if(!$s) contractError(404,'Nie znaleziono rozmowy.');
 if($method==='GET' && ($_GET['format']??'')==='editor') { header('Content-Type: text/html; charset=utf-8'); echo contractEditor($s); exit; }
 if($method==='GET') {
+    if(($_GET['format']??'')==='archive-file'){
+        $query=contractArchiveDb()->prepare('SELECT filename,sha256,content FROM contract_files WHERE id=? AND session_id=?');$query->execute([(string)($_GET['file']??''),$id]);$file=$query->fetch(PDO::FETCH_ASSOC);
+        if(!$file)contractError(404,'Nie znaleziono pliku w tej sprawie.');
+        $pdf=(string)$file['content'];if(!hash_equals($file['sha256'],hash('sha256',$pdf)))contractError(500,'Nie udało się potwierdzić integralności pliku.');
+        header('Content-Type: application/pdf');header('X-Content-Type-Options: nosniff');header('Content-Disposition: attachment; filename="umowa-archiwum.pdf"');header('Content-Length: '.strlen($pdf));echo $pdf;exit;
+    }
     if(($_GET['format']??'')==='manifest') {
         $c=$s['contract']??[];
         if(!isset($c['package'])) contractError(404,'Ta wersja nie ma manifestu pakietu.');
@@ -99,6 +105,23 @@ if($method==='GET') {
 }
 if(($s['offer']['status']??'')!=='ACCEPTED') contractError(409,'Najpierw zaakceptuj ofertę.');
 if((int)($body['expectedVersion']??-1)!==(int)($s['contract']['version']??0)) contractError(409,'Umowa została zmieniona. Odśwież panel przed zapisem.');
+if($action==='upload-contract-file'){
+    $version=(int)($body['contractVersion']??0);$target=null;
+    foreach(array_merge($s['contractVersions']??[],isset($s['contract'])?[$s['contract']]:[]) as $c)if((int)$c['version']===$version)$target=$c;
+    if(!$target)contractError(422,'Wybierz istniejącą wersję umowy.');
+    $kind=(string)($body['kind']??'');if(!in_array($kind,['signed','reference'],true))contractError(422,'Wybierz rodzaj dokumentu.');
+    if($kind==='signed'&&empty($target['pdfBase64']))contractError(422,'Najpierw przygotuj PDF tej wersji umowy.');
+    $upload=$_FILES['document']??[];
+    if(($upload['error']??UPLOAD_ERR_NO_FILE)!==UPLOAD_ERR_OK||!is_uploaded_file((string)($upload['tmp_name']??'')))contractError(422,'Nie udało się odebrać PDF. Sprawdź plik oraz limit przesyłania na serwerze.');
+    if((int)$upload['size']>10*1024*1024)contractError(422,'Maksymalny rozmiar PDF to 10 MB.');
+    $pdf=file_get_contents($upload['tmp_name']);
+    if(!$pdf||!str_starts_with($pdf,'%PDF-')||(new finfo(FILEINFO_MIME_TYPE))->buffer($pdf)!=='application/pdf')contractError(422,'Prześlij prawidłowy plik PDF.');
+    $existing=contractArchiveDb()->prepare('SELECT id FROM contract_files WHERE session_id=? AND contract_version=? AND kind=? AND sha256=?');$existing->execute([$id,$version,$kind,hash('sha256',$pdf)]);
+    if($existingId=$existing->fetchColumn())contractReply(['fileId'=>$existingId,'message'=>'Ten dokument jest już zapisany w archiwum.'],apiPath('admin.php').'?view=all&session='.$id.'#contract-panel');
+    $fileId=bin2hex(random_bytes(16));$filename=mb_substr(basename(str_replace('\\','/',(string)$upload['name'])),0,200);
+    contractArchiveDb()->prepare('INSERT INTO contract_files(id,session_id,contract_version,kind,filename,sha256,generated_sha256,uploaded_at,uploaded_by,content) VALUES(?,?,?,?,?,?,?,?,?,?)')->execute([$fileId,$id,$version,$kind,$filename,hash('sha256',$pdf),hash('sha256',base64_decode((string)($target['pdfBase64']??''),true)?:''),time(),$user,$pdf]);
+    contractReply(['fileId'=>$fileId,'message'=>'Dokument zapisany w archiwum.'],apiPath('admin.php').'?view=all&session='.$id.'#contract-panel');
+}
 $templateId=(string)($body['templateId']??$s['contract']['templateId']??(isset($s['contract'])?'legacy':contractSelectTemplate($s['offer'])['id']));
 try { $activeTemplate=$templateId==='legacy'?contractTemplate():contractCatalogTemplate($templateId); }
 catch(InvalidArgumentException $error) { contractError(422,$error->getMessage()); }

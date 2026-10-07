@@ -53,6 +53,7 @@ function contractReadFacts(array $body, array $saved = [], ?array $template = nu
     }
     if($facts['contractDate']!=='' && (!preg_match('/^\d{4}-\d{2}-\d{2}$/',$facts['contractDate']) || date('Y-m-d',strtotime($facts['contractDate'])?:0)!==$facts['contractDate'])) throw new InvalidArgumentException('Podaj poprawną datę zawarcia umowy.');
     $template ??= contractTemplateDefaults();
+    contractCustomClauses($facts['customClauses']);
     $facts['ipPayment']=trim((string)($saved['ipPayment']??''))!=='' ? $saved['ipPayment'] : $template['defaultIpPayment'];
     if($facts['ipMode']==='transfer') $facts['rightsTerms']=($saved['ipMode']??'')==='transfer' && trim((string)($saved['rightsTerms']??''))!=='' ? $saved['rightsTerms'] : $template['defaultTransferTerms'];
     return $facts;

@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__.'/contract-archive.php';
 require_once __DIR__.'/contract-suggestions.php';
 
 // Original clauses. A package is a draft until its exact bytes are reviewed.
@@ -16,6 +17,7 @@ function contractPackageFields(): array {
         'acceptanceDays'=>$text('Termin sprawdzenia zgłoszonej wersji — liczba dni kalendarzowych'),
         'cooperationTerms'=>$text('Materiały i współpraca: kto dostarcza co, termin, sposób przekazania oraz procedura przy opóźnieniu','general',true),
         'rightsInventory'=>$text('Wykaz składników, autorów i praw do projektu','general',true),
+        'customClauses'=>$text('Dodatkowe postanowienia uzgodnione z klientem (opcjonalnie)','general',true),
         'privacyRecipients'=>$text('Dane kontaktowe i umowne: odbiorcy, dostawcy, lokalizacje, transfery poza EOG i ich zabezpieczenia','general',true),
         'privacyRetention'=>$text('Dane kontaktowe i umowne: okresy przechowania lub konkretne kryteria oraz źródło danych reprezentantów','general',true),
         'hostingFee'=>$text('Hosting agencji: cena brutto, okres rozliczeniowy, płatnik, zakres usług i koszty dodatkowe','hosting'),
@@ -66,7 +68,8 @@ function contractPackageJson(string $raw,string $kind): array {
 }
 function contractPackageMissing(array $facts): array {
     $missing=[];
-    foreach(contractPackageFields() as $key=>$field) if(contractPackageApplicable($key,$facts)&&trim((string)($facts[$key]??''))==='') $missing[]=$field['label'];
+    foreach(contractPackageFields() as $key=>$field) if($key!=='customClauses'&&contractPackageApplicable($key,$facts)&&trim((string)($facts[$key]??''))==='') $missing[]=$field['label'];
+    try{contractCustomClauses((string)($facts['customClauses']??''));}catch(InvalidArgumentException $e){$missing[]=$e->getMessage();}
     if(($facts['acceptanceDays']??'')!==''&&(!ctype_digit($facts['acceptanceDays'])||(int)$facts['acceptanceDays']<1||(int)$facts['acceptanceDays']>90)) $missing[]='Termin odbioru: od 1 do 90 dni';
     foreach(['rightsInventory'=>'rights','processingSubprocessors'=>'subprocessors'] as $key=>$kind) if(contractPackageApplicable($key,$facts)&&trim($facts[$key]??'')!=='') {
         try { contractPackageJson($facts[$key],$kind); } catch(InvalidArgumentException $e) { $missing[]=$e->getMessage(); }
@@ -184,6 +187,8 @@ function contractPackageBuild(array $contract): array {
         'Naruszenia i pomoc'=>$f['processingIncident'].' Podmiot przetwarzający zgłasza naruszenie bez zbędnej zwłoki, przekazując znane okoliczności, zakres, skutki, środki zaradcze i kontakt; uzupełnia informacje sukcesywnie. Z uwzględnieniem charakteru przetwarzania pomaga obsługiwać prawa osób oraz obowiązki z art. 32–36 RODO, w tym ocenę skutków i konsultacje. Nie odpowiada samodzielnie osobom ani organowi za administratora bez umocowania, chyba że prawo wymaga.',
         'Kontrola i zakończenie'=>'Podmiot przetwarzający udostępnia informacje wykazujące zgodność z art. 28 RODO i umożliwia audyty oraz inspekcje administratora lub upoważnionego audytora. Strony organizują kontrolę tak, aby chronić dane innych klientów; nie wyłącza to prawa kontroli. Administrator odpowiada za podstawę prawną i legalność instrukcji.\n'.$f['processingReturn'].' Po zakończeniu usług, według wyboru administratora, dane i kopie zwraca się lub usuwa, chyba że prawo nakazuje przechowanie. Wykonanie potwierdza się administratorowi. Powierzenie nie zastępuje informacji administratora dla osób ani nie upoważnia do własnych celów, szkolenia AI lub marketingu.',
     ]);
+    $custom=contractCustomClauses((string)($f['customClauses']??''));
+    if($custom){$sections=[];foreach($custom as $i=>$clause)$sections[($i+1).'. '.$clause['title']]=$clause['text'];$add('custom_clauses','Załącznik 7. Dodatkowe postanowienia uzgodnione z klientem',$sections);}
     $manifest=['policyVersion'=>CONTRACT_PACKAGE_POLICY,'contractVersion'=>$contract['version'],'offerVersion'=>$contract['offerVersion']??0,'documents'=>array_map(static fn($d)=>['id'=>$d['id'],'title'=>$d['title'],'sha256'=>$d['sha256']],$documents),'contractSha256'=>hash('sha256',json_encode(array_intersect_key($contract,array_flip(array_merge(array_keys(contractFields()),['facts','templateSnapshot','templateVersion','templateRevision','templateId','number','version','offerVersion','profileVersion','commercialSnapshot']))),JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES|JSON_THROW_ON_ERROR))];
     return ['schemaVersion'=>1,'manifest'=>$manifest,'hash'=>hash('sha256',json_encode($manifest,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES|JSON_THROW_ON_ERROR)),'documents'=>$documents,'assessment'=>'complete_draft'];
 }

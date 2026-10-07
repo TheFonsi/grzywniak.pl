@@ -27,6 +27,7 @@ function contractRequiredReview(array $fields,array $facts): array {
     $required=array_keys($fields);
     if(trim($fields['paymentDetails']??'')==='') $required=array_values(array_diff($required,['paymentDetails']));
     foreach(contractFacts() as $key=>$field) {
+        if($key==='customClauses'&&!contractCustomClauses((string)($facts[$key]??'')))continue;
         if(!contractPackageApplicable($key,$facts)) continue;
         if(in_array($key,['consumerDocuments','dataProcessingTerms'],true) && trim($facts[$key]??'')==='') continue;
         if($key==='ipPayment' || ($key==='rightsTerms' && ($facts['ipMode']??'')==='transfer')) continue;
