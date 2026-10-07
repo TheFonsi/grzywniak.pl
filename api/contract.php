@@ -25,8 +25,8 @@ if($method==='POST') {
     if(!is_array($body)) $body=[];
     $body=array_replace($body,$_POST);
     if(!hash_equals(contractToken(),(string)($body['csrf']??''))) contractError(403,'Sesja formularza wygasła. Odśwież panel.');
-    // AI only fills the browser form; do not hold a SQLite write lock during HTTP.
-    if(!in_array($body['action']??$body['contract_action']??'',['ai-fill','apply-template','brief-fill','sync-offer','auto-prepare'],true)) sessionDb()->exec('BEGIN IMMEDIATE');
+    // Remote AI only fills the browser form; local auto-prepare persists a separate working draft.
+    if(!in_array($body['action']??$body['contract_action']??'',['ai-fill','apply-template','brief-fill','sync-offer'],true)) sessionDb()->exec('BEGIN IMMEDIATE');
 }
 $action=(string)($body['action']??$body['contract_action']??'');
 if($action==='save-profile') {
@@ -115,7 +115,9 @@ if($action==='auto-prepare') {
     $current=['facts'=>[]];foreach(contractFields() as $key=>$label) $current[$key]=(string)($body[$key]??'');
     try {$current['facts']=contractReadFacts($body,$s['contract']['facts']??[],$template);$proposal=contractPreparedProposal($s,contractProfile(),$template,$current);}
     catch(InvalidArgumentException $error){contractError(422,$error->getMessage());}
-    echo json_encode($proposal,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);exit;
+    $s['contractWorkingDraft']=['proposal'=>$proposal,'baseVersion'=>(int)($s['contract']['version']??0),'preparedAt'=>time(),'preparedBy'=>$user];
+    writeSession($s);
+    contractReply($proposal,apiPath('admin.php').'?view=all&session='.$id.'#contract-panel');
 }
 if($action==='brief-fill') {
     try {
@@ -216,7 +218,7 @@ if(in_array($action,['save','generate','approve-generate'],true)) {
         $c['package']['pdfSha256']=hash('sha256',$pdf);
     }
     if(is_array($s['contract']??null)) $s['contractVersions'][]=$s['contract'];
-    $s['contract']=$c; writeSession($s);
+    $s['contract']=$c; unset($s['contractWorkingDraft']); writeSession($s);
     contractReply(['contract'=>$c],apiPath('admin.php').'?view=all&session='.$id.'#contract-panel');
 }
 if(in_array($action,['legal-review','record-receipt','resolve-delivery'],true)) {

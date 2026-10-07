@@ -97,8 +97,16 @@ try:
     code,stale_editor=request('/api/contract.php?session='+sid+'&format=editor');assert code==200
     assert b'data-contract-outdated' in stale_editor and b'OF-NEW-TEST' in stale_editor and b'data-contract-reprepare' in stale_editor
     assert json.loads(request('/api/contract.php?session='+sid)[1])['contract']==before_preview,'Mismatch notice must not regenerate or mutate saved contract'
+    code,reprepared=request('/api/contract.php',dict(body,expectedVersion=1,action='auto-prepare'));assert code==200,(code,reprepared)
+    for _ in range(2):
+        code,reloaded=request('/api/contract.php?session='+sid+'&format=editor');assert code==200
+        assert b'data-contract-working-draft' in reloaded and b'data-contract-outdated' not in reloaded,'Prepared draft must survive page reload'
+        assert b'OF-NEW-TEST' in reloaded
+    assert json.loads(request('/api/contract.php?session='+sid)[1])['contract']==before_preview,'Preparing a working draft must preserve saved PDF and approvals'
+    assert request('/api/contract.php?session='+sid+'&format=pdf')[1]==pdf,'Old PDF bytes must stay unchanged'
     restore_offer="require 'api/bootstrap.php'; $s=readSession('"+sid+"'); $s['offer']['version']=3; unset($s['offer']['offerId']); writeSession($s);"
     subprocess.run(['php','-r',restore_offer],cwd=work,env=env,check=True)
+    assert b'data-contract-working-draft' not in request('/api/contract.php?session='+sid+'&format=editor')[1],'Draft must not survive a change of offer source'
     code,preview=request('/api/contract.php?session='+sid+'&format=layout-preview&inline=1');assert code==200 and b'/BaseFont /Times-Roman' in preview
     assert json.loads(request('/api/contract.php?session='+sid)[1])['contract']==before_preview,'Visual preview must not change saved bytes, package approval or history'
     assert request('/api/contract.php',body)[0]==409

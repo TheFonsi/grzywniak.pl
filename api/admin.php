@@ -91,10 +91,10 @@ register_shutdown_function(static function(): void {
         window.contractReview.apply(form, result);
         form.querySelector('[name=publicationDestination]')?.dispatchEvent(new Event('change', {bubbles:true}));
         const notes = form.querySelector('[data-ai-feedback]'); notes.replaceChildren();
-        const title = document.createElement('p'); title.textContent = result.replaceCommercial ? 'Wczytano zaakceptowane warunki oferty. Porównaj różnice i zaakceptuj zmienione pola; umowa nie została jeszcze zapisana.' : result.replaceTemplate ? 'Wczytano wzór. Sprawdź i zaakceptuj klauzule; dokument nie został jeszcze zapisany.' : 'Uzupełniono dane projektu, zachowując klauzule wzoru. Sprawdź propozycje i uzupełnij brakujące dane.'; notes.append(title);
+        const title = document.createElement('p'); title.textContent = data.contract_action==='auto-prepare' ? 'Szkic zapisany na podstawie aktualnej oferty. PDF pozostaje bez zmian do zatwierdzenia zakładek i przygotowania nowej wersji.' : result.replaceCommercial ? 'Wczytano zaakceptowane warunki oferty. Porównaj różnice i zaakceptuj zmienione pola; umowa nie została jeszcze zapisana.' : result.replaceTemplate ? 'Wczytano wzór. Sprawdź i zaakceptuj klauzule; dokument nie został jeszcze zapisany.' : 'Uzupełniono dane projektu, zachowując klauzule wzoru. Sprawdź propozycje i uzupełnij brakujące dane.'; notes.append(title);
         if (result.missing?.length) { const list = document.createElement('ul'); for (const text of result.missing) { const item=document.createElement('li'); item.textContent=text; list.append(item); } notes.append(list); }
         if(result.sources) for(const [field,source] of Object.entries(result.sources)) { const p=document.createElement('p');p.textContent=`Źródło (${field}): ${source}`;notes.append(p); }
-        feedback.textContent = 'Formularz uzupełniony. Dane nie zostały jeszcze zapisane.';
+        feedback.textContent = data.contract_action==='auto-prepare' ? 'Szkic zapisany. Przejrzyj i zatwierdź zakładki, następnie przygotuj nową wersję PDF.' : 'Formularz uzupełniony. Dane nie zostały jeszcze zapisane.';
         if (reprepareStatus) reprepareStatus.textContent = 'Formularz jest gotowy do przeglądu. Zatwierdź poszczególne zakładki, następnie kliknij „Przygotuj PDF”.';
         if (reprepareButton) reprepareButton.disabled = false;
         buttons.forEach(button => button.disabled=false); delete form.dataset.saving; window.contractReview.refresh(form); return;
