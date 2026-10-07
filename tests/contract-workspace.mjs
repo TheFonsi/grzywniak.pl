@@ -8,7 +8,9 @@ const before=[...new dom.window.FormData(form).entries()];
 dom.window.eval(read('../api/contract-workspace.js'));dom.window.eval(read('../api/contract-review.js'));dom.window.contractReview.init(form);
 assert.equal(form.querySelectorAll('[data-contract-pane]').length,5);
 for(const [name,value] of before) if(name!=='reviewState')assert.equal(new dom.window.FormData(form).get(name),value,`Preserve field ${name}`);
-assert.equal(form.querySelectorAll('[value="approve-generate"]').length,1,'One primary approval action');
+assert.equal(form.querySelectorAll('[value="approve-generate"]').length,0,'PDF must not approve all fields');
+assert.equal(form.querySelectorAll('[value="generate"]').length,1,'Separate PDF action');
+assert.equal(form.querySelectorAll('[data-contract-approve-pane]').length,1,'Current tab approval');
 assert.equal(form.querySelectorAll('[value="auto-prepare"]').length,1,'One automatic preparation action');
 for(const [name,pane]of [['party','parties'],['scope','scope'],['hostingFee','publication'],['rightsInventory','rights']])assert.equal(form.elements.namedItem(name).closest('[data-contract-pane]').dataset.contractPane,pane);
 const input=form.elements.party;input.value='Unsaved edits';
@@ -19,3 +21,20 @@ assert.equal(form.elements.commercialHash.value,'current-hash');assert.equal(for
 assert.equal(form.elements.scope.value,'Current accepted scope');
 dom.window.contractReview.init(form);assert.equal(form.querySelectorAll('[aria-label="Przegląd projektu umowy"]').length,1);
 console.log('Contract workspace passed: form preservation, section routing, single main actions, validation reveal and current-offer binding.');
+
+for(const card of form.querySelectorAll('[data-review-field]')){
+  const input=form.elements.namedItem(card.dataset.reviewField);
+  input.dispatchEvent(new dom.window.Event('input',{bubbles:true}));
+}
+form._selectContractPane('scope');
+form.querySelector('[data-contract-approve-pane]').click();
+const review=JSON.parse(form.elements.reviewState.value);
+assert.equal(review.scope.accepted,true,'Approve only active tab');
+assert.equal(review.party.accepted,false,'Other tab remains unapproved');
+assert.equal(dom.window.contractWorkspace.validate(form),false,'PDF requires other tab approvals');
+assert.equal(form.querySelector('[data-contract-workspace-errors]').hidden,false);
+form._selectContractPane('parties');form.elements.party.value='';form.elements.party.dispatchEvent(new dom.window.Event('input',{bubbles:true}));
+form.querySelector('[data-contract-approve-pane]').click();
+assert.equal(JSON.parse(form.elements.reviewState.value).party.accepted,false,'Missing field cannot be approved');
+assert.match(form.querySelector('[data-contract-workspace-errors]').textContent,/Uzupełnij/);
+console.log('Per-tab approval and PDF validation passed.');

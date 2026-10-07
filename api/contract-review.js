@@ -58,6 +58,7 @@
       const accepted = entry?.accepted && entry.value.trim() === input.value.trim();
       const invalidDays=name==='acceptanceDays' && (!/^\d+$/.test(input.value)||Number(input.value)<1||Number(input.value)>90);
       const missing = (!input.value.trim() && !optional.has(name)) || unresolved(input.value) || invalidDays;
+      card.dataset.missing=missing?'1':'0';
       card.dataset.accepted = accepted ? '1' : '0';
       card.querySelector('[data-review-status]').textContent = accepted ? 'Zaakceptowano' : missing ? 'Uzupełnij dane' : entry ? 'Propozycja do akceptacji' : 'Dane do sprawdzenia';
       const accept = card.querySelector('[data-review-accept]');
@@ -81,7 +82,7 @@
       const card=input?.closest('[data-review-field]');
       return card && !card.hidden && (!item.accepted || item.value.trim()!==input.value.trim());
     }).length;
-    form.querySelector('[data-review-summary]').textContent = pending ? `Do przeglądu: ${pending} pól. Nie musisz akceptować każdego osobno — po sprawdzeniu zatwierdź całość przyciskiem poniżej.` : 'Akceptacja pól zatwierdza projekt wewnętrznie — nie oznacza podpisania umowy przez klienta.';
+    form.querySelector('[data-review-summary]').textContent = pending ? `Do przeglądu: ${pending} pól. Przejrzyj i zatwierdź poszczególne zakładki, następnie przygotuj PDF.` : 'Akceptacja pól zatwierdza projekt wewnętrznie — nie oznacza podpisania umowy przez klienta.';
     window.contractWorkspace?.refresh(form);
   }
   function init(form) {
@@ -135,7 +136,7 @@
         if(Object.keys(examples).length) {
           const box=document.createElement('details');box.dataset.fieldSuggestions='';box.style.cssText='margin:12px 0;padding:12px;border:1px solid #40516b;border-radius:8px';
           const heading=document.createElement('summary');heading.textContent='Gotowe propozycje';heading.style.cursor='pointer';box.append(heading);
-          const note=document.createElement('p');note.textContent='Opcjonalny wariant do zastąpienia obecnego zapisu. Przejrzyj treść; możesz zatwierdzić ją razem z całą umową.';box.append(note);
+          const note=document.createElement('p');note.textContent='Opcjonalny wariant do zastąpienia obecnego zapisu. Przejrzyj treść i zatwierdź ją w tej zakładce.';box.append(note);
           const select=document.createElement('select');select.setAttribute('aria-label','Propozycja: '+label.firstChild.textContent);select.style.cssText='width:100%;margin-bottom:10px';
           for(const [title,value] of Object.entries(examples)) {const option=document.createElement('option');option.value=title;option.textContent=title;select.append(option);}
           const preview=document.createElement('p');preview.style.cssText='white-space:pre-wrap;max-height:180px;overflow:auto;font-size:13px';

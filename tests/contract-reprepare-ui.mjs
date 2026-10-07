@@ -15,6 +15,9 @@ assert.equal(form.elements.scope.value,'Nowy zakres',form.querySelector('[role=a
 assert.match(banner.querySelector('[data-contract-reprepare-status]').textContent,/PDF|Formularz/);
 assert.equal(form.dataset.saving,undefined,'Buttons must be released');
 assert.equal(banner.querySelector('button').disabled,false);
+form.querySelector('[value="generate"]').click();
+assert.equal(requests,1,'Incomplete or unapproved tabs must block PDF without submitting');
+assert.equal(form.querySelector('[data-contract-workspace-errors]').hidden,false);
 
 // Server failures must replace the loading message and allow a retry.
 w.fetch=async()=>({ok:false,json:async()=>({message:'Offer version conflict'})});

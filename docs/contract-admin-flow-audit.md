@@ -11,6 +11,8 @@ Zakres: przegląd kodu formularza, synchronizacji oferty, akcji przygotowania, w
 
 ## Docelowa ścieżka
 
+Aktualizacja: akceptacja jest teraz osobna dla każdej zakładki. „Przejrzałem — zatwierdź” akceptuje wyłącznie kompletne pola otwartej sekcji. „Przygotuj PDF” nie akceptuje danych automatycznie: pokazuje czerwoną listę braków i niezatwierdzonych pól z odnośnikami do sekcji. Kontrola na serwerze pozostaje wymagana.
+
 Poprawka przygotowania ponownego: pola wykazów bez unikalnych nazw powodowały fałszywy komunikat o edycji podczas żądania. Porównanie śledzi teraz konkretne elementy, ich wartości i zaznaczenie. Status nad formularzem pokazuje wynik lub błąd, a przycisk blokuje podwójne żądania. Test `tests/contract-reprepare-ui.mjs` odtwarza problem i sprawdza powodzenie, błąd serwera oraz zachowanie ręcznych zmian podczas oczekiwania.
 
 Zaakceptowana oferta → przygotowanie projektu z aktualnej oferty → przegląd sekcji i uzupełnienie rzeczywistych braków → jedno zatwierdzenie i nowy PDF → podgląd pakietu → odrębne potwierdzenie przeglądu prawnego → wysyłka → potwierdzenie zawarcia.

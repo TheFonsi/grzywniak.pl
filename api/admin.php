@@ -59,6 +59,7 @@ register_shutdown_function(static function(): void {
     if (!form.matches('.contract-form:not(.offer-agreement-form),.contract-send')) return;
     event.preventDefault();
     if (form.dataset.saving) return;
+    if(event.submitter?.value==='generate' && window.contractWorkspace?.validate(form)===false)return;
     if(event.submitter?.value==='apply-template' && !confirm('Wczytać wybrany wzór? Zastąpi to klauzule prawne i cofnie ich akceptację. Dane stron, zakres, cena i terminy zostaną zachowane.')) return;
     form.dataset.saving = '1';
     const data = Object.fromEntries(new FormData(form));
@@ -66,6 +67,7 @@ register_shutdown_function(static function(): void {
     const buttons = [...form.querySelectorAll('button')]; buttons.forEach(button => button.disabled = true);
     let feedback = form.querySelector('[role="alert"]');
     if (!feedback) { feedback = document.createElement('p'); feedback.setAttribute('role','alert'); form.append(feedback); }
+    feedback.style.cssText='color:#ffb4b4;white-space:pre-wrap';
     const aiFill = ['ai-fill','apply-template','brief-fill','sync-offer','auto-prepare'].includes(data.contract_action);
     const previous = aiFill ? new Map([...form.querySelectorAll('textarea,input,select')].map(input => [input, {value:input.value,checked:input.checked}])) : null;
     const reprepare = data.contract_action === 'auto-prepare' ? form.closest('#contract-panel')?.querySelector('[data-contract-outdated]') : null;
@@ -93,7 +95,7 @@ register_shutdown_function(static function(): void {
         if (result.missing?.length) { const list = document.createElement('ul'); for (const text of result.missing) { const item=document.createElement('li'); item.textContent=text; list.append(item); } notes.append(list); }
         if(result.sources) for(const [field,source] of Object.entries(result.sources)) { const p=document.createElement('p');p.textContent=`Źródło (${field}): ${source}`;notes.append(p); }
         feedback.textContent = 'Formularz uzupełniony. Dane nie zostały jeszcze zapisane.';
-        if (reprepareStatus) reprepareStatus.textContent = 'Formularz jest gotowy do przeglądu. Zatwierdź całość poniżej, aby zapisać nową wersję PDF.';
+        if (reprepareStatus) reprepareStatus.textContent = 'Formularz jest gotowy do przeglądu. Zatwierdź poszczególne zakładki, następnie kliknij „Przygotuj PDF”.';
         if (reprepareButton) reprepareButton.disabled = false;
         buttons.forEach(button => button.disabled=false); delete form.dataset.saving; window.contractReview.refresh(form); return;
       }
