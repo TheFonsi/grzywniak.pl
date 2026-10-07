@@ -60,7 +60,8 @@
       const missing = (!input.value.trim() && !optional.has(name)) || unresolved(input.value) || invalidDays;
       card.dataset.missing=missing?'1':'0';
       card.dataset.accepted = accepted ? '1' : '0';
-      card.querySelector('[data-review-status]').textContent = accepted ? 'Zaakceptowano' : missing ? 'Uzupełnij dane' : entry ? 'Propozycja do akceptacji' : 'Dane do sprawdzenia';
+      card.querySelector('[data-review-status]').textContent = accepted ? (!input.value.trim()&&optional.has(name)?'Nie dotyczy':'Zaakceptowano') : missing ? 'Uzupełnij dane' : entry ? 'Propozycja do akceptacji' : 'Dane do sprawdzenia';
+      card.querySelectorAll('[data-review-skip],[data-no-data-processing]').forEach(button=>{button.disabled=!!form.dataset.saving;});
       const accept = card.querySelector('[data-review-accept]');
       accept.disabled = !!accepted || missing || !!form.dataset.saving;
       accept.textContent = accepted ? 'Zaakceptowano' : 'Akceptuj';
@@ -102,6 +103,20 @@
       const edit=document.createElement('button'); edit.type='button'; edit.className='button'; edit.dataset.reviewEdit=''; edit.textContent='Zmień';
       edit.onclick=() => { const state=read(form); state[input.name]={value:input.value,accepted:false}; write(form,state); refresh(form); input.focus(); };
       card.append(accept,edit);
+      if(optional.has(input.name)) {
+        const skip=document.createElement('button');skip.type='button';skip.className='button';skip.dataset.reviewSkip='';skip.textContent='Nie dotyczy';
+        skip.onclick=()=>{
+          if(form.dataset.saving)return;
+          input.value='';input.dispatchEvent(new Event('input',{bubbles:true}));
+          const state=read(form);state[input.name]={value:'',accepted:true};write(form,state);refresh(form);
+        };
+        card.append(skip);
+      }
+      if(input.name==='dataRole') {
+        const none=document.createElement('button');none.type='button';none.className='button';none.dataset.noDataProcessing='';none.textContent='Nie dotyczy — brak powierzenia';
+        none.onclick=()=>{if(form.dataset.saving)return;input.value='none';input.dispatchEvent(new Event('change',{bubbles:true}));};
+        const note=document.createElement('p');note.textContent='Wybierz tylko, gdy nie przetwarzamy danych osobowych w imieniu klienta. Ukryje pola powierzenia. Dane kontaktowe stron umowy są sprawdzane osobno.';card.append(none,note);
+      }
       const change=() => {
         const state=read(form); state[input.name]={value:input.value,accepted:false};
         for(const [key,visible] of [['consumerDocuments',['consumer','protected'].includes(form.elements.clientType.value)],['dataProcessingTerms',form.elements.dataRole.value==='processor']]) {
