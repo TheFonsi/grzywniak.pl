@@ -70,7 +70,7 @@ register_shutdown_function(static function(): void {
     feedback.style.cssText='color:#ffb4b4;white-space:pre-wrap';
     const aiFill = ['ai-fill','apply-template','brief-fill','sync-offer','auto-prepare'].includes(data.contract_action);
     const previous = aiFill ? new Map([...form.querySelectorAll('textarea,input,select')].map(input => [input, {value:input.value,checked:input.checked}])) : null;
-    const reprepare = data.contract_action === 'auto-prepare' ? form.closest('#contract-panel')?.querySelector('[data-contract-outdated]') : null;
+    const reprepare = data.contract_action === 'auto-prepare' ? form.closest('#contract-panel')?.querySelector('[data-contract-refresh],[data-contract-outdated]') : null;
     const reprepareButton = reprepare?.querySelector('[data-contract-reprepare]');
     const reprepareStatus = reprepare?.querySelector('[data-contract-reprepare-status]');
     if (reprepareButton) reprepareButton.disabled = true;

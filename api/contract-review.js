@@ -184,7 +184,7 @@
       const preview=form.querySelector('[data-commercial-preview]');
       if(preview) { preview.replaceChildren(); for(const [label,text] of Object.entries(result.commercialSections||{})) {const title=document.createElement('h5');title.textContent=label;const p=document.createElement('p');p.style.whiteSpace='pre-wrap';p.textContent=text;preview.append(title,p);} }
       form.querySelector('[data-commercial-warning]')?.remove();
-      const warning=form.closest('#contract-panel')?.querySelector('[data-contract-outdated]');
+      const warning=form.closest('#contract-panel')?.querySelector('[data-contract-refresh],[data-contract-outdated]');
       if(warning){warning.style.background='#123322';warning.style.borderColor='#3eaf73';warning.setAttribute('role','status');warning.querySelector('strong').textContent='Formularz uzupełniony z aktualnej oferty. Przejrzyj sekcje i zatwierdź nowy PDF.';warning.querySelector('[data-contract-reprepare-status]').textContent='Poprzedni zapisany PDF pozostaje bez zmian do zatwierdzenia nowej wersji.';}
       const diff=form.querySelector('[data-commercial-diff]');
       if(diff) {

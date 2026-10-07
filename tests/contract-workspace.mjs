@@ -12,6 +12,9 @@ assert.equal(form.querySelectorAll('[value="approve-generate"]').length,0,'PDF m
 assert.equal(form.querySelectorAll('[value="generate"]').length,1,'Separate PDF action');
 assert.equal(form.querySelectorAll('[data-contract-approve-pane]').length,1,'Current tab approval');
 assert.equal(form.querySelectorAll('[value="auto-prepare"]').length,1,'One automatic preparation action');
+assert.equal(form.querySelector('[value="auto-prepare"]').hidden,true,'Internal submit action is hidden');
+assert.equal(dom.window.document.querySelectorAll('[data-contract-reprepare]').length,1,'Only one visible refresh button at the top');
+assert.equal(form.querySelector('[value="sync-offer"]'),null,'No competing offer refresh action');
 for(const [name,pane]of [['party','parties'],['scope','scope'],['hostingFee','publication'],['rightsInventory','rights']])assert.equal(form.elements.namedItem(name).closest('[data-contract-pane]').dataset.contractPane,pane);
 const input=form.elements.party;input.value='Unsaved edits';
 form.querySelector('[data-contract-pane-button="rights"]').click();assert.equal(form.elements.party.value,'Unsaved edits');

@@ -16,11 +16,22 @@
     const approve=document.createElement('button');approve.type='button';approve.className='button';approve.dataset.contractApprovePane='';approve.textContent='Przejrzałem — zatwierdź';actions.append(approve);
     const errors=document.createElement('div');errors.dataset.contractWorkspaceErrors='';errors.setAttribute('role','alert');errors.style.cssText='color:#ffb4b4;background:#341b24;border:1px solid #df616b;padding:12px;border-radius:8px';errors.hidden=true;
     const used=new Set();
+    const panel=form.closest('#contract-panel');
+    let refreshBox=panel?.querySelector('[data-contract-outdated]');
+    if(panel&&!refreshBox){refreshBox=document.createElement('div');refreshBox.innerHTML='<strong>Projekt umowy z aktualnej oferty</strong><p data-contract-reprepare-status role="status"></p>';panel.insertBefore(refreshBox,panel.querySelector('details'));}
+    if(refreshBox){
+      refreshBox.dataset.contractRefresh='';
+      let refreshButton=refreshBox.querySelector('[data-contract-reprepare]');
+      if(!refreshButton){refreshButton=document.createElement('button');refreshButton.type='button';refreshButton.className='button';refreshButton.dataset.contractReprepare='';refreshBox.append(refreshButton);}
+      refreshButton.textContent='Odśwież na podstawie aktualnej oferty';
+      const explanation=document.createElement('p');explanation.textContent='Ponownie dobiera wzór i wczytuje ustalenia oferty. Zastępuje robocze zapisy zakresu i klauzul oraz cofa ich zatwierdzenia. Zapisany PDF pozostaje bez zmian.';refreshBox.append(explanation);
+    }
     for(const button of [...form.querySelectorAll('button[name="contract_action"]')]){
       const action=button.value;
       if(action==='approve-generate'){button.remove();continue;}
+      if(action==='sync-offer'){button.remove();continue;}
       if(used.has(action)){button.remove();continue;}used.add(action);
-      if(['auto-prepare','generate','save'].includes(action)){actions.append(button);if(action==='auto-prepare')button.textContent='Przygotuj automatycznie z aktualnej oferty';if(action==='generate'){button.textContent='Przygotuj PDF';button.formNoValidate=true;}}
+      if(['auto-prepare','generate','save'].includes(action)){actions.append(button);if(action==='auto-prepare')button.hidden=true;if(action==='generate'){button.textContent='Przygotuj PDF';button.formNoValidate=true;}}
       else advanced.append(button);
     }
     summary.append(advanced);
