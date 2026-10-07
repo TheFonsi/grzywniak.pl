@@ -64,7 +64,36 @@
     // A single listener follows replacement of the detail panel by AJAX.
     root._selectCaseHash = () => { const name = fromHash(); if (name) select(name); };
   }
-  window.adminDetailTabs = { init };
+  async function openContract(sessionId, beforeLoad) {
+    const root=document.querySelector('[data-detail-tabs-ready]');
+    const host=root?.querySelector('[data-contract-host]');
+    if(!host) { location.hash='contract-panel'; return; }
+    root.querySelector('[data-case-tab="contract"]').click();
+    if(host.dataset.contractLoading==='1') return;
+    if(!beforeLoad && host.querySelector('form.contract-form')) return;
+    host._contractAbort?.abort();
+    let prepared=false;
+    const status=document.createElement('div');host.before(status);
+    async function load() {
+      host.dataset.contractLoading='1';host.hidden=true;host.setAttribute('aria-busy','true');
+      status.className='detail-loader';status.setAttribute('role','status');status.textContent='Przygotowywanie umowy z zaakceptowanej oferty…';
+      try {
+        if(!prepared && beforeLoad) await beforeLoad();
+        prepared=true;
+        const base=location.pathname.startsWith('/api/')?'/api':'';
+        const response=await fetch(`${base}/contract.php?session=${encodeURIComponent(sessionId)}&format=editor`,{cache:'no-store'});
+        if(!response.ok) throw new Error('Nie udało się wczytać formularza umowy. Spróbuj ponownie.');
+        const html=await response.text();
+        if(!host.isConnected) return;
+        host.innerHTML=html;window.contractReview?.init(host.querySelector('form.contract-form'));status.remove();
+      } catch(error) {
+        status.className='';status.setAttribute('role','alert');status.textContent=error.message || 'Nie udało się przygotować umowy.';
+        const retry=document.createElement('button');retry.type='button';retry.className='button';retry.textContent='Spróbuj ponownie';retry.onclick=()=>{status.replaceChildren();void load();};status.append(document.createElement('br'),retry);
+      } finally { host.hidden=false;host.removeAttribute('aria-busy');delete host.dataset.contractLoading; }
+    }
+    await load();
+  }
+  window.adminDetailTabs = { init, openContract };
   window.addEventListener('hashchange', () => document.querySelector('[data-detail-tabs-ready]')?._selectCaseHash());
   init(document.querySelectorAll('section.panel')[1]);
 })();

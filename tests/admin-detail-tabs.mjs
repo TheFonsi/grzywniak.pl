@@ -25,6 +25,17 @@ button('offer').dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'Arrow
 assert.equal(button('contract').getAttribute('aria-selected'),'true');assert.equal(doc.activeElement,button('contract'));
 assert.equal([...root.querySelectorAll('[role="tabpanel"]')].filter(el=>!el.hidden).length,1);
 dom.window.adminDetailTabs.init(root);assert.equal(root.querySelectorAll('[role="tablist"]').length,1,'Initialization is idempotent');
+let release;const acceptance=new Promise(resolve=>{release=resolve;});let requests=0;
+dom.window.fetch=async()=>{requests++;return {ok:true,text:async()=>'<section id="contract-panel"><form class="contract-form"><input name="party" value="Nowy projekt"></form></section>'};};
+const preparing=dom.window.adminDetailTabs.openContract('abc',()=>acceptance);
+assert.equal(panel('contract').hidden,false,'Offer action switches to contract immediately');
+assert.ok(panel('contract').querySelector('[role="status"]'),'Loading is visible while accepting the offer');
+assert.equal(requests,0,'Editor loads after acceptance succeeds');
+release();await preparing;assert.equal(requests,1);assert.equal(root.querySelector('[name="party"]').value,'Nowy projekt');
+await dom.window.adminDetailTabs.openContract('abc');assert.equal(requests,1,'Opening an already loaded draft preserves unsaved input');
+dom.window.fetch=async()=>({ok:false});await dom.window.adminDetailTabs.openContract('abc',async()=>{});
+assert.ok(panel('contract').querySelector('[role="alert"] button'),'Failure offers retry inside contract tab');
+assert.equal(root.querySelector('[name="party"]').value,'Nowy projekt','Failure preserves existing draft');
 dom.window.history.replaceState({},'','?session=abc');
 const replacement=doc.createElement('section');replacement.className='panel';replacement.innerHTML='<div class="topline">Kolejne wczytanie</div><h3>Co ustalono</h3><div class="brief-grid">Brief</div>';root.replaceWith(replacement);dom.window.adminDetailTabs.init(replacement);
 assert.equal(replacement.querySelector('[data-case-tab="contract"]').getAttribute('aria-selected'),'true','AJAX replacement restores remembered tab');
