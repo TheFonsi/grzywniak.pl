@@ -208,9 +208,9 @@
   document.addEventListener('click',event=>{
     const button=event.target.closest('[data-contract-reprepare]');if(!button)return;
     const panel=button.closest('#contract-panel');const form=panel?.querySelector('form.contract-form');
-    const action=form?.querySelector('[name="contract_action"][value="auto-prepare"]');if(!action)return;
+    const action=form?.querySelector('[name="contract_action"][value="auto-prepare"]');if(!action || form.dataset.saving)return;
     for(let parent=form.parentElement;parent&&parent!==panel;parent=parent.parentElement) if(parent.tagName==='DETAILS')parent.open=true;
-    panel.querySelector('[data-contract-reprepare-status]').textContent='Przygotowujemy nowy projekt. Przejrzyj wynik poniżej i zatwierdź całość, aby zapisać nową wersję PDF.';
+    form._selectContractPane?.('summary');
     action.click();
   });
 })();

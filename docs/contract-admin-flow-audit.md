@@ -11,6 +11,8 @@ Zakres: przegląd kodu formularza, synchronizacji oferty, akcji przygotowania, w
 
 ## Docelowa ścieżka
 
+Poprawka przygotowania ponownego: pola wykazów bez unikalnych nazw powodowały fałszywy komunikat o edycji podczas żądania. Porównanie śledzi teraz konkretne elementy, ich wartości i zaznaczenie. Status nad formularzem pokazuje wynik lub błąd, a przycisk blokuje podwójne żądania. Test `tests/contract-reprepare-ui.mjs` odtwarza problem i sprawdza powodzenie, błąd serwera oraz zachowanie ręcznych zmian podczas oczekiwania.
+
 Zaakceptowana oferta → przygotowanie projektu z aktualnej oferty → przegląd sekcji i uzupełnienie rzeczywistych braków → jedno zatwierdzenie i nowy PDF → podgląd pakietu → odrębne potwierdzenie przeglądu prawnego → wysyłka → potwierdzenie zawarcia.
 
 Zgodność numeru, wersji i hasha pakietu nadal jest sprawdzana na serwerze. Formularz nie może sam uznać starej umowy za aktualną ani nadpisać zaakceptowanej oferty. Przy prawdziwej zmianie warunków potrzebna jest nowa uzgodniona oferta. Otwarcie formularza i przygotowanie propozycji nie zmieniają zapisanej umowy, historii ani dowodów podpisania.

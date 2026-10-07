@@ -67,14 +67,24 @@ register_shutdown_function(static function(): void {
     let feedback = form.querySelector('[role="alert"]');
     if (!feedback) { feedback = document.createElement('p'); feedback.setAttribute('role','alert'); form.append(feedback); }
     const aiFill = ['ai-fill','apply-template','brief-fill','sync-offer','auto-prepare'].includes(data.contract_action);
-    const previous = aiFill ? Object.fromEntries([...form.querySelectorAll('textarea,input,select')].map(input => [input.name,input.value])) : null;
+    const previous = aiFill ? new Map([...form.querySelectorAll('textarea,input,select')].map(input => [input, {value:input.value,checked:input.checked}])) : null;
+    const reprepare = data.contract_action === 'auto-prepare' ? form.closest('#contract-panel')?.querySelector('[data-contract-outdated]') : null;
+    const reprepareButton = reprepare?.querySelector('[data-contract-reprepare]');
+    const reprepareStatus = reprepare?.querySelector('[data-contract-reprepare-status]');
+    if (reprepareButton) reprepareButton.disabled = true;
+    if (aiFill) form._selectContractPane?.('summary');
     feedback.textContent = data.contract_action==='auto-prepare' ? 'Przygotowywanie umowy z zaakceptowanej oferty i aktualnego wzoru…' : data.contract_action==='sync-offer' ? 'Porównywanie z zaakceptowaną ofertą…' : data.contract_action==='brief-fill' ? 'Uzupełnianie ustaleń z briefu…' : data.contract_action==='apply-template' ? 'Wczytywanie wzoru…' : aiFill ? 'AI uzupełnia dane projektu. Może to potrwać około minuty…' : 'Zapisywanie…';
+    if (reprepareStatus) reprepareStatus.textContent = feedback.textContent;
     try {
       const response = await fetch('/api/contract.php', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
       const result = await response.json();
       if (!response.ok) throw new Error(result.message || 'Nie udało się zapisać umowy.');
       if (aiFill) {
-        const changed = [...form.querySelectorAll('textarea,input,select')].some(input => input.value !== previous[input.name]);
+        const controls = [...form.querySelectorAll('textarea,input,select')];
+        const changed = controls.length !== previous.size || controls.some(input => {
+          const saved = previous.get(input);
+          return !saved || input.value !== saved.value || input.checked !== saved.checked;
+        });
         if (changed) throw new Error('Formularz zmienił się podczas pracy AI. Zachowano Twoje zmiany. Uruchom AI ponownie, aby je uwzględnić.');
         window.contractReview.apply(form, result);
         form.querySelector('[name=publicationDestination]')?.dispatchEvent(new Event('change', {bubbles:true}));
@@ -83,12 +93,14 @@ register_shutdown_function(static function(): void {
         if (result.missing?.length) { const list = document.createElement('ul'); for (const text of result.missing) { const item=document.createElement('li'); item.textContent=text; list.append(item); } notes.append(list); }
         if(result.sources) for(const [field,source] of Object.entries(result.sources)) { const p=document.createElement('p');p.textContent=`Źródło (${field}): ${source}`;notes.append(p); }
         feedback.textContent = 'Formularz uzupełniony. Dane nie zostały jeszcze zapisane.';
+        if (reprepareStatus) reprepareStatus.textContent = 'Formularz jest gotowy do przeglądu. Zatwierdź całość poniżej, aby zapisać nową wersję PDF.';
+        if (reprepareButton) reprepareButton.disabled = false;
         buttons.forEach(button => button.disabled=false); delete form.dataset.saving; window.contractReview.refresh(form); return;
       }
       if (data.action === 'save-profile') location.href = '?view=contract-settings&profileSaved=1';
       else if (data.action === 'save-template') location.href = '?view=contract-settings&saved=1&template=' + encodeURIComponent(data.templateId || 'legacy');
       else location.href = '?view=all&session=' + encodeURIComponent(data.contract_session) + '&saved=1#contract-panel';
-    } catch(error) { feedback.textContent = error.message || 'Nie udało się połączyć z serwerem.'; buttons.forEach(button => button.disabled = false); delete form.dataset.saving; if(form.elements.reviewState) window.contractReview.refresh(form); }
+    } catch(error) { feedback.textContent = error.message || 'Nie udało się połączyć z serwerem.'; if(reprepareStatus) reprepareStatus.textContent=feedback.textContent; if(reprepareButton) reprepareButton.disabled=false; form._selectContractPane?.('summary'); buttons.forEach(button => button.disabled = false); delete form.dataset.saving; if(form.elements.reviewState) window.contractReview.refresh(form); }
   });
   const enhanceUi = () => { const style = document.createElement('style'); style.textContent = '.nav a:focus-visible,.button:focus-visible,.row:focus-visible,.analytics-filter:focus-visible{outline:2px solid #9daaff;outline-offset:2px}.nav a:hover,.button:hover:not(:disabled),.analytics-filter:hover{border-color:#7181f1;background:#1a2340;color:#fff}.button:disabled{cursor:not-allowed;opacity:.55}.status{display:inline-flex;align-items:center;white-space:nowrap;max-width:100%}.layout{align-items:start}.layout>.panel:first-child{position:sticky;top:18px;max-height:calc(100vh - 36px);overflow:auto}.actions form{margin:0}.brief-section p,.message{overflow-wrap:anywhere}.analytics-panel{margin-bottom:20px;background:linear-gradient(135deg,#11172a,#0f1218)}.analytics-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:12px}.analytics-heading h2{margin:0 0 3px;font-size:20px}.analytics-filters{display:flex;gap:7px;flex-wrap:wrap;margin:0 0 16px}.analytics-filter{border:1px solid #354052;border-radius:999px;padding:6px 11px;color:#adb8d2;background:#111622;text-decoration:none;font-size:12px}.analytics-filter.active{border-color:#7181f1;background:#263271;color:#fff}.analytics-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}.analytics-card{min-width:0;border:1px solid #2d385b;border-radius:12px;background:#121827;padding:13px}.analytics-card b{display:block;font-size:23px;letter-spacing:-.03em;color:#eef1ff}.analytics-card span{display:block;color:#c9d1e8;font-size:12px;line-height:1.35}.analytics-card small{display:block;color:#7f8ca8;font-size:11px;margin-top:5px}.analytics-charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}.chart-card{border:1px solid #2d385b;border-radius:12px;background:#101522;padding:14px}.chart-card h3{margin:0 0 12px;font-size:13px;color:#cbd4ef}.chart-row{display:grid;grid-template-columns:130px minmax(60px,1fr) auto;align-items:center;gap:9px;margin:9px 0;color:#aeb9d2;font-size:12px}.chart-row b{font-size:12px;color:#edf0ff;min-width:48px;text-align:right}.chart-track{height:8px;background:#252d43;border-radius:999px;overflow:hidden}.chart-track i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#6475ed,#9ca8ff)}.analytics-foot{display:flex;gap:18px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid #2d385b;color:#9da8bf;font-size:12px}.analytics-foot strong{color:#e5e9ff}@media(max-width:1100px){.analytics-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:900px){.layout>.panel:first-child{position:static;max-height:280px}.analysis-head{align-items:flex-start;flex-direction:column}.analytics-charts{grid-template-columns:1fr}}@media(max-width:560px){.analytics-heading{display:block}.analytics-heading time{display:block;margin-top:5px}.analytics-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.chart-row{grid-template-columns:100px minmax(45px,1fr) auto}}'; document.head.append(style); };
   const addBulkActions = () => {
