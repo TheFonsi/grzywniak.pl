@@ -77,7 +77,7 @@ function contractCommercialEditor(array $snapshot, array $saved, string $session
     $binding=$saved?$old:$snapshot['hash'];
     $html='<section data-commercial-panel style="padding:16px;border:1px solid #5368c7;border-radius:12px"><h4>Warunki zaakceptowanej oferty</h4><p>Oferta v'.(int)$snapshot['offerVersion'].'. Zakres, cena, płatności i harmonogram pochodzą z oferty. Zmiany negocjuj w nowej wersji oferty. Klauzule wzoru są edytowane osobno.</p>';
     $html.='<input type="hidden" name="commercialHash" value="'.$e($binding).'">';
-    if($binding!==$snapshot['hash']) $html.='<p data-commercial-warning style="color:#ffba80">Zapisana umowa nie jest powiązana z aktualnym pakietem oferty. PDF jest zablokowany do uzgodnienia różnic.</p>';
+    if($binding!==$snapshot['hash']) $html.='<p data-commercial-warning style="color:#ffba80">Ten formularz korzysta z wcześniejszych ustaleń. Kliknij „Przygotuj automatycznie”, aby wczytać ofertę '.$e($snapshot['offerId']?:'bez numeru').' · v'.(int)$snapshot['offerVersion'].', następnie przejrzyj sekcje i zatwierdź nowy PDF. Poprzedni zapisany dokument pozostaje w historii.</p>';
     $html.='<button class="button" type="submit" name="contract_action" value="sync-offer" formnovalidate>Wczytaj aktualne ustalenia oferty i sprawdź różnice</button><div data-commercial-diff></div><details><summary>Pełny pakiet warunków — trafi do załącznika umowy</summary><div data-commercial-preview>';
     foreach(contractCommercialSections($snapshot) as $label=>$text) $html.='<h5>'.$e($label).'</h5><p style="white-space:pre-wrap">'.$e($text).'</p>';
     return $html.'</div></details></section>';

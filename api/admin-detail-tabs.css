@@ -6,4 +6,8 @@
 .case-tab-panel[hidden]{display:none!important}
 .case-tab-panel{min-width:0;padding:4px 0 12px;overflow-wrap:anywhere}
 .case-tab-panel>.conversation-contract{margin-top:0}
+.contract-form [data-contract-pane][hidden]{display:none!important}
+.contract-form [data-contract-pane]{min-width:0;display:grid;gap:14px}
+.contract-workspace-actions{position:sticky;bottom:8px;z-index:5;display:flex;gap:8px;flex-wrap:wrap;padding:14px;border:1px solid #5368c7;border-radius:10px;background:#111a2e;box-shadow:0 5px 20px #0006}
+.contract-workspace-actions [value="approve-generate"]{background:#6479df;color:white;border-color:#92a1ff}
 @media(max-width:600px){.case-tabs{gap:5px}.case-tabs button{padding:9px 12px;font-size:13px}}
