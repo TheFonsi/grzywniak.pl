@@ -92,6 +92,13 @@ try:
     assert 'pełnego wynagrodzenia' in saved_facts['rightsTerms'] and 'zawarte w cenie' in saved_facts['ipPayment']
     code,pdf=request('/api/contract.php?session='+sid+'&format=pdf');assert code==200 and pdf.startswith(b'%PDF-')
     before_preview=json.loads(request('/api/contract.php?session='+sid)[1])['contract']
+    change_offer="require 'api/bootstrap.php'; $s=readSession('"+sid+"'); $s['offer']['version']=4; $s['offer']['offerId']='OF-NEW-TEST'; writeSession($s);"
+    subprocess.run(['php','-r',change_offer],cwd=work,env=env,check=True)
+    code,stale_editor=request('/api/contract.php?session='+sid+'&format=editor');assert code==200
+    assert b'data-contract-outdated' in stale_editor and b'OF-NEW-TEST' in stale_editor and b'data-contract-reprepare' in stale_editor
+    assert json.loads(request('/api/contract.php?session='+sid)[1])['contract']==before_preview,'Mismatch notice must not regenerate or mutate saved contract'
+    restore_offer="require 'api/bootstrap.php'; $s=readSession('"+sid+"'); $s['offer']['version']=3; unset($s['offer']['offerId']); writeSession($s);"
+    subprocess.run(['php','-r',restore_offer],cwd=work,env=env,check=True)
     code,preview=request('/api/contract.php?session='+sid+'&format=layout-preview&inline=1');assert code==200 and b'/BaseFont /Times-Roman' in preview
     assert json.loads(request('/api/contract.php?session='+sid)[1])['contract']==before_preview,'Visual preview must not change saved bytes, package approval or history'
     assert request('/api/contract.php',body)[0]==409
