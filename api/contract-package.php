@@ -196,7 +196,7 @@ function contractPackageIntegrity(array $c): bool {
 function contractPackageApproved(array $c): bool {
     return contractPackageIntegrity($c)&&($c['package']['legalReview']['packageHash']??'')===$c['package']['hash']&&($c['package']['legalReview']['pdfSha256']??'')===$c['package']['pdfSha256'];
 }
-function contractPackageEditor(array $c,string $id): string {
+function contractPackageEditor(array $c,string $id,array $session=[]): string {
     $e='contractEscape'; $html='<h4>Pakiet dokumentów i załączników</h4><p class="muted">Zakres i wykaz praw są obowiązkowe. Pozostałe moduły wynikają z ustaleń. AI nie określa statusu klienta ani nie dopisuje zgód. Sprawdzenie danych nie zastępuje weryfikacji prawnej.</p>';
     $group=null; $names=['general'=>'Charakter umowy, odbiór i prawa','hosting'=>'Hosting, kopie i przekazanie','domain_purchase'=>'Zakup i obsługa domeny klienta','consumer'=>'Ochrona klienta i odstąpienie','dpa'=>'Powierzenie danych osobowych'];
     foreach(contractPackageFields() as $key=>$field) {
@@ -214,7 +214,7 @@ function contractPackageEditor(array $c,string $id): string {
             if($value!==''&&!$numeric) $html.='<small>Poprzedni zapis: '.$e($value).'. Wskaż samą liczbę dni.</small>';
         }
         elseif(isset($field['options'])) { $html.='<select name="'.$key.'">'; foreach($field['options'] as $option=>$label) $html.='<option value="'.$e($option).'"'.($value===$option?' selected':'').'>'.$e($label).'</option>'; $html.='</select>'; }
-        else $html.='<textarea name="'.$key.'" data-contract-suggestions="'.$e(json_encode(contractFieldSuggestions($key),JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR)).'"'.(in_array($key,['rightsInventory','processingSubprocessors'],true)?' data-contract-inventory':'').' rows="'.(!empty($field['long'])?5:2).'" maxlength="20000">'.$e($value).'</textarea>';
+        else $html.='<textarea name="'.$key.'" data-contract-suggestions="'.$e(json_encode($session?contractContextSuggestions($key,$session,$c['facts']??[]):array_filter(contractFieldSuggestions($key),static fn($text)=>!preg_match('/\[DO (?:UZUPEŁNIENIA|UZGODNIENIA)/iu',$text)),JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR)).'"'.(in_array($key,['rightsInventory','processingSubprocessors'],true)?' data-contract-inventory':'').' rows="'.(!empty($field['long'])?5:2).'" maxlength="20000">'.$e($value).'</textarea>';
         $html.='</label>';
     }
     return $html.'</fieldset><p class="muted">W wykazie praw uwzględnij również biblioteki, wcześniejsze komponenty, materiały klienta i elementy AI. Sprawdź prawo użycia i modyfikacji przez przyszły zespół utrzymania. W wykazie powierzenia wpisz faktycznych dostawców mających dostęp do danych.</p>';

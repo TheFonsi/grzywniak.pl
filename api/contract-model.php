@@ -53,6 +53,8 @@ function contractEditor(array $session): string {
     $values = is_array($saved) ? $saved : $defaults;
     $briefProposal=contractBriefProposal($session,is_array($saved)?($saved['facts']??[]):[]);
     $editorFacts=is_array($saved)?($saved['facts']??[]):$briefProposal['facts'];
+    $draftCompleted=false;
+    if(is_array($saved)&&contractDraftLayoutAllowed($session,$saved)) {$completedFacts=contractCompleteDraftFacts($session,$profile,$editorFacts);$draftCompleted=$completedFacts!==$editorFacts;$editorFacts=$completedFacts;}
     if(!$saved) {$prepared=contractPreparedProposal($session,$profile,$template,['facts'=>$editorFacts]);$values=array_replace($defaults,$prepared['fields']);$editorFacts=$prepared['facts'];}
     $e = 'contractEscape'; $id=$e($session['id']);
     $contractUrl=apiPath('contract.php');
@@ -77,7 +79,8 @@ function contractEditor(array $session): string {
         else $html.='<input name="'.$key.'" maxlength="2000" value="'.$e($value).'"'.($key==='contractDate'?' type="date"':'').'>';
         $html.='</label>';
     }
-    $html.=contractPackageEditor(['facts'=>$editorFacts],$session['id']);
+    if($draftCompleted) $html.='<p class="muted">Puste i niekompletne pola szkicu uzupełniono gotowymi zapisami z oferty i standardu realizacji. Przejrzyj całość i zatwierdź; zapis utworzy nową wersję umowy.</p>';
+    $html.=contractPackageEditor(['facts'=>$editorFacts],$session['id'],$session);
     $html.='<p class="muted">Moment przeniesienia praw i wynagrodzenie za IP są pobierane z ustawień wzoru. Zapisana umowa zachowuje własne warunki.</p>';
     $html.='<div><button class="button" name="contract_action" value="ai-fill" formnovalidate>Uzupełnij dane projektu AI</button></div><div data-ai-feedback role="status"></div>';
     $html.=contractCommercialEditor($commercial,$saved??[],$session['id']);

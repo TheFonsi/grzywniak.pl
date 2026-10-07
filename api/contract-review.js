@@ -134,7 +134,7 @@
         if(Object.keys(examples).length) {
           const box=document.createElement('details');box.dataset.fieldSuggestions='';box.style.cssText='margin:12px 0;padding:12px;border:1px solid #40516b;border-radius:8px';
           const heading=document.createElement('summary');heading.textContent='Gotowe propozycje';heading.style.cursor='pointer';box.append(heading);
-          const note=document.createElement('p');note.textContent='Wybierz wariant, dopasuj treść i uzupełnij oznaczone miejsca. Propozycja wymaga osobnej akceptacji.';box.append(note);
+          const note=document.createElement('p');note.textContent='Opcjonalny wariant do zastąpienia obecnego zapisu. Przejrzyj treść; możesz zatwierdzić ją razem z całą umową.';box.append(note);
           const select=document.createElement('select');select.setAttribute('aria-label','Propozycja: '+label.firstChild.textContent);select.style.cssText='width:100%;margin-bottom:10px';
           for(const [title,value] of Object.entries(examples)) {const option=document.createElement('option');option.value=title;option.textContent=title;select.append(option);}
           const preview=document.createElement('p');preview.style.cssText='white-space:pre-wrap;max-height:180px;overflow:auto;font-size:13px';

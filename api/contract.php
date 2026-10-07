@@ -156,6 +156,7 @@ if($action==='ai-fill') {
         foreach(['clientAddress','clientTaxId','clientRepresentative','clientType','dataRole','publicationDestination','productionDomain','domainRegistrar','domainOwnershipTerms','productionHosting','serverTarget','backupResponsibility','dnsTlsResponsibility','consumerDocuments','dataProcessingTerms','ipMode','signing','contractDate'] as $key) $result['facts'][$key]=$facts[$key];
         foreach($facts as $key=>$value) if($value!=='' && !($key==='rightsTerms'&&$facts['ipMode']==='')) $result['facts'][$key]=$value;
         foreach(contractPackageFields() as $key=>$field) $result['facts'][$key]=$facts[$key];
+        $result['facts']=contractCompleteDraftFacts($s,contractProfile(),$result['facts']);
         $result['facts']=contractReadFacts($result['facts'],$s['contract']['facts']??[],$template);
         foreach($accepted as $key=>$value) { if(array_key_exists($key,$result['fields'])) $result['fields'][$key]=$value; elseif(array_key_exists($key,$result['facts'])) $result['facts'][$key]=$value; }
         $latest=readSession($id);

@@ -1,10 +1,44 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__.'/offer-defaults.php';
+
+function contractDraftValueMissing(mixed $value):bool {
+    return trim((string)$value)===''||preg_match('/\[DO (?:UZUPEŁNIENIA|UZGODNIENIA)(?::|\])|^(?:do ustalenia|wybierz)$/iu',trim((string)$value))===1;
+}
+
+/** Complete draft proposals; never write or approve a document on opening it. */
+function contractCompleteDraftFacts(array $session,array $profile,array $facts):array {
+    $offer=$session['offer']??[];
+    $defaults=offerAgreementDefaultPackage($session,$offer);
+    // Do not silently choose publication, IP mode or data roles for an accepted offer.
+    $allowed=['acceptanceCriteria','acceptanceDays','cooperationTerms','privacyRetention'];
+    $defaults['privacyRetention']=$profile['privacyRetention']??'';
+    if(contractDraftValueMissing($defaults['privacyRetention'])) $defaults['privacyRetention']='Dane umowne przechowujemy przez okres niezbędny do wykonania umowy, rozliczeń i dochodzenia roszczeń, a dokumenty księgowe przez okres wymagany przepisami. Nie przechowujemy zbędnych kopii. Dane reprezentantów otrzymujemy od klienta w toku zawierania i realizacji umowy.';
+    foreach($allowed as $key) if(contractDraftValueMissing($facts[$key]??'')) {
+        $agreed=$offer['agreement'][$key]??'';
+        $facts[$key]=!contractDraftValueMissing($agreed)?$agreed:$defaults[$key];
+    }
+    if(empty($facts['obligationKind'])) $facts['obligationKind']=in_array($facts['publicationDestination']??'',['agency','agency_purchase'],true)?'mixed':'result';
+    foreach(['legalStatusBasis','rightsInventory','privacyRecipients','processingLocations','processingSubprocessors'] as $key) if(contractDraftValueMissing($facts[$key]??'')) {
+        $known=$session['projectState'][$key]??$profile[$key]??'';
+        if(!contractDraftValueMissing($known)) $facts[$key]=$known;
+    }
+    return $facts;
+}
+
+function contractContextSuggestions(string $key,array $session,array $facts):array {
+    $complete=contractCompleteDraftFacts($session,[],[]);
+    $suggestions=[];
+    if(in_array($key,['acceptanceCriteria','acceptanceDays','cooperationTerms','privacyRetention'],true)&&!contractDraftValueMissing($complete[$key]??'')) $suggestions['Zapis na podstawie oferty i standardu realizacji']=$complete[$key];
+    foreach(contractFieldSuggestions($key) as $title=>$value) if(!contractDraftValueMissing($value)) $suggestions[$title]=$value;
+    return $suggestions;
+}
 
 function contractPreparedProposal(array $session,array $profile,array $template,array $current=[]):array {
     $offer=$session['offer']??[];$snapshot=contractCommercialSnapshot($session);
     $facts=is_array($current['facts']??null)?$current['facts']:[];
     foreach($snapshot['agreement'] as $key=>$value) if(isset(contractFacts()[$key])) $facts[$key]=$value;
+    $facts=contractCompleteDraftFacts($session,$profile,$facts);
     $state=$session['projectState']??[];$contact=$offer['contact']??[];
     foreach(['clientAddress'=>['contactAddress','address'],'clientTaxId'=>['contactTaxId','taxId'],'clientRepresentative'=>['contactRepresentative','representative']] as $key=>[$source,$contactKey]) {
         if(trim((string)($facts[$key]??''))==='') $facts[$key]=(string)($contact[$contactKey]??$state[$source]??'');
