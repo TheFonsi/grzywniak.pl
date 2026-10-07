@@ -504,7 +504,7 @@ register_shutdown_function(static function(): void {
     };
     box.append(title, hint, button, feedback, result);
     brief.after(box);
-    const contractBox = document.createElement('div'); box.before(contractBox);
+    const contractBox = document.createElement('div'); contractBox.dataset.contractHost = '1'; box.before(contractBox);
     fetch('/api/contract.php?session=' + encodeURIComponent(id) + '&format=editor').then(async response => { if (!response.ok) throw new Error('contract'); contractBox.innerHTML = await response.text(); window.contractReview.init(contractBox.querySelector('form.contract-form')); if (location.hash === '#contract-panel') contractBox.scrollIntoView(); }).catch(() => { contractBox.textContent = 'Nie udało się wczytać umowy. Odśwież panel.'; });
     // Enable the offer action immediately when there are no unresolved items.
     refreshOfferEligibility(root);
@@ -620,7 +620,7 @@ register_shutdown_function(static function(): void {
     root.dataset.missingProcessed = '1';
     refreshOfferEligibility(root);
   };
-  const ensureAgreedBeforeConversation = (root) => { const headings = [...root.querySelectorAll('h3')]; const agreed = headings.find((node) => node.textContent.trim() === 'Co ustalono'); const conversation = headings.find((node) => node.textContent.trim() === 'Rozmowa'); if (!agreed || !conversation) return; const grid = agreed.nextElementSibling; const anchor = conversation.parentElement; anchor.parentNode.insertBefore(agreed, anchor); if (grid) anchor.parentNode.insertBefore(grid, anchor); const offer = root.querySelector('[data-visible-offer]'); const analysisSection = root.querySelector('section.analysis'); if (offer && analysisSection && analysisSection.parentNode) analysisSection.parentNode.insertBefore(offer, analysisSection); };
+  const ensureAgreedBeforeConversation = (root) => { if (root.querySelector('[data-case-tab-panel]')) return; const headings = [...root.querySelectorAll('h3')]; const agreed = headings.find((node) => node.textContent.trim() === 'Co ustalono'); const conversation = headings.find((node) => node.textContent.trim() === 'Rozmowa'); if (!agreed || !conversation) return; const grid = agreed.nextElementSibling; const anchor = conversation.parentElement; anchor.parentNode.insertBefore(agreed, anchor); if (grid) anchor.parentNode.insertBefore(grid, anchor); const offer = root.querySelector('[data-visible-offer]'); const analysisSection = root.querySelector('section.analysis'); if (offer && analysisSection && analysisSection.parentNode) analysisSection.parentNode.insertBefore(offer, analysisSection); };
   const ensureRiskFlagsVisible = (root) => { if ([...root.querySelectorAll('h3')].some((node) => node.textContent.trim() === 'Flagi ryzyka')) return; const analysisSection = root.querySelector('section.analysis'); if (!analysisSection || !analysisSection.parentNode) return; const box = document.createElement('section'); box.style.cssText = 'margin:18px 0;padding:14px;border:1px solid #29313c;border-radius:12px;background:#11151d'; const title = document.createElement('h3'); title.textContent = 'Flagi ryzyka'; title.style.margin = '0 0 7px'; const text = document.createElement('p'); text.className = 'muted'; text.textContent = 'Brak wykrytych flag.'; box.append(title, text); analysisSection.parentNode.insertBefore(box, analysisSection); };
   const addWorkflowStatus = (root) => {
     const top = root.querySelector('.topline'); if (!top || top.querySelector('[data-workflow-status]')) return;
@@ -680,6 +680,7 @@ register_shutdown_function(static function(): void {
       ensureAgreedBeforeConversation(next);
       ensureRiskFlagsVisible(next);
       current.replaceWith(next);
+      window.adminDetailTabs?.init(next);
       markCurrent(url);
     } catch {
       location.assign(url);
@@ -753,7 +754,8 @@ HTML;
     $html = str_replace('</head>', '<style>.contract-form [hidden]{display:none}.contract-form [data-review-field]{padding:14px;border:1px solid #465474;border-radius:10px;background:#101725}.contract-form [data-review-field][data-accepted="1"]{border-color:#3eaf73}.contract-form [data-review-status]{display:inline-block;margin:10px 12px 0 0;color:#d5c48b}.contract-form [data-review-field][data-accepted="1"] [data-review-status]{color:#88d7ab}.contract-form [data-review-field] button{margin-right:8px}.contract-form [data-review-preview]{overflow-wrap:anywhere}</style></head>', $html);
     $html = str_replace('</head>', '<meta name="admin-csrf" content="'.contractEscape(contractToken()).'">'.adminShellStyles().'</head>', $html);
     $html = str_replace('<body>', '<body>'.adminShellHeader('briefs'), $html);
-    echo apiRewritePaths(str_replace('</body>', '<script src="/api/contract-review.js"></script><script src="/api/offer-agreement.js"></script><script src="/api/offer-scope.js"></script>'.$script . '</body>', $html === false ? '' : $html));
+    $html = str_replace('</head>', '<link rel="stylesheet" href="/api/admin-detail-tabs.css"></head>', $html);
+    echo apiRewritePaths(str_replace('</body>', '<script src="/api/contract-review.js"></script><script src="/api/offer-agreement.js"></script><script src="/api/offer-scope.js"></script>'.$script . '<script src="/api/admin-detail-tabs.js"></script></body>', $html === false ? '' : $html));
 });
 function statusLabel(string $status,int $updatedAt=0):string{if(in_array($status,['STARTED','DISCOVERY','NEEDS_INFORMATION'],true)&&$updatedAt>0&&$updatedAt<time()-86400)return'Rozmowa przerwana';return match($status){'STARTED'=>'Nowa rozmowa','DISCOVERY'=>'W trakcie rozmowy','NEEDS_INFORMATION'=>'Czekamy na informacje','READY_FOR_SUMMARY'=>'Gotowe do przekazania','COMPLETED'=>'Brief przekazany','CLOSED'=>'Rozmowa zakończona',default=>$status?:'Nowa rozmowa'};}
 function riskLabel(string $risk): string { return match($risk){'PERSONAL_DATA'=>'Dane osobowe','SENSITIVE_DATA'=>'Dane wrażliwe','PAYMENTS'=>'Płatności online','MEDICAL'=>'Dane medyczne','FINANCIAL'=>'Dane finansowe','LEGAL'=>'Wymogi prawne','HIGH_SECURITY'=>'Podwyższone wymagania bezpieczeństwa','EXTERNAL_INTEGRATION'=>'Połączenie z zewnętrznymi usługami','DATA_MIGRATION'=>'Przeniesienie danych','LARGE_SCALE'=>'Duża skala rozwiązania','UNCLEAR_SCOPE'=>'Zakres wymaga doprecyzowania','UNREALISTIC_BUDGET'=>'Budżet może wymagać weryfikacji','UNREALISTIC_DEADLINE'=>'Termin może wymagać weryfikacji',default=>$risk}; }

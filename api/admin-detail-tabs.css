@@ -1,0 +1,9 @@
+.case-tabs{display:flex;gap:6px;overflow-x:auto;padding:10px 0 12px;margin:16px 0;border-bottom:1px solid #35415a;scrollbar-width:thin}
+.case-tabs button{flex:0 0 auto;border:1px solid #3b4762;border-radius:9px;background:#11192b;color:#bcc8df;font:inherit;font-size:14px;padding:10px 16px;cursor:pointer}
+.case-tabs button:hover{border-color:#8a9aff;color:#fff}
+.case-tabs button[aria-selected="true"]{background:#293b76;border-color:#899aff;color:#fff;font-weight:600;box-shadow:inset 0 -2px #aab5ff}
+.case-tabs button:focus-visible,.case-tab-panel:focus-visible{outline:2px solid #aab5ff;outline-offset:3px}
+.case-tab-panel[hidden]{display:none!important}
+.case-tab-panel{min-width:0;padding:4px 0 12px;overflow-wrap:anywhere}
+.case-tab-panel>.conversation-contract{margin-top:0}
+@media(max-width:600px){.case-tabs{gap:5px}.case-tabs button{padding:9px 12px;font-size:13px}}
