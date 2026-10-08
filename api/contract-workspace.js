@@ -42,6 +42,8 @@
       const target=parties.has(key)?'parties':scope.has(key)?'scope':publication.has(key)||['hosting','domain_purchase'].includes(module)?'publication':'rights';
       panes.get(target).append(card);
     }
+    // Field cards now live in tabs; their empty module wrappers must not reappear on refresh.
+    form.querySelectorAll('fieldset[data-contract-module]').forEach(fieldset=>{if(!fieldset.querySelector('input,textarea,select'))fieldset.remove();});
     for(const node of [...form.children]){
       if(node.matches('input[type="hidden"]'))continue;
       if(node.matches('[data-commercial-panel]'))summary.append(node);

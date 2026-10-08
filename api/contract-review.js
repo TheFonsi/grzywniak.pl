@@ -1,7 +1,7 @@
 (() => {
   const optional = new Set(['clientTaxId', 'paymentDetails', 'domainRegistrar', 'serverTarget','consumerDocuments','dataProcessingTerms','customClauses']);
   const unresolved = value => /\[DO (UZUPEŁNIENIA|UZGODNIENIA):/iu.test(value);
-  const read = form => { try { return JSON.parse(form.elements.reviewState.value) || {}; } catch { return {}; } };
+  const read = form => { try { const state=JSON.parse(form.elements.reviewState.value); return state && typeof state==='object' && !Array.isArray(state) ? state : {}; } catch { return {}; } };
   const write = (form, state) => { form.elements.reviewState.value = JSON.stringify(state); };
   function inventoryEditor(input,card) {
     const rights=input.name==='rightsInventory';
